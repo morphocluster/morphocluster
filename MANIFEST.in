@@ -1,0 +1,2 @@
+graft cluster_labeling/templates
+graft cluster_labeling/static

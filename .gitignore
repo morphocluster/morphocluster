@@ -1,0 +1,8 @@
+*.pyc
+.DS_Store
+env
+venv
+.pydevproject
+.project
+*.egg-info/
+*.db
