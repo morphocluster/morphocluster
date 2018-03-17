@@ -7,6 +7,9 @@ setup(
     install_requires=[
         'flask',
         'flask_restful',
-        'psycopg2-binary'
+        'psycopg2-binary',
+        'pandas',
+        'sqlalchemy',
+        'etaprogress'
     ],
 )
