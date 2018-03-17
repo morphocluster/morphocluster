@@ -10,6 +10,8 @@ setup(
         'psycopg2-binary',
         'pandas',
         'sqlalchemy',
-        'etaprogress'
+        'etaprogress',
+        'tables',
+        'scikit-learn'
     ],
 )
