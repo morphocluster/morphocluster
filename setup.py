@@ -12,6 +12,7 @@ setup(
         'sqlalchemy',
         'etaprogress',
         'tables',
-        'scikit-learn'
+        'scikit-learn',
+        'scipy'
     ],
 )
