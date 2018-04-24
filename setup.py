@@ -6,13 +6,14 @@ setup(
     include_package_data=True,
     install_requires=[
         'flask',
-        'flask_restful',
         'psycopg2-binary',
         'pandas',
         'sqlalchemy',
         'etaprogress',
         'tables',
         'scikit-learn',
-        'scipy'
+        'scipy',
+        'redis',
+        'hiredis'
     ],
 )
