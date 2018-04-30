@@ -10,10 +10,11 @@ setup(
         'pandas',
         'sqlalchemy',
         'etaprogress',
-        'tables',
+        'h5py',
         'scikit-learn',
         'scipy',
         'redis',
-        'hiredis'
+        'hiredis',
+        'flask-restful'
     ],
 )
