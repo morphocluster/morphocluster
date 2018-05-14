@@ -10,3 +10,4 @@ activate
 *.err
 *.log
 *.pid
+.settings/*
