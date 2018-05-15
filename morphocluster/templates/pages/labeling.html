@@ -1,0 +1,136 @@
+{% extends 'layouts/main.html' %}
+{% block title %}MorphoCluster{% endblock %}
+
+{% block head_last %}
+<link rel="stylesheet" href="/static/jstree/themes/default/style.min.css" />
+<link rel="stylesheet" href="/static/css/labeling.css" />
+  <link rel="stylesheet" href="/static/jquery-ui/jquery-ui.min.css">
+{% endblock %}
+
+{% block content %}
+<div id="grid">
+	<div id="tree-header" class="bg-light px-1">
+		 <form class="form-inline" autocomplete="off">
+			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-deepest-node"
+				title="Go to the deepest node">
+				<i class="mdi mdi-chevron-double-right"></i>
+			</button>
+		</form>
+	</div>
+	<div id="node-header" class="bg-light px-1">
+		<form class="form-inline" autocomplete="off">
+			This Node:
+			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-merge-into-parent"
+				title="The children of this node are too diverse. Move all of them to the parent.">
+				<i class="mdi mdi-call-merge"></i>Merge into parent
+			</button>
+			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-recommend">
+				<i class="mdi mdi-comment-check-outline"></i>Recommend Members
+			</button>
+			<span class="ml-2 mr-2">|</span>
+			Its Members:
+			<button type="button" class="btn btn-secondary disabled btn-sm ml-2" id="btn-group-selected">
+				<i class="mdi mdi-basket-fill"></i>Create umbrella term
+			</button>
+			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-classify-members">
+				<i class="mdi mdi-auto-fix"></i>Classify into starred members.
+			</button>
+		</form>
+	</div>
+	<div id="recommend-header" class="bg-light px-1">
+		<form class="form-inline" autocomplete="off">
+			<button type="button" class="btn btn-secondary btn-sm ml-2 mr-2" id="btn-rec-add">
+				<i class="mdi mdi-check-all"></i>Add selected
+			</button>
+			<button type="button" class="btn btn-secondary btn-sm ml-2 mr-2" id="btn-rec-reload">
+				<i class="mdi mdi-reload"></i>Reload
+			</button>
+		</form>
+	</div>
+	
+	<div id="tree-pane" class="px-1"></div>
+	<div id="node-pane" class="px-1"></div>
+	<div id="recommend-pane" class="px-1"></div>
+	
+	<div id="tree-status" class="bg-light px-1"></div>
+	<div id="node-status" class="bg-light px-1"></div>
+	<div id="recommend-status" class="bg-light px-1"></div>
+</div>
+{% endblock %}
+
+{% block body_last %}
+<div id="dialog-umbrella" style="display: none;">
+<form autocomplete="off">
+  <div class="form-group">
+    <label for="dialog-umbrella-input-term">Umbrella term for the selected members:</label>
+    <input type="text" class="form-control" id="dialog-umbrella-input-term" placeholder="Umbrella term" autocomplete="off">
+  </div>
+  <button type="submit" class="btn btn-primary pull-right">Submit</button>
+</form>
+</div>
+<script src="/static/jstree/jstree.min.js"></script>
+<script src="/static/js/jsrender.min.js"></script>
+<script src="/static/jquery-ui/jquery-ui.min.js"></script>
+
+<script src="/static/js/labeling.js" defer></script>
+
+{% raw %}
+<script type="text/html" id="node-preview-template">
+<div class="card member member-node">
+	<div class="member-headline">
+  		<div class="member-title"><i class="{{:icon}}"></i>{{:text}}</div>
+  		<div class="member-controls"></div>
+	</div>
+	<div class="images img-9">
+	</div>
+</div>
+</script>
+<script type="text/html" id="obj-preview-template">
+<div class="card member member-object">
+	<div class="member-headline">
+  		<div class="member-title" title="{{:object_id}}">{{:object_id}}</div>
+		<div class="member-controls"></div>
+	</div>
+	<div class="images img-1">
+		<img src="/get_obj_image/{{:object_id}}" class="show-tt-fullsize" />
+	</div>
+</div>
+</script>
+<script type="text/html" id="objects-children-template">
+<div class="card member">
+	<div class="member-headline">
+  		<div class="member-title" title="{{:title}}">{{:title}}</div>
+	</div>
+	<div class="images img-1">
+		<img src="/get_obj_image/{{:object_id}}" class="show-tt-fullsize" />
+	</div>
+</div>
+</script>
+<script type="text/html" id="node-template">
+<div class="pane-header">
+	<h1><i class="{{:icon}}"></i>{{:text}}</h1>
+	<form id="node-userdata" autocomplete="off">
+		<div class="form-group row">
+			<label for="node-name" class="col-sm-1 col-form-label">Name</label>
+			<div class="col-sm-11"><input name="name" id="node-name" value="{{:name}}" class="form-control" type="text" autocomplete="off" /></div>
+		</div>
+		<div class="form-group row">
+			<label for="node-starred" class="col-sm-1 col-form-label">Starred</label>
+			<div class="col-sm-11"><input name="starred" id="node-starred" class="form-check" type="checkbox" autocomplete="off" /></div>
+		</div>
+		<div class="form-group row">
+			<div class="col-sm-1 col-form-label"></div>
+			<div class="col-sm-11"><button type="submit" class="btn btn-primary">Save</button></div>
+		</div>
+	</form>
+	{{:recursive_n_objects}} objects below this node (total).
+</div>
+</script>
+{% endraw %}
+
+<script defer>
+	$(function () {
+		init_tree();
+	});
+</script>
+{% endblock %}

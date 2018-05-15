@@ -1,0 +1,11 @@
+{% extends 'layouts/main.html' %}
+{% block title %}MorphoCluster{% endblock %}
+{% block content %}
+	Some content
+    
+    <ul>
+	{% for project in projects %}
+		<li><a href="{{ url_for("labeling", project_id=project)}}">{{ project }}</a></li>
+	{% endfor %}
+	</ul>
+{% endblock %}

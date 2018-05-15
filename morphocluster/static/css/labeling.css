@@ -1,0 +1,150 @@
+@charset "UTF-8";
+
+#content {
+	flex-grow: 1;
+	overflow: hidden;
+}
+
+#grid {
+	display: grid;
+	grid-template-rows: auto 1fr auto;
+	height: 100%;
+	grid-template-columns: 300px 1fr auto;
+	grid-template-areas: "thead nhead rhead" "tree node recommend" "tstat nstat rstat";
+}
+
+#tree-header {
+	grid-area: thead;
+}
+
+#node-header {
+	grid-area: nhead;
+}
+
+#recommend-header {
+	grid-area: rhead;
+}
+
+#tree-pane {
+	overflow: auto;
+	grid-area: tree;
+}
+
+#node-pane {
+	grid-area: node;
+}
+
+#recommend-pane {
+	grid-area: recommend;
+}
+
+#tree-status {
+	overflow: auto;
+	grid-area: tstat;
+}
+
+#node-status {
+	grid-area: nstat;
+}
+
+#recommend-status {
+	grid-area: rstat;
+}
+
+
+#node-pane, #recommend-pane {
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+#recommend-header,#recommend-pane,#recommend-status {
+	display: none;
+}
+
+.square {
+	position: relative;
+}
+
+.square:before {
+	content: "";
+	display: block;
+	padding-top: 100%; /* initial ratio of 1:1*/
+}
+
+.square-content {
+	position: absolute;
+	top: 0;
+	left: 0;
+	bottom: 0;
+	right: 0;
+}
+
+.member {
+	margin-bottom: 15px;
+}
+
+.member .images {
+	background-color: white;
+}
+
+.member-headline {
+	border-top-right-radius: calc(.25rem - 1px);
+	border-top-left-radius: calc(.25rem - 1px);
+	padding-top: 3px;
+	height: auto;
+	display: flex;
+}
+
+.member-node {
+	background-color: #fdbf6f;
+}
+
+.member-node.highlight {
+	background-color: #ff7f00;
+}
+
+.member-object {
+	background-color: #a6cee3;
+}
+
+.member-object.highlight {
+	background-color: #1f78b4;
+}
+
+.card .member-title {
+	text-overflow: ellipsis;
+	flex-grow: 1;
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+.member .member-controls {
+	flex-shrink: 0;
+}
+
+.member-controls i {
+	cursor: pointer;
+}
+
+.member .img-9 img {
+	width: 33.333333%;
+}
+
+.member .img-1 img {
+	max-width: 100%;
+	width: unset;
+	max-height: 150px;
+	margin: 0 auto;
+	display: block;
+}
+
+img.tt-fullsize {
+	min-height: 150px;
+	min-width: 150px;
+	max-width: 100%;
+}
+
+.member.ui-draggable-dragging {
+    opacity: 0.5;
+    filter: alpha(opacity=50); /* For IE8 and earlier */
+}
