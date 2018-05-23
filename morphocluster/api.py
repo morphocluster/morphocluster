@@ -12,7 +12,6 @@ from flask import jsonify, request
 from flask.blueprints import Blueprint
 from sklearn.manifold.isomap import Isomap
 
-from morphocluster.database import engine
 from morphocluster.tree import Tree
 from urllib.parse import urlencode
 import warnings
@@ -25,7 +24,8 @@ import uuid
 import zlib
 from redis.exceptions import RedisError
 from morphocluster import models
-from pprint import pprint
+from morphocluster.extensions import database, redis_store
+
 
 api = Blueprint("api", __name__)
 
@@ -45,9 +45,6 @@ def log(connection, action, node_id = None, reverse_action = None):
 @api.record
 def record(state):
     api.config = state.app.config
-    api.redis_pool = redis.ConnectionPool(host=api.config["REDIS_HOST"],
-                                          port=api.config["REDIS_PORT"],
-                                          db=api.config["REDIS_DB"])
 
 @api.after_request
 def no_cache_header(response):
@@ -83,7 +80,7 @@ def _tree_node(node):
 
 @api.route("/tree", methods=["GET"])
 def get_tree_root():
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
         result = [_tree_root(p) for p in tree.get_projects()]
         
@@ -91,7 +88,7 @@ def get_tree_root():
     
 @api.route("/tree/<int:node_id>", methods=["GET"])
 def get_subtree(node_id):
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
         
         children = tree.get_children(node_id, order_by="n_children DESC")
@@ -109,14 +106,14 @@ def get_subtree(node_id):
 
 @api.route("/projects", methods=["GET"])
 def get_projects():
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
         return jsonify(tree.get_projects())
     
     
 @api.route("/projects/<int:project_id>/", methods=["GET"])
 def get_project(project_id):
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
         log(connection, "get_project({})".format(project_id))
         return jsonify(_project(tree.get_project(project_id)))
@@ -137,7 +134,7 @@ def create_node():
         starred
     """
     
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
         data = request.get_json()
         
@@ -215,7 +212,7 @@ def node_children(node_id):
             - icon: Icon for the node
             - n_children: number of children
     """
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
         
         flags = {k: request.args.get(k, 0) for k in ("include_children")}
@@ -257,7 +254,7 @@ def get_node_objects(node_id):
     Returns:
         List of objids
     """
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
     
         objects = tree.get_objects(node_id)
@@ -350,11 +347,10 @@ def cache_serialize_page(func, page_size = 100, compress = True):
                                       request_id)
         
         try:
-            r = redis.StrictRedis(connection_pool = api.redis_pool)
-            page_result = r.lindex(cache_key, page)
+            page_result = redis_store.lindex(cache_key, page)
         
             if page_result is not None:
-                n_pages = r.llen(cache_key)
+                n_pages = redis_store.llen(cache_key)
                 
                 if compress:
                     page_result = zlib.decompress(page_result)
@@ -387,7 +383,7 @@ def cache_serialize_page(func, page_size = 100, compress = True):
                 cache_pages = pages
                 
             try:
-                r.rpush(cache_key, *cache_pages)
+                redis_store.rpush(cache_key, *cache_pages)
             except RedisError as e:
                 warnings.warn("RedisError: {}".format(e))
         
@@ -401,7 +397,7 @@ def cache_serialize_page(func, page_size = 100, compress = True):
     
 @cache_serialize_page
 def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", starred_first = False):
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
         
         sorted_nodes_include = "unstarred" if starred_first else None
@@ -513,7 +509,7 @@ def post_node_members(node_id):
     print("new nodes:", node_ids)
     print("new objects:", object_ids)
     
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
 
         with connection.begin():
@@ -525,7 +521,7 @@ def post_node_members(node_id):
 
 @api.route("/nodes/<int:node_id>", methods=["GET"])
 def get_node(node_id):    
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
         
         flags = {k: request.args.get(k, 0) for k in ("include_children",)}
@@ -543,7 +539,7 @@ def get_node(node_id):
     
 @api.route("/nodes/<int:node_id>", methods=["PATCH"])
 def patch_node(node_id):
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
         
         data = request.get_json()
@@ -565,7 +561,7 @@ def patch_node(node_id):
 
 @api.route("/nodes/<int:node_id>/recommended_children", methods=["GET"])
 def node_get_recommended_children(node_id):
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
     
         flags = {k: request.args.get(k, 0) for k in ("include_children",)}
@@ -575,7 +571,7 @@ def node_get_recommended_children(node_id):
 
 @api.route("/nodes/<int:node_id>/recommended_objects", methods=["GET"])
 def node_get_recommended_objects(node_id):
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
     
         result = [ _object(o) for o in tree.recommend_objects(node_id) ]
@@ -584,7 +580,7 @@ def node_get_recommended_objects(node_id):
     
 @api.route("/nodes/<int:node_id>/tip", methods=["GET"])
 def node_get_tip(node_id):
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
     
         return jsonify(tree.get_tip(node_id))
@@ -592,10 +588,10 @@ def node_get_tip(node_id):
     
 @api.route("/nodes/<int:node_id>/n_sorted", methods=["GET"])
 def node_get_n_sorted(node_id):
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
         
-        nodes = tree.get_minlevel_starred(node_id)
+        nodes = tree.get_minlevel_starred(node_id, expensive_values = True)
         
         n_sorted = sum(n["_recursive_n_objects"] for n in nodes)
         
@@ -613,7 +609,7 @@ def post_node_merge_into(node_id):
     Request parameters:
         dest_node_id: Node that absorbs the children and objects.
     """
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
         
         data = request.get_json()
@@ -633,7 +629,7 @@ def post_node_classify(node_id):
     Parameters:
         node_id: Parent of the classified members.
     """
-    with engine.connect() as connection:
+    with database.engine.connect() as connection:
         tree = Tree(connection)
         
         # Split children into starred and unstarred

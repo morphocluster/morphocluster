@@ -13,40 +13,23 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql.expression import bindparam
 from werkzeug import check_password_hash, generate_password_hash
 
-from morphocluster import database, models
+from morphocluster import models
 from morphocluster.api import api
-from morphocluster.database import engine
 from morphocluster.models import objects
 from morphocluster.tree import Tree
+from time import sleep
+from morphocluster.extensions import database, redis_store, migrate
 
 app = Flask(__name__)
+
+app.config.from_object('morphocluster.config_default')
+app.config.from_envvar('MORPHOCLUSTER_SETTINGS')
 app.config.from_object(__name__) # load config from this file , flaskr.py
 
-# Load default config and override config from an environment variable
-app.config.update(dict(
-    SECRET_KEY='RuetVarbyap8',
-    DATASET_PATH = "/data-ssd/mschroeder/NoveltyDetection/Dataset/",
-    #DATASET_PATH = "/data1/mschroeder/Downloads/CIF/10_unstained_brightfield_10/",
-    COLLECTION_FNS = ["collection_train.csv", "collection_unlabeled.csv"],
-    REDIS_HOST = "localhost",
-    REDIS_PORT = 6379,
-    REDIS_DB = 0,
-))
-
-feature_fns = [
-    "/data1/mschroeder/NoveltyDetection/Results/CrossVal/2018-01-26-11-54-41/n_features-32_split-0/collection_train_0_train.h5",
-    "/data1/mschroeder/NoveltyDetection/Results/CrossVal/2018-01-26-11-54-41/n_features-32_split-0/collection_train_0_val.h5",
-    "/data1/mschroeder/NoveltyDetection/Results/CrossVal/2018-01-26-11-54-41/n_features-32_split-0/collection_unlabeled.h5"
-]
-
-# Load projects
-project_paths = ["/data1/mschroeder/NoveltyDetection/Results/CV-Clustering/2018-02-08-12-55-06/min_cluster_size-30_split-1",
-                 "/data1/mschroeder/NoveltyDetection/Results/CV-Clustering/2018-02-08-12-55-06/min_cluster_size-20_split-0",
-                 "/data1/mschroeder/NoveltyDetection/Results/CV-Clustering/2018-02-08-12-55-06/min_cluster_size-10_split-1",
-                 "/data1/mschroeder/NoveltyDetection/Results/CV-Clustering/2018-02-08-12-55-06/min_cluster_size-5_split-1"]
-project_paths = {os.path.basename(os.path.normpath(ppth)): ppth for ppth in project_paths}
-
-PROJECT_ID = "min_cluster_size-20_split-0"
+# Initialize extensions
+database.init_app(app)
+redis_store.init_app(app)
+migrate.init_app(app, database)
 
 @app.cli.command()
 @click.option('--drop/--no-drop', default=False)
@@ -114,7 +97,7 @@ def load_features(features_fn):
 @app.cli.command()
 @click.argument('project_path')
 def load_project(project_path):
-    with engine.connect() as conn:
+    with database.engine.connect() as conn:
         tree = Tree(conn)
         
         name = os.path.basename(os.path.normpath(project_path))
@@ -144,7 +127,7 @@ def add_user(username):
     pwhash = generate_password_hash(password, method='pbkdf2:sha256:10000', salt_length=12)
     
     try:
-        with engine.connect() as conn:
+        with database.engine.connect() as conn:
             stmt = models.users.insert({"username": username, "pwhash": pwhash})
             conn.execute(stmt)
     except IntegrityError as e:
@@ -165,7 +148,7 @@ def change_user(username):
     pwhash = generate_password_hash(password, method='pbkdf2:sha256:10000', salt_length=12)
     
     try:
-        with engine.connect() as conn:
+        with database.engine.connect() as conn:
             stmt = models.users.insert({"username": username, "pwhash": pwhash})
             conn.execute(stmt)
     except IntegrityError as e:
@@ -174,10 +157,6 @@ def change_user(username):
     
 @app.route("/")
 def index():
-    #===========================================================================
-    # return render_template('pages/index.html',
-    #                        projects = sorted(project_paths))
-    #===========================================================================
     return redirect(url_for("labeling"))
 
 
@@ -188,7 +167,9 @@ def labeling():
 
 @app.route("/get_obj_image/<objid>")
 def get_obj_image(objid):
-    result = models.objects.select(models.objects.c.object_id == objid).execute().first()
+    with database.engine.connect() as conn:
+        stmt = models.objects.select(models.objects.c.object_id == objid)
+        result = conn.execute(stmt).first()
     
     if result is None:
         abort(404)
@@ -205,7 +186,7 @@ app.register_blueprint(api, url_prefix='/api')
 #===============================================================================
 def check_auth(username, password):
     # Retrieve entry from the database
-    with engine.connect() as conn:
+    with database.engine.connect() as conn:
         stmt = models.users.select(models.users.c.username == username).limit(1)
         user = conn.execute(stmt).first()
         
@@ -224,7 +205,13 @@ def require_auth():
     
     auth = request.authorization
     
-    if not auth or not check_auth(auth.username, auth.password):
+    success = check_auth(auth.username, auth.password) if auth else None
+    
+    if not auth or not success:
+        if success is False:
+            # Rate limiting for failed passwords
+            sleep(1)
+        
         # Send a 401 response that enables basic auth
         return Response(
             'Could not verify your access level.\n'

@@ -16,6 +16,9 @@ setup(
         'redis',
         'hiredis',
         'flask-restful',
-        'alembic'
+        'alembic',
+        'Flask-SQLAlchemy',
+        'flask-redis',
+        'Flask-Migrate',
     ],
 )

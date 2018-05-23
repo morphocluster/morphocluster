@@ -5,13 +5,15 @@ Created on 13.03.2018
 '''
 from sqlalchemy import Table, Column, ForeignKey, Index
 
-from morphocluster.database import metadata
 import datetime
 
 from sqlalchemy.types import Integer, BigInteger, String, DateTime, PickleType, Boolean, Text
 from sqlalchemy.sql.schema import UniqueConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.sql import func
+from morphocluster.extensions import database
+
+metadata = database.metadata
 
 #: :type objects: sqlalchemy.sql.schema.Table
 objects = Table('objects', metadata,
@@ -47,6 +49,9 @@ nodes = Table('nodes', metadata,
     Column('_own_type_objects', ARRAY(String), nullable = True),
     # Number of objects below this node
     Column('_recursive_n_objects', BigInteger, nullable = True),
+    
+    # Are the cached values valid?
+    Column('valid', Boolean, nullable = False, server_default = "FALSE"),
     
     # An orig_id must be unique inside a project
     Index('idx_orig_proj', 'orig_id', 'project_id', unique = True),

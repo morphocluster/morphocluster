@@ -5,11 +5,9 @@ Created on 13.03.2018
 '''
 from morphocluster.models import nodes, projects, nodes_objects, objects
 from sqlalchemy.sql import text
-from morphocluster.database import engine
 from sqlalchemy.sql.expression import select, join, column, alias, outerjoin, update
 import os
 import pandas as pd
-from morphocluster import database
 from etaprogress.progress import ProgressBar
 from sqlalchemy.sql.functions import coalesce, func
 from sqlalchemy.exc import SQLAlchemyError
@@ -19,6 +17,7 @@ import numpy as np
 import warnings
 from morphocluster.classifier import Classifier
 from sqlalchemy import func
+from morphocluster.extensions import database
 
 
 class TreeError(Exception):
@@ -283,41 +282,38 @@ class Tree(object):
     
     
     def _upgrade_node(self, node, expensive_values):
-        if expensive_values:
-            expensive_fields = ("_centroid", "_type_objects", "_own_type_objects", "_recursive_n_objects")
-            missing_fields = set(k for k in expensive_fields if node[k] is None)
+        if not expensive_values:
+            return node
+
+        if node["valid"]:
+            return node
+        
+        print("Upgrading node {}...".format(node["node_id"]))
+        
+        if node["n_children"] > 0:
+            children = self.get_children(node["node_id"], expensive_values = True)
+        else:
+            children = []
+        objects = self.get_objects(node["node_id"], limit = 1000)
+        
+        n_objects = self.get_n_objects(node["node_id"])
             
-            if len(missing_fields) == 0:
-                return node
+        node["_centroid"] = self._calc_centroid(children, objects)
+        if node["_centroid"] is None:
+            print("Node {} has no centroid!".format(node["node_id"]))
             
-            print("Upgrading node {} ({})...".format(node["node_id"], ",".join(missing_fields)))
-            
-            if node["n_children"] > 0:
-                children = self.get_children(node["node_id"], expensive_values = True)
-            else:
-                children = []
-            objects = self.get_objects(node["node_id"], limit = 1000)
-            
-            n_objects = self.get_n_objects(node["node_id"])
-                
-            if node["_centroid"] is None:
-                node["_centroid"] = self._calc_centroid(children, objects)
-                
-            if node["_centroid"] is None:
-                print("Node {} has no centroid!".format(node["node_id"]))
-                
-            if node["_own_type_objects"] is None:
-                node["_own_type_objects"] = self._calc_own_type_objects(children, objects)
-                
-            if node["_type_objects"] is None:
-                node["_type_objects"] = self._calc_type_objects(children, objects)
-                
-            if node["_recursive_n_objects"] is None:
-                node["_recursive_n_objects"] = self._calc_recursive_n_objects(children, n_objects)
-            
-            # Store these values
-            stmt = nodes.update().values({k: node[k] for k in missing_fields}).where(nodes.c.node_id == node["node_id"])
-            self.connection.execute(stmt)
+        node["_own_type_objects"] = self._calc_own_type_objects(children, objects)
+        
+        node["_type_objects"] = self._calc_type_objects(children, objects)
+        
+        node["_recursive_n_objects"] = self._calc_recursive_n_objects(children, n_objects)
+        
+        node["valid"] = True
+        
+        # Store these values
+        update_fields = ("valid", "_centroid", "_type_objects", "_own_type_objects", "_recursive_n_objects")
+        stmt = nodes.update().values({k: node[k] for k in update_fields}).where(nodes.c.node_id == node["node_id"])
+        self.connection.execute(stmt)
                 
         return node
         
@@ -441,7 +437,7 @@ class Tree(object):
             ON      p.node_id = q.parent_id
         )
         UPDATE nodes
-        SET _centroid = NULL, _type_objects = NULL, _own_type_objects = NULL
+        SET valid = FALSE
         WHERE node_id IN (SELECT node_id from q);
         """)
         
@@ -672,7 +668,7 @@ class Tree(object):
         
         return self.connection.execute(stmt, node_id = node_id).scalar()
     
-    def get_minlevel_starred(self, root_node_id):
+    def get_minlevel_starred(self, root_node_id, expensive_values):
         """
         Get the id of the tip (descendant with maximum depth) below a node.
         """
@@ -710,12 +706,12 @@ class Tree(object):
         
         result = self.connection.execute(stmt).fetchall()
         
-        return [self._upgrade_node(dict(r), True) for r in result]
+        return [self._upgrade_node(dict(r), expensive_values = expensive_values) for r in result]
 
     
 if __name__ in ("__main__", "builtins"):
     #: :type conn: sqlalchemy.engine.base.Connection
-    with engine.connect() as conn:
+    with database.engine.connect() as conn:
         #=======================================================================
         # conn.execute("DROP TABLE IF EXISTS nodes_objects, nodes, projects;")
         # database.metadata.create_all(conn)
