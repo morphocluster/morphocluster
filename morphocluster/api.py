@@ -12,7 +12,7 @@ from flask import jsonify, request
 from flask.blueprints import Blueprint
 from sklearn.manifold.isomap import Isomap
 
-from morphocluster.tree import Tree
+from morphocluster.tree import Tree, DEFAULT_CACHE_DEPTH
 from urllib.parse import urlencode
 import warnings
 from morphocluster.classifier import Classifier
@@ -161,7 +161,7 @@ def create_node():
         
         log(connection, "create_node", node_id = node_id)
             
-        node = tree.get_node(node_id, expensive_values = True)
+        node = tree.get_node(node_id, cache_depth=DEFAULT_CACHE_DEPTH)
           
         result = _node(tree, node)
         
@@ -216,12 +216,9 @@ def node_children(node_id):
         tree = Tree(connection)
         
         flags = {k: request.args.get(k, 0) for k in ("include_children")}
-        expensive_values = flags["include_type_objects"]
+        expensive_values = DEFAULT_CACHE_DEPTH if flags["include_type_objects"] else 0
         
-        if node_id is "root":
-            result = [_project(p) for p in tree.get_projects()]
-        else:
-            result = [ _node(tree, c, **flags) for c in tree.get_children(node_id, expensive_values) ]
+        result = [ _node(tree, c, **flags) for c in tree.get_children(node_id, expensive_values) ]
             
         return jsonify(result)
 
@@ -404,7 +401,7 @@ def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", 
         
         result = []
         if nodes:
-            result.extend(tree.get_children(node_id, expensive_values=True, include=sorted_nodes_include))
+            result.extend(tree.get_children(node_id, cache_depth = DEFAULT_CACHE_DEPTH, include=sorted_nodes_include))
         if objects:
             result.extend(tree.get_objects(node_id))
             
@@ -422,7 +419,7 @@ def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", 
             result = result[order].tolist()
             
         if starred_first:
-            result = tree.get_children(node_id, expensive_values=True, include="starred") + result
+            result = tree.get_children(node_id, cache_depth = DEFAULT_CACHE_DEPTH, include="starred") + result
             
         result = _members(tree, result)
     
@@ -526,9 +523,7 @@ def get_node(node_id):
         
         flags = {k: request.args.get(k, 0) for k in ("include_children",)}
         
-        expensive_values = True
-        
-        node = tree.get_node(node_id, expensive_values)
+        node = tree.get_node(node_id, cache_depth=DEFAULT_CACHE_DEPTH)
         
         log(connection, "get_node", node_id = node_id)
         
@@ -634,7 +629,7 @@ def post_node_classify(node_id):
         
         # Split children into starred and unstarred
         with connection.begin():
-            children = tree.get_children(node_id, expensive_values = True)
+            children = tree.get_children(node_id, cache_depth = DEFAULT_CACHE_DEPTH)
             
             starred = []
             unstarred = []

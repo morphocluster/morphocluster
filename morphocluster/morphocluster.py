@@ -15,10 +15,11 @@ from werkzeug import check_password_hash, generate_password_hash
 
 from morphocluster import models
 from morphocluster.api import api
-from morphocluster.models import objects
-from morphocluster.tree import Tree
+from morphocluster.models import objects, nodes, projects
+from morphocluster.tree import Tree, CACHE_DEPTH_MAX
 from time import sleep
 from morphocluster.extensions import database, redis_store, migrate
+import flask_migrate
 
 app = Flask(__name__)
 
@@ -32,15 +33,54 @@ redis_store.init_app(app)
 migrate.init_app(app, database)
 
 @app.cli.command()
-@click.option('--drop/--no-drop', default=False)
-def init_db(drop):
-    print("Initializing the database.")
+def reset_db():
+    print("Resetting the database.")
+    print("WARNING: This is a destructive operation and all data will be lost.")
+    
+    if input("Continue? (y/n) ") != "y":
+        print("Canceled.")
+        return
     
     with database.engine.begin() as txn:
-        if drop and input("This is a destructive operation and all data will be lost. Continue? (y/n) ") == "y":
-            database.metadata.drop_all(txn)
-            
+        database.metadata.drop_all(txn)
         database.metadata.create_all(txn)
+        
+        flask_migrate.stamp()
+        
+@app.cli.command()
+def clear_cache():
+    with database.engine.begin() as txn:
+        # Cached values are prefixed with an underscore
+        cached_columns = list(c for c in nodes.columns.keys() if c.startswith("_"))
+        values = {c: None for c in cached_columns}
+        values["valid"] = False
+        stmt = nodes.update().values(values)
+        txn.execute(stmt)
+        
+    print("Cache was cleared.")
+    
+    
+@app.cli.command()
+def clear_projects():
+    print("Clearing projects.")
+    print("WARNING: This is a destructive operation and all data will be lost.")
+    
+    if input("Continue? (y/n) ") != "y":
+        print("Canceled.")
+        return
+    
+    print("Clearing project data...")
+    with database.engine.begin() as txn:
+        txn.execute(projects.delete())
+        
+@app.cli.command()
+@click.option('--depth', type=int, default = CACHE_DEPTH_MAX)
+def warm_cache(depth):
+    print("Warming the cache (depth {})...".format(depth))
+    with database.engine.connect() as conn:
+        tree = Tree(conn)
+        for p in tree.get_projects():
+            tree.get_node(p["node_id"], cache_depth = depth)
     
 
 @app.cli.command()
@@ -69,29 +109,30 @@ def load_object_locations(collection_fn):
             
             
 @app.cli.command()
-@click.argument('features_fn')
-def load_features(features_fn):
-    print("Loading {}...".format(features_fn))
-    with h5py.File(features_fn, "r", libver="latest") as f_features, database.engine.begin() as txn:
-        object_ids = f_features["objids"]
-        vectors = f_features["features"]
-        
-        stmt = objects.update().where(objects.c.object_id == bindparam('_object_id')).values({
-            'vector': bindparam('vector')
-        })
-        
-        bar = ProgressBar(len(object_ids), max_width=40)
-        obj_iter = iter(zip(object_ids, vectors))
-        while True:
-            chunk = tuple(itertools.islice(obj_iter, 1000))
-            if not chunk:
-                break
-            txn.execute(stmt, [{"_object_id": str(object_id), "vector": vector} for (object_id, vector) in chunk])
-              
-            bar.numerator += len(chunk)
-            print(bar, end="\r")
-        print()
-        print("Done.")
+@click.argument('features_fns', nargs=-1)
+def load_features(features_fns):
+    for features_fn in features_fns:
+        print("Loading {}...".format(features_fn))
+        with h5py.File(features_fn, "r", libver="latest") as f_features, database.engine.begin() as txn:
+            object_ids = f_features["objids"]
+            vectors = f_features["features"]
+            
+            stmt = objects.update().where(objects.c.object_id == bindparam('_object_id')).values({
+                'vector': bindparam('vector')
+            })
+            
+            bar = ProgressBar(len(object_ids), max_width=40)
+            obj_iter = iter(zip(object_ids, vectors))
+            while True:
+                chunk = tuple(itertools.islice(obj_iter, 1000))
+                if not chunk:
+                    break
+                txn.execute(stmt, [{"_object_id": str(object_id), "vector": vector} for (object_id, vector) in chunk])
+                  
+                bar.numerator += len(chunk)
+                print(bar, end="\r")
+            print()
+            print("Done.")
         
         
 @app.cli.command()
@@ -101,12 +142,14 @@ def load_project(project_path):
         tree = Tree(conn)
         
         name = os.path.basename(os.path.normpath(project_path))
-        print("Loading...")
-        project_id = tree.load_project(name, project_path)
-        root_id = tree.get_root_id(project_id)
-        print("Simplifying...")
-        tree.flatten_tree(root_id)
-        tree.prune_chains(root_id)
+        
+        with conn.begin():
+            print("Loading...")
+            project_id = tree.load_project(name, project_path)
+            root_id = tree.get_root_id(project_id)
+            print("Simplifying...")
+            tree.flatten_tree(root_id)
+            tree.prune_chains(root_id)
         
         
 @app.cli.command()

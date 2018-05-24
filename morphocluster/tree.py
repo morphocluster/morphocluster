@@ -16,8 +16,12 @@ from numbers import Integral
 import numpy as np
 import warnings
 from morphocluster.classifier import Classifier
-from sqlalchemy import func
 from morphocluster.extensions import database
+import sys
+
+
+DEFAULT_CACHE_DEPTH = 10
+CACHE_DEPTH_MAX = sys.maxsize
 
 
 class TreeError(Exception):
@@ -220,9 +224,9 @@ class Tree(object):
             a) the centroid of its children, or
             b) the centroid of its objects, if the node is a leaf. 
         """
-        if len(children) > 0:
-            vectors = [ c["_centroid"] for c in children if c["_centroid"] is not None ]
-        else:
+        vectors = [ c["_centroid"] for c in children if c["_centroid"] is not None ]
+            
+        if len(vectors) == 0:
             vectors = [ o["vector"] for o in objects if o["vector"] is not None ]
             
         if len(vectors) > 0:
@@ -255,21 +259,27 @@ class Tree(object):
             a) the nine objects with maximum distance to the children, or
             b) [], if the node is a leaf.
         """
-        if len(children) > 0 and len(objects) > 0:
-            child_vectors = np.array([ c["_centroid"] for c in children if c["_centroid"] is not None ])
-            object_vectors = np.array([ o["vector"] for o in objects ])
-            
+        
+        child_vectors = np.array([ c["_centroid"] for c in children if c["_centroid"] is not None ])
+        object_vectors = np.array([ o["vector"] for o in objects ])
+        
+        if len(child_vectors) > 0 and len(objects) > 0:
+        
             try:
                 classifier = Classifier(child_vectors)
                 distances = classifier.distances(object_vectors)
-                max_dist_idx = np.argmax(distances, axis=1)[::-1]
+                max_dist = np.max(distances, axis=0)
+                max_dist_idx = np.argsort(max_dist)[::-1]
+                
+                assert len(max_dist_idx) == len(objects), "{} != {}".format(len(max_dist_idx), len(objects))
+                
+                return [objects[i]["object_id"] for i in max_dist_idx[:9]]
+                
             except:
                 print("child_vectors", child_vectors.shape)
                 print("object_vectors", object_vectors.shape)
                 raise
-            
-            return [objects[i]["object_id"] for i in max_dist_idx[:9]]
-            
+
         else:
             return []
         
@@ -278,20 +288,26 @@ class Tree(object):
         """
         Recursively calculate the number of objects.
         """
-        return n_objects + sum(c["_recursive_n_objects"] for c in children if c["_recursive_n_objects"] is not None)
+        
+        child_ns = [c["_recursive_n_objects"] for c in children]
+        
+        if any(n is None for n in child_ns):
+            return None
+        
+        return n_objects + sum(child_ns)
     
     
-    def _upgrade_node(self, node, expensive_values):
-        if not expensive_values:
+    def _upgrade_node(self, node, depth = DEFAULT_CACHE_DEPTH):
+        if depth == 0:
             return node
 
-        if node["valid"]:
+        if node["cache_depth"] >= depth:
             return node
         
         print("Upgrading node {}...".format(node["node_id"]))
         
         if node["n_children"] > 0:
-            children = self.get_children(node["node_id"], expensive_values = True)
+            children = self.get_children(node["node_id"], cache_depth = depth - 1)
         else:
             children = []
         objects = self.get_objects(node["node_id"], limit = 1000)
@@ -308,17 +324,21 @@ class Tree(object):
         
         node["_recursive_n_objects"] = self._calc_recursive_n_objects(children, n_objects)
         
-        node["valid"] = True
+        if node["_recursive_n_objects"] is None:
+            print("_recursive_n_objects could not be determined for node {}!".format(node["node_id"]))
+            # TODO: Run DB-query
+        
+        node["cache_depth"] = depth
         
         # Store these values
-        update_fields = ("valid", "_centroid", "_type_objects", "_own_type_objects", "_recursive_n_objects")
+        update_fields = ("cache_depth", "_centroid", "_type_objects", "_own_type_objects", "_recursive_n_objects")
         stmt = nodes.update().values({k: node[k] for k in update_fields}).where(nodes.c.node_id == node["node_id"])
         self.connection.execute(stmt)
                 
         return node
         
         
-    def get_node(self, node_id, expensive_values = False):
+    def get_node(self, node_id, cache_depth = 0):
         assert isinstance(node_id, Integral), "node_id is not integral: {!r}".format(node_id)
         
         #=======================================================================
@@ -342,10 +362,10 @@ class Tree(object):
         if result is None:
             raise TreeError("Node {} is unknown.".format(node_id))
         
-        return self._upgrade_node(dict(result), expensive_values)
+        return self._upgrade_node(dict(result), cache_depth)
         
         
-    def get_children(self, node_id, expensive_values = False, order_by = None, include = None):
+    def get_children(self, node_id, cache_depth = 0, order_by = None, include = None):
         """
         
         Parameters:
@@ -376,7 +396,7 @@ class Tree(object):
             
         result = self.connection.execute(stmt, node_id = node_id).fetchall()
         
-        return [self._upgrade_node(dict(r), expensive_values) for r in result]
+        return [self._upgrade_node(dict(r), cache_depth) for r in result]
         
 
     def merge_node_into(self, node_id, dest_node_id):
@@ -445,7 +465,7 @@ class Tree(object):
         
         
     def recommend_children(self, node_id, max_n = 1000):
-        node = self.get_node(node_id, expensive_values = True)
+        node = self.get_node(node_id, cache_depth=DEFAULT_CACHE_DEPTH)
         
         # Get the path to the node
         path = self.get_path_ids(node_id)
@@ -454,7 +474,7 @@ class Tree(object):
         
         # Traverse the path in reverse (without the node itself)
         for parent_id in path[:-1][::-1]:
-            nodes.extend(c for c in self.get_children(parent_id, expensive_values = True) if c["node_id"] not in path)
+            nodes.extend(c for c in self.get_children(parent_id, cache_depth = DEFAULT_CACHE_DEPTH) if c["node_id"] not in path)
             
             # Break if we already have enough nodes
             if len(nodes) > max_n:
@@ -475,7 +495,7 @@ class Tree(object):
     
     
     def recommend_objects(self, node_id, max_n = 1000):
-        node = self.get_node(node_id, expensive_values = True)
+        node = self.get_node(node_id, cache_depth=DEFAULT_CACHE_DEPTH)
         
         # Get the path to the node (without the node itself)        
         path = self.get_path_ids(node_id)[:-1]

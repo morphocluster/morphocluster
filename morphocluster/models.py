@@ -33,8 +33,8 @@ projects = Table('projects', metadata,
 nodes = Table('nodes', metadata,
     Column('node_id', BigInteger, primary_key = True),
     Column('orig_id', BigInteger, nullable = True),
-    Column('project_id', None, ForeignKey('projects.project_id'), nullable = False),
-    Column('parent_id', None, ForeignKey('nodes.node_id'), nullable = True),
+    Column('project_id', None, ForeignKey('projects.project_id', ondelete="CASCADE"), nullable = False),
+    Column('parent_id', None, ForeignKey('nodes.node_id', ondelete="SET NULL"), nullable = True),
     Column('name', String),
     Column('starred', Boolean, default = False, nullable = False),
     
@@ -50,8 +50,8 @@ nodes = Table('nodes', metadata,
     # Number of objects below this node
     Column('_recursive_n_objects', BigInteger, nullable = True),
     
-    # Are the cached values valid?
-    Column('valid', Boolean, nullable = False, server_default = "FALSE"),
+    # Depth of cached values
+    Column('cache_depth', Integer, nullable = False, server_default = "0"),
     
     # An orig_id must be unique inside a project
     Index('idx_orig_proj', 'orig_id', 'project_id', unique = True),
