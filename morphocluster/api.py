@@ -25,6 +25,7 @@ from redis.exceptions import RedisError
 from morphocluster import models
 from morphocluster.extensions import database, redis_store
 from pprint import pprint
+from flask.helpers import url_for
 
 
 api = Blueprint("api", __name__)
@@ -537,19 +538,19 @@ def get_node_members(node_id):
     if 0 < arguments.page < n_pages:
         # Link to previous page
         link_parameters["page"] = arguments.page - 1
-        url = "{}?{}".format(request.base_url, urlencode(link_parameters))
+        url = "{}?{}".format(url_for(".get_node_members", node_id = node_id), urlencode(link_parameters))
         link_header_fields.append('<{}>; rel="previous"'.format(url))
     
     
     if arguments.page + 1 < n_pages:
         # Link to next page
         link_parameters["page"] = arguments.page + 1
-        url = "{}?{}".format(request.base_url, urlencode(link_parameters))
+        url = "{}?{}".format(url_for(".get_node_members", node_id = node_id), urlencode(link_parameters))
         link_header_fields.append('<{}>; rel="next"'.format(url))
         
     # Link to last page
     link_parameters["page"] = n_pages - 1
-    url = "{}?{}".format(request.base_url, urlencode(link_parameters))
+    url = "{}?{}".format(url_for(".get_node_members", node_id = node_id), urlencode(link_parameters))
     link_header_fields.append('<{}>; rel="last"'.format(url))
     
     response.headers["Link"] = ",". join(link_header_fields)
