@@ -8,7 +8,7 @@ import time
 from distutils.util import strtobool
 
 import numpy as np
-from flask import jsonify, request
+from flask import jsonify as flask_jsonify, request
 from flask.blueprints import Blueprint
 from sklearn.manifold.isomap import Isomap
 
@@ -16,7 +16,6 @@ from morphocluster.tree import Tree, DEFAULT_CACHE_DEPTH
 from urllib.parse import urlencode
 import warnings
 from morphocluster.classifier import Classifier
-import redis
 from functools import wraps
 import json
 from flask import Response
@@ -25,6 +24,7 @@ import zlib
 from redis.exceptions import RedisError
 from morphocluster import models
 from morphocluster.extensions import database, redis_store
+from pprint import pprint
 
 
 api = Blueprint("api", __name__)
@@ -54,6 +54,15 @@ def no_cache_header(response):
     response.headers['Expires'] = '-1'
     return response
 
+def _node_icon(node):
+    if node["starred"]:
+        return "mdi mdi-star"
+    
+    if node["approved"]:
+        return "mdi mdi-approval"
+    
+    return "mdi mdi-hexagon-multiple"
+
 #===============================================================================
 # /tree
 #===============================================================================
@@ -70,11 +79,8 @@ def _tree_node(node):
         "id": node["node_id"],
         "text": "{} ({})".format(node["name"] or node["node_id"], node["n_children"]),
         "children": node["n_children"] > 0,
-        "icon": "mdi mdi-hexagon-multiple",
+        "icon": _node_icon(node)
     }
-    
-    if node["starred"]:
-        result["icon"] = "mdi mdi-star"
     
     return result
 
@@ -180,9 +186,10 @@ def _node(tree, node, include_children=False):
         "name": node["name"],
         "children": node["n_children"] > 0,
         "n_children": node["n_children"],
-        "icon": "mdi mdi-hexagon-multiple",
+        "icon": _node_icon(node),
         "type_objects": node["_type_objects"],
         "starred": node["starred"],
+        "approved": node["approved"],
         "own_type_objects": node["_own_type_objects"],
         "recursive_n_objects": node["_recursive_n_objects"],
     }
@@ -314,6 +321,23 @@ def batch(iterable, n=1):
     for ndx in range(0, l, n):
         yield iterable[ndx:min(ndx + n, l)]
 
+
+def json_dumps(o, *args, **kwargs):
+    try:
+        return json.dumps(o, *args, **kwargs)
+    except TypeError:
+        pprint(o)
+        raise
+    
+def jsonify(*args, **kwargs):
+    try:
+        flask_jsonify(*args, **kwargs)
+    except TypeError:
+        pprint(args)
+        pprint(kwargs)
+        raise
+
+
 def cache_serialize_page(func, page_size = 100, compress = True):
     """
     `func` is expected to return a json-serializable list.
@@ -340,7 +364,7 @@ def cache_serialize_page(func, page_size = 100, compress = True):
             raise ValueError("page may not be None!")
         
         cache_key = '{}:{}:{}'.format(func.__name__,
-                                      json.dumps([args, kwargs], sort_keys = True, separators=(',', ':')),
+                                      json_dumps([args, kwargs], sort_keys = True, separators=(',', ':')),
                                       request_id)
         
         try:
@@ -366,7 +390,8 @@ def cache_serialize_page(func, page_size = 100, compress = True):
         pages = batch(result, page_size)
         
         # Serialize individual pages
-        pages = [json.dumps(p) for p in pages]
+        pages = [json_dumps(p) for p in pages]
+        
         n_pages = len(pages)
         
         if n_pages:
@@ -392,6 +417,35 @@ def cache_serialize_page(func, page_size = 100, compress = True):
     return wrapper
     
     
+def _arrange_by_starred_sim(result, starred):
+    if len(starred) == 0:
+        return _arrange_by_sim(result)
+    
+    if len(result) == 0:
+        return ()
+    
+    # Get vectors
+    vectors = np.array([ m["_centroid"] if "_centroid" in m else m["vector"] for m in result ],
+                       dtype = float)
+    starred_vectors = np.array([ m["_centroid"] for m in starred ],
+                       dtype = float)
+
+    try:
+        classifier = Classifier(starred_vectors)
+        distances = classifier.distances(vectors)
+        max_dist = np.max(distances, axis=0)
+        max_dist_idx = np.argsort(max_dist)[::-1]
+        
+        assert len(max_dist_idx) == len(result), "{} != {}".format(len(max_dist_idx), len(result))
+        
+        return max_dist_idx
+        
+    except:
+        print("starred_vectors", starred_vectors.shape)
+        print("vectors", vectors.shape)
+        raise
+
+
 @cache_serialize_page
 def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", starred_first = False):
     with database.engine.connect() as connection:
@@ -405,6 +459,9 @@ def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", 
         if objects:
             result.extend(tree.get_objects(node_id))
             
+        if arrange_by == "starred_sim" or starred_first:
+            starred = tree.get_children(node_id, cache_depth = DEFAULT_CACHE_DEPTH, include="starred")
+            
         if arrange_by != "":
             result = np.array(result, dtype=object)
             
@@ -412,6 +469,9 @@ def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", 
                 order = _arrange_by_sim(result)
             elif arrange_by == "nleaves":
                 order = _arrange_by_nleaves(result)
+            elif arrange_by == "starred_sim":
+                starred = tree.get_children(node_id, cache_depth = DEFAULT_CACHE_DEPTH, include="starred")
+                order = _arrange_by_starred_sim(result, starred)
             else:
                 warnings.warn("arrange_by={} not supported!".format(arrange_by))
                 order = ()
@@ -419,7 +479,7 @@ def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", 
             result = result[order].tolist()
             
         if starred_first:
-            result = tree.get_children(node_id, cache_depth = DEFAULT_CACHE_DEPTH, include="starred") + result
+            result = starred + result
             
         result = _members(tree, result)
     
@@ -642,18 +702,21 @@ def post_node_classify(node_id):
             
             classifier = Classifier(starred_centroids)
             
-            
-            # Predict unstarred children
-            print("Predicting {} unstarred children of {}...".format(len(unstarred_centroids), node_id))
-            type_predicted = classifier.classify(unstarred_centroids)
-            
-            print(type_predicted)
-            
-            for i, starred_node in enumerate(starred):
-                nodes_to_move = [int(n) for n in unstarred_ids[type_predicted == i]]
-                tree.relocate_nodes(nodes_to_move, starred_node["node_id"])
+            # Predict unstarred children (if any)
+            n_unstarred = len(unstarred_centroids)
+            if n_unstarred > 0:
+                print("Predicting {} unstarred children of {}...".format(n_unstarred, node_id))
+                type_predicted = classifier.classify(unstarred_centroids)
                 
-            n_predicted_children = np.sum(type_predicted > -1)
+                print(type_predicted)
+                
+                for i, starred_node in enumerate(starred):
+                    nodes_to_move = [int(n) for n in unstarred_ids[type_predicted == i]]
+                    tree.relocate_nodes(nodes_to_move, starred_node["node_id"])
+                    
+                n_predicted_children = np.sum(type_predicted > -1)
+            else:
+                n_predicted_children = 0
             
             
             #Predict objects

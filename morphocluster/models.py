@@ -37,6 +37,7 @@ nodes = Table('nodes', metadata,
     Column('parent_id', None, ForeignKey('nodes.node_id', ondelete="SET NULL"), nullable = True),
     Column('name', String),
     Column('starred', Boolean, default = False, nullable = False),
+    Column('approved', Boolean, default = False, nullable = False, server_default = "f"),
     
     #===========================================================================
     # The following fields are cached values

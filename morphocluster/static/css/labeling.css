@@ -103,6 +103,14 @@
 	background-color: #ff7f00;
 }
 
+.member-starred {
+	background-color: #fb9a99;
+}
+
+.member-starred.highlight {
+	background-color: #e31a1c;
+}
+
 .member-object {
 	background-color: #a6cee3;
 }

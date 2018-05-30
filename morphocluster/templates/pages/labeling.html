@@ -15,35 +15,53 @@
 				title="Go to the deepest node">
 				<i class="mdi mdi-chevron-double-right"></i>
 			</button>
+			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-up"
+				title="Go up.">
+				<i class="mdi mdi-chevron-up"></i>
+			</button>
 		</form>
 	</div>
 	<div id="node-header" class="bg-light px-1">
 		<form class="form-inline" autocomplete="off">
 			This Node:
+			<div class="btn-group ml-2">
+				<button type="button" class="btn btn-secondary btn-sm" id="btn-approve"
+					title="The descendants of this node look alike." data-action="next">
+					<i class="mdi mdi-approval"></i> Approve + Next
+				</button>
+				<button type="button" class="btn btn-sm btn-secondary dropdown-toggle dropdown-toggle-split" data-toggle="dropdown">
+					<span class="sr-only">Toggle Dropdown</span>
+				</button>
+				<div class="dropdown-menu">
+					<a class="dropdown-item" href="#" data-action="">Approve</a>
+					<a class="dropdown-item" href="#" data-action="next">Approve + Next</a>
+					<a class="dropdown-item" href="#" data-action="up">Approve + Up</a>
+				</div>
+			</div>
 			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-merge-into-parent"
 				title="The children of this node are too diverse. Move all of them to the parent.">
-				<i class="mdi mdi-call-merge"></i>Merge into parent
+				<i class="mdi mdi-call-merge"></i> Merge into parent
 			</button>
 			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-recommend">
-				<i class="mdi mdi-comment-check-outline"></i>Recommend Members
+				<i class="mdi mdi-comment-check-outline"></i> Recommend Members
 			</button>
 			<span class="ml-2 mr-2">|</span>
 			Its Members:
 			<button type="button" class="btn btn-secondary disabled btn-sm ml-2" id="btn-group-selected">
-				<i class="mdi mdi-basket-fill"></i>Create umbrella term
+				<i class="mdi mdi-basket-fill"></i> Create umbrella term
 			</button>
 			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-classify-members">
-				<i class="mdi mdi-auto-fix"></i>Classify into starred members.
+				<i class="mdi mdi-auto-fix"></i> Classify into starred members.
 			</button>
 		</form>
 	</div>
 	<div id="recommend-header" class="bg-light px-1">
 		<form class="form-inline" autocomplete="off">
 			<button type="button" class="btn btn-secondary btn-sm ml-2 mr-2" id="btn-rec-add">
-				<i class="mdi mdi-check-all"></i>Add selected
+				<i class="mdi mdi-check-all"></i> Add selected
 			</button>
 			<button type="button" class="btn btn-secondary btn-sm ml-2 mr-2" id="btn-rec-reload">
-				<i class="mdi mdi-reload"></i>Reload
+				<i class="mdi mdi-reload"></i> Reload
 			</button>
 		</form>
 	</div>
@@ -76,7 +94,7 @@
 
 {% raw %}
 <script type="text/html" id="node-preview-template">
-<div class="card member member-node">
+<div class="card member">
 	<div class="member-headline">
   		<div class="member-title"><i class="{{:icon}}"></i>{{:text}}</div>
   		<div class="member-controls"></div>
@@ -123,7 +141,7 @@
 			<div class="col-sm-11"><button type="submit" class="btn btn-primary">Save</button></div>
 		</div>
 	</form>
-	{{:recursive_n_objects}} objects below this node (total).
+	{{:recursive_n_objects_txt}} objects below this node (total).
 </div>
 </script>
 {% endraw %}

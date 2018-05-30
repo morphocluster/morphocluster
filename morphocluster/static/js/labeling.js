@@ -26,8 +26,6 @@ function init_tree() {
 		}
 	};
 	
-	
-	
 	/**
 	 * Generate a hash query string
 	 */
@@ -38,6 +36,19 @@ function init_tree() {
 			
 		});
 		return '#' + params.toString();
+	}
+	
+	/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+	 * AJAX methods
+	 * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+	function patchNode(node_id, data) {
+		return $.ajax({
+			type: "PATCH",
+			url: "/api/nodes/" + node_id,
+			data: JSON.stringify(data),
+			contentType: "application/json; charset=utf-8",
+			dataType: "json",
+		});
 	}
 	
 	/**
@@ -94,7 +105,7 @@ function init_tree() {
 	function load_path(path, done) {
 		if (path.length == 0) {
 			done();
-			return
+			return;
 		}
 		
 		var node = $('#tree-pane').jstree("get_node", path[0]);
@@ -186,6 +197,7 @@ function init_tree() {
 		
 		var $node_pane = $("#node-pane").empty();
 			
+		node.recursive_n_objects_txt = Number.prototype.toLocaleString.apply(node.recursive_n_objects, ["en-US"])
 		$node_pane.append(node_template.render(node));
 		
 		$("#node-starred").prop("checked", node.starred);
@@ -201,7 +213,7 @@ function init_tree() {
 		var parameters = {
 				objects: displayObjects,
 				nodes: !displayObjects,
-				arrange_by: "sim",
+				arrange_by: "starred_sim",
 				// Always show starred objects first
 				starred_first: true
 		};
@@ -574,6 +586,12 @@ function init_tree() {
 			// Render a node
 			$member = $(node_preview_template.render(member)).data("node_id", member["node_id"]);
 			
+			if(member.starred) {
+				$member.addClass("member-starred");
+			} else {
+				$member.addClass("member-node");
+			}
+			
 			var $node_images = $member.children(".images").first();
 			
 			$.each(member["type_objects"], function (k, v) {
@@ -693,6 +711,28 @@ function init_tree() {
 		return false;
 	});
 	
+	function nodeStatusErrorHandler(jqXHR, textStatus, errorThrown) {
+		console.log(jqXHR, textStatus, errorThrown);
+		$("#node-status").text(textStatus + ", " + errorThrown);
+	}
+	
+	$("#btn-approve").click(function _btnApprove() {
+		/*
+		 * The descendants of this node look alike.
+		 * Approve and go to next node.
+		 */
+		var node = appState.node;
+		var root_id = node.path[0];
+		
+		// Star current node
+		patchNode(node.node_id, {approved: true}).done(function (data) {
+			// Go to next deepest node
+			loadDeepestNode(root_id).fail(nodeStatusErrorHandler);
+		}).fail(nodeStatusErrorHandler);
+		
+		return false;
+	});
+	
 	/*
 	 * Recommendation
 	 */
@@ -779,13 +819,7 @@ function init_tree() {
 		if (action == "star") {
 			var starred = $this.hasClass("mdi-star");
 			
-			$.ajax({
-				type: "PATCH",
-				url: "/api/nodes/" + member_node_id,
-				data: JSON.stringify({starred: !starred}),
-				contentType: "application/json; charset=utf-8",
-				dataType: "json",
-			}).done(function (data) {
+			patchNode(member_node_id, {starred: !starred}).done(function (data) {
 				$this.toggleClass("mdi-star mdi-star-outline");
 			}).fail(function (jqXHR, textStatus, errorThrown) {
 				console.log(jqXHR, textStatus, errorThrown);
@@ -946,7 +980,16 @@ function init_tree() {
 	/*
 	 * Tree controls
 	 */
-	$("#btn-deepest-node").on("click", function () {
+	
+	function loadDeepestNode(root_id) {
+		return $.get("/api/nodes/" + root_id  + "/tip").done(function (tipNodeId) {
+			$("#tree-status").empty();
+			
+			loadNode(tipNodeId);
+		});
+	}
+	
+	$("#btn-deepest-node").on("click", function _btnDeepestNode() {
 		if(typeof(appState.node) == "undefined") {
 			return;
 		}
@@ -956,12 +999,19 @@ function init_tree() {
 		$("#node-status").text("Loading tip for " + root_id + "...");
 		console.log("root_id:", root_id);
 		
-		$.get("/api/nodes/" + root_id  + "/tip").done(function (tipNodeId) {
-			$("#tree-status").empty();
-			
-			loadNode(tipNodeId);
-		}).fail(function (jqXHR, textStatus, errorThrown) {
+		loadDeepestNode(root_id).fail(function (jqXHR, textStatus, errorThrown) {
 			$("#tree-status").text(textStatus + ", " + errorThrown);
 		});
+	});
+	
+	$("#btn-up").on("click", function _btnUp() {
+		if(typeof(appState.node) == "undefined") {
+			return;
+		}
+		
+		var path = appState.node.path;
+		var parent_id = path[path.length - 2];
+		
+		loadNode(parent_id);
 	});
 }

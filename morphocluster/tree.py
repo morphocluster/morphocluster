@@ -20,8 +20,8 @@ from morphocluster.extensions import database
 import sys
 
 
-DEFAULT_CACHE_DEPTH = 10
-CACHE_DEPTH_MAX = sys.maxsize
+DEFAULT_CACHE_DEPTH = 5
+CACHE_DEPTH_MAX = 0xFFFFFF
 
 
 class TreeError(Exception):
@@ -296,8 +296,36 @@ class Tree(object):
         
         return n_objects + sum(child_ns)
     
+    def _query_recursive_n_objects(self, node):
+        # Recursively select all descendants
+        rquery = select([nodes]).where(nodes.c.node_id == node["node_id"]).cte(recursive=True)
+        
+        parents = rquery.alias("n")
+        descendants = nodes.alias("nd")
+        
+        rquery = rquery.union_all(
+            select([descendants]).where(descendants.c.parent_id == parents.c.node_id))
+        
+        # For each node in rquery, calculate #objects
+        deep_count = select([rquery.c.node_id, func.count(nodes_objects.c.object_id).label("count")]).\
+            select_from(rquery.join(nodes_objects)).\
+            group_by(rquery.c.node_id).\
+            alias("deep_count")
+            
+        # Build total sum
+        stmt = select([func.sum(deep_count.c.count)]).select_from(deep_count)
+        
+        result = int(self.connection.scalar(stmt))
+        
+        return result or 0
     
     def _upgrade_node(self, node, depth = DEFAULT_CACHE_DEPTH):
+        """
+        Parameters:
+            depth: Cache depth.
+                0: No calculations are performed
+                >0: The hierarchy is traversed to calculate meaningful values
+        """
         if depth == 0:
             return node
 
@@ -324,9 +352,15 @@ class Tree(object):
         
         node["_recursive_n_objects"] = self._calc_recursive_n_objects(children, n_objects)
         
+        # TODO: Remove assertion if we're sure enough that this works
+        query_recursive_n_objects = self._query_recursive_n_objects(node)
+        
         if node["_recursive_n_objects"] is None:
-            print("_recursive_n_objects could not be determined for node {}!".format(node["node_id"]))
-            # TODO: Run DB-query
+            node["_recursive_n_objects"] = query_recursive_n_objects
+            
+        else:
+            assert node["_recursive_n_objects"] == query_recursive_n_objects, "{}=={}".format(node["_recursive_n_objects"], query_recursive_n_objects)
+            
         
         node["cache_depth"] = depth
         
@@ -457,7 +491,7 @@ class Tree(object):
             ON      p.node_id = q.parent_id
         )
         UPDATE nodes
-        SET valid = FALSE
+        SET cache_depth = 0
         WHERE node_id IN (SELECT node_id from q);
         """)
         
@@ -664,6 +698,11 @@ class Tree(object):
     def get_tip(self, node_id):
         """
         Get the id of the tip (descendant with maximum depth) below a node.
+        
+        A node is selected as tip if
+            - it is not approved
+            - it is not starred
+            - is has children
         """
         
         stmt = text("""
@@ -678,11 +717,13 @@ class Tree(object):
             FROM    q
             JOIN    nodes AS nd
             ON      nd.parent_id = q.node_id
-            WHERE q.starred != 't'
+            WHERE nd.approved = 'f' AND nd.starred = 'f'
         )
-        SELECT  node_id
-        FROM    q
-        ORDER BY level desc
+        SELECT q.node_id
+        FROM q LEFT JOIN nodes as c ON c.parent_id = q.node_id
+        GROUP BY q.node_id, q.level
+        HAVING COUNT(c.*) > 0
+        ORDER BY q.level desc
         LIMIT 1
         """)
         
@@ -692,26 +733,6 @@ class Tree(object):
         """
         Get the id of the tip (descendant with maximum depth) below a node.
         """
-        
-        stmt = text("""
-        WITH    RECURSIVE
-        q AS
-        (
-            SELECT  node_id, starred, 1 as level
-            FROM    nodes AS n
-            WHERE   node_id = :node_id
-            UNION ALL
-            SELECT  nd.node_id, nd.starred, level + 1
-            FROM    q
-            JOIN    nodes AS nd
-            ON      nd.parent_id = q.node_id
-            WHERE q.starred != 't'
-        )
-        SELECT  node_id
-        FROM    q
-        ORDER BY level desc
-        LIMIT 1
-        """)
         
         rquery = select([nodes]).where(nodes.c.node_id == root_node_id).cte(recursive=True)
         
