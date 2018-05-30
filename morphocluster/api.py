@@ -26,6 +26,7 @@ from morphocluster import models
 from morphocluster.extensions import database, redis_store
 from pprint import pprint
 from flask.helpers import url_for
+from itertools import chain
 
 
 api = Blueprint("api", __name__)
@@ -417,6 +418,26 @@ def cache_serialize_page(func, page_size = 100, compress = True):
     
     return wrapper
     
+def seq2array(seq, dtype, count = -1):
+    """
+    Converts a sequence consisting of `numpy array`s to a single array.
+    Elements that are None are converted to an appropriate zero entry.
+    """
+    
+    seq = iter(seq)
+    leading = []
+    zero = None
+    
+    for x in seq:
+        leading.append(x)
+        if x is not None:
+            zero = np.zeros_like(x)
+            break
+        
+    if zero is None:
+        raise ValueError("Empty sequence or only None")
+    
+    return np.fromiter((zero if x is None else x for x in chain(leading, seq)), dtype, count)
     
 def _arrange_by_starred_sim(result, starred):
     if len(starred) == 0:
@@ -426,10 +447,9 @@ def _arrange_by_starred_sim(result, starred):
         return ()
     
     # Get vectors
-    vectors = np.array([ m["_centroid"] if "_centroid" in m else m["vector"] for m in result ],
-                       dtype = float)
-    starred_vectors = np.array([ m["_centroid"] for m in starred ],
-                       dtype = float)
+    vectors = seq2array((m["_centroid"] if "_centroid" in m else m["vector"] for m in result),
+                        float, len(result))
+    starred_vectors = seq2array((m["_centroid"] for m in starred), float, len(starred))
 
     try:
         classifier = Classifier(starred_vectors)
