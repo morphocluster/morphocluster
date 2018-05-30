@@ -437,7 +437,12 @@ def seq2array(seq, dtype, count = -1):
     if zero is None:
         raise ValueError("Empty sequence or only None")
     
-    return np.fromiter((zero if x is None else x for x in chain(leading, seq)), dtype, count)
+    try:
+        return np.fromiter((zero if x is None else x for x in chain(leading, seq)), dtype, count)
+    except ValueError:
+        print(leading)
+        print(list(seq))
+        raise
     
 def _arrange_by_starred_sim(result, starred):
     if len(starred) == 0:
