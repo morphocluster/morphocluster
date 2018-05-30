@@ -53,7 +53,7 @@ def clear_cache():
         # Cached values are prefixed with an underscore
         cached_columns = list(c for c in nodes.columns.keys() if c.startswith("_"))
         values = {c: None for c in cached_columns}
-        values["cache_depth"] = False
+        values["cache_depth"] = 0
         stmt = nodes.update().values(values)
         txn.execute(stmt)
         
