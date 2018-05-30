@@ -331,7 +331,7 @@ def json_dumps(o, *args, **kwargs):
     
 def jsonify(*args, **kwargs):
     try:
-        flask_jsonify(*args, **kwargs)
+        return flask_jsonify(*args, **kwargs)
     except TypeError:
         pprint(args)
         pprint(kwargs)
