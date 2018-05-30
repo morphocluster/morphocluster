@@ -315,7 +315,7 @@ class Tree(object):
         # Build total sum
         stmt = select([func.sum(deep_count.c.count)]).select_from(deep_count)
         
-        result = int(self.connection.scalar(stmt))
+        result = self.connection.scalar(stmt) or 0
         
         return result or 0
     
