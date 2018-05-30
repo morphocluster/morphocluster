@@ -418,7 +418,7 @@ def cache_serialize_page(func, page_size = 100, compress = True):
     
     return wrapper
     
-def seq2array(seq, dtype, count = -1):
+def seq2array(seq, dtype, length):
     """
     Converts a sequence consisting of `numpy array`s to a single array.
     Elements that are None are converted to an appropriate zero entry.
@@ -437,12 +437,11 @@ def seq2array(seq, dtype, count = -1):
     if zero is None:
         raise ValueError("Empty sequence or only None")
     
-    try:
-        return np.fromiter((zero if x is None else x for x in chain(leading, seq)), dtype, count)
-    except ValueError:
-        print(leading)
-        print(list(seq))
-        raise
+    array = np.empty((length,) + zero.shape, zero.dtype)
+    for i, x in enumerate(chain(leading, seq)):
+        array[i] = zero if x is None else x 
+    
+    return array
     
 def _arrange_by_starred_sim(result, starred):
     if len(starred) == 0:
