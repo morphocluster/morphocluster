@@ -71,7 +71,9 @@ def clear_projects():
     
     print("Clearing project data...")
     with database.engine.begin() as txn:
-        txn.execute(projects.delete())
+        affected_tables = [nodes, projects, nodes_objects]
+        database.metadata.drop_all(txn, tables = affected_tables)
+        database.metadata.create_all(txn, tables = affected_tables)
         
 @app.cli.command()
 @click.option('--depth', type=int, default = CACHE_DEPTH_MAX)
@@ -144,7 +146,7 @@ def load_project(project_path):
         name = os.path.basename(os.path.normpath(project_path))
         
         with conn.begin():
-            print("Loading...")
+            print("Loading {}...".format(project_path))
             project_id = tree.load_project(name, project_path)
             root_id = tree.get_root_id(project_id)
             print("Simplifying...")
