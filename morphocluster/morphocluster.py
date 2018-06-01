@@ -15,7 +15,7 @@ from werkzeug import check_password_hash, generate_password_hash
 
 from morphocluster import models
 from morphocluster.api import api
-from morphocluster.models import objects, nodes, projects
+from morphocluster.models import objects, nodes, projects, nodes_objects
 from morphocluster.tree import Tree, CACHE_DEPTH_MAX
 from time import sleep
 from morphocluster.extensions import database, redis_store, migrate

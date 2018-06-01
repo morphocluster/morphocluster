@@ -5,7 +5,7 @@ Created on 13.03.2018
 '''
 from morphocluster.models import nodes, projects, nodes_objects, objects
 from sqlalchemy.sql import text
-from sqlalchemy.sql.expression import select, join, column, alias, outerjoin, update
+from sqlalchemy.sql.expression import select, outerjoin
 import os
 import pandas as pd
 from etaprogress.progress import ProgressBar
@@ -17,10 +17,9 @@ import numpy as np
 import warnings
 from morphocluster.classifier import Classifier
 from morphocluster.extensions import database
-import sys
 
 
-DEFAULT_CACHE_DEPTH = 5
+DEFAULT_CACHE_DEPTH = 2
 CACHE_DEPTH_MAX = 0xFFFFFF
 
 
@@ -317,7 +316,24 @@ class Tree(object):
         
         result = self.connection.scalar(stmt) or 0
         
-        return result or 0
+        return result
+    
+    def node_n_descendants(self, node_id):
+        # Recursively select all descendants
+        rquery = select([nodes]).where(nodes.c.node_id == node_id).cte(recursive=True)
+        
+        parents = rquery.alias("n")
+        descendants = nodes.alias("nd")
+        
+        rquery = rquery.union_all(
+            select([descendants]).where(descendants.c.parent_id == parents.c.node_id))
+            
+        # Count results
+        stmt = select([func.count(rquery)])
+        
+        result = self.connection.scalar(stmt) or 0
+        
+        return result
     
     def _upgrade_node(self, node, depth = DEFAULT_CACHE_DEPTH):
         """
@@ -613,12 +629,18 @@ class Tree(object):
             Else recurse in all children that have 2 children by themselves (grandchildren of n).
         """
         
-        n_merged = 0
+        
         
         print("Flattening tree...")
         
+        n_total = self.node_n_descendants(root_id)
+        n_processed = 0
+        n_merged = 0
+        
         with self.connection.begin():
             queue = [root_id]
+            
+            bar = ProgressBar(n_total, max_width=40)
             
             while len(queue) > 0:
                 node_id = queue.pop()
@@ -627,21 +649,31 @@ class Tree(object):
             
                 children_2 = [c for c in children if c["n_children"] == 2]
                 
+                # Count skipped children
+                n_processed += len(children) - len(children_2)
+                
                 if len(children_2) == 0:
-                    # Do nothing
+                    # Nothing to do for the current node
+                    # Count current node
+                    n_processed += 1
                     continue
                 
                 if len(children_2) == 1:
                     # Merge this child and restart with this node
                     child_to_merge = children_2[0]
                     self.merge_node_into(child_to_merge["node_id"], node_id)
-                    queue.append(node_id)
                     n_merged += 1
+                    
+                    # Current node is not yet done
+                    queue.append(node_id)
                     continue
                 
                 # Else recurse into every child that has 2 children by itself
                 for c in children_2:
                     queue.append(c["node_id"])
+                    
+                bar.numerator = n_processed
+                print(bar)
                     
         print("Merged {:d} nodes.".format(n_merged))
                     
