@@ -671,7 +671,7 @@ def node_get_n_sorted(node_id):
     with database.engine.connect() as connection:
         tree = Tree(connection)
         
-        nodes = tree.get_minlevel_starred(node_id, expensive_values = True)
+        nodes = tree.get_minlevel_starred(node_id, cache_depth = DEFAULT_CACHE_DEPTH)
         
         n_sorted = sum(n["_recursive_n_objects"] for n in nodes)
         

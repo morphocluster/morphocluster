@@ -17,6 +17,7 @@ import numpy as np
 import warnings
 from morphocluster.classifier import Classifier
 from morphocluster.extensions import database
+import csv
 
 
 DEFAULT_CACHE_DEPTH = 2
@@ -91,6 +92,38 @@ class Tree(object):
             print()
             
         return project_id
+    
+    def get_objects_recursive(self, node_id):
+        # Recursively select all descendants
+        rquery = select([nodes]).where(nodes.c.node_id == node_id).cte(recursive=True)
+        
+        parents = rquery.alias("n")
+        descendants = nodes.alias("nd")
+        
+        rquery = rquery.union_all(
+            select([descendants]).where(descendants.c.parent_id == parents.c.node_id))
+        
+        # For each node in rquery, get associated objects
+        obj_query = select([objects]).distinct().\
+            select_from(rquery.join(nodes_objects).join(objects)).\
+            
+        result = self.connection.execute(obj_query)
+        
+        return [dict(r) for r in result]
+    
+    
+    def export_classifications(self, root_id, classification_fn):
+        """
+        Export `object_id`s with cluster labels.
+        """
+        
+        with self.connection.begin(), open(classification_fn, "w") as f:
+            writer = csv.writer(delimiter=",")
+            for node in tree.get_minlevel_starred(root_id, cache_depth = 0):
+                objs = self.get_objects_recursive(node["node_id"])
+                
+                for o in objs:
+                    writer.writerow((o["object_id"], node["name"]))
 
 
     def get_root_id(self, project_id):
@@ -209,10 +242,13 @@ class Tree(object):
         if object_ids is not None:
             object_ids = iter(object_ids)
             while True:
-                chunk = tuple(itertools.islice(object_ids, 1000))
-                if not chunk:
-                    break
+                chunk = itertools.islice(object_ids, 1000)
+                
                 data = [dict(node_id=node_id, object_id = object_id, project_id = project_id) for object_id in chunk]
+                
+                if not data:
+                    break
+                
                 self.connection.execute(nodes_objects.insert(), data)
         return node_id
     
@@ -493,7 +529,7 @@ class Tree(object):
         """
         Invalidate the cached values in the node and its parents.
         """
-        # TODO: cache_version = cache_version + 1
+        
         stmt = text("""
         WITH RECURSIVE q AS
         (
@@ -761,9 +797,11 @@ class Tree(object):
         
         return self.connection.execute(stmt, node_id = node_id).scalar()
     
-    def get_minlevel_starred(self, root_node_id, expensive_values):
+    def get_minlevel_starred(self, root_node_id, cache_depth):
         """
-        Get the id of the tip (descendant with maximum depth) below a node.
+        Returns all starred nodes with minimal depth.
+        
+        Descend into the tree while a node is not starred. Return only starred nodes.
         """
         
         rquery = select([nodes]).where(nodes.c.node_id == root_node_id).cte(recursive=True)
@@ -779,7 +817,7 @@ class Tree(object):
         
         result = self.connection.execute(stmt).fetchall()
         
-        return [self._upgrade_node(dict(r), expensive_values = expensive_values) for r in result]
+        return [self._upgrade_node(dict(r), depth = cache_depth) for r in result]
 
     
 if __name__ in ("__main__", "builtins"):
