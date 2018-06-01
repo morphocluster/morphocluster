@@ -105,7 +105,7 @@ class Tree(object):
         
         # For each node in rquery, get associated objects
         obj_query = select([objects]).distinct().\
-            select_from(rquery.join(nodes_objects).join(objects)).\
+            select_from(rquery.join(nodes_objects).join(objects))
             
         result = self.connection.execute(obj_query)
         
