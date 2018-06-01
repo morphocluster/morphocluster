@@ -75,6 +75,7 @@ def clear_projects():
         database.metadata.drop_all(txn, tables = affected_tables)
         database.metadata.create_all(txn, tables = affected_tables)
         
+        
 @app.cli.command()
 @click.option('--depth', type=int, default = CACHE_DEPTH_MAX)
 def warm_cache(depth):
@@ -198,6 +199,15 @@ def change_user(username):
             conn.execute(stmt)
     except IntegrityError as e:
         print(e)
+    
+    
+@app.cli.command()
+@click.argument('root_id')
+@click.argument('classification_fn')
+def export_classifications(root_id, classification_fn):
+    with database.engine.connect() as conn:
+        tree = Tree(conn)
+        tree.export_classifications(root_id, classification_fn)
     
     
 @app.route("/")
