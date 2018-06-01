@@ -119,7 +119,7 @@ class Tree(object):
         
         with self.connection.begin(), open(classification_fn, "w") as f:
             writer = csv.writer(f, delimiter=",")
-            for node in tree.get_minlevel_starred(root_id, cache_depth = 0):
+            for node in self.get_minlevel_starred(root_id, cache_depth = 0):
                 objs = self.get_objects_recursive(node["node_id"])
                 
                 for o in objs:
