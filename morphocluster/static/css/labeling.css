@@ -120,10 +120,12 @@
 }
 
 .card .member-title {
-	text-overflow: ellipsis;
 	flex-grow: 1;
 	overflow: hidden;
+	/*
 	white-space: nowrap;
+	text-overflow: ellipsis;
+	*/
 }
 
 .member .member-controls {
