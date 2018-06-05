@@ -119,11 +119,18 @@ class Tree(object):
         
         with self.connection.begin(), open(classification_fn, "w") as f:
             writer = csv.writer(f, delimiter=",")
-            for node in self.get_minlevel_starred(root_id, cache_depth = 0):
+            starred_nodes = self.get_minlevel_starred(root_id, cache_depth = 0)
+            
+            bar = ProgressBar(len(starred_nodes), max_width=40)
+            
+            for node in starred_nodes:
                 objs = self.get_objects_recursive(node["node_id"])
                 
                 for o in objs:
                     writer.writerow((o["object_id"], node["name"]))
+                    
+                bar.numerator += 1
+                print(bar, end="\r")
 
 
     def get_root_id(self, project_id):
@@ -411,7 +418,9 @@ class Tree(object):
             node["_recursive_n_objects"] = query_recursive_n_objects
             
         else:
-            assert node["_recursive_n_objects"] == query_recursive_n_objects, "{}=={}".format(node["_recursive_n_objects"], query_recursive_n_objects)
+            if node["_recursive_n_objects"] != query_recursive_n_objects:
+                warnings.warn("_recursive_n_objects do not match! {}!={}".format(node["_recursive_n_objects"], query_recursive_n_objects))
+                node["_recursive_n_objects"] = query_recursive_n_objects
             
         
         node["cache_depth"] = depth
@@ -709,7 +718,7 @@ class Tree(object):
                     queue.append(c["node_id"])
                     
                 bar.numerator = n_processed
-                print(bar)
+                print(bar, end="\r")
                     
         print("Merged {:d} nodes.".format(n_merged))
                     
