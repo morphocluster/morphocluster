@@ -20,6 +20,7 @@ from morphocluster.tree import Tree, CACHE_DEPTH_MAX
 from time import sleep
 from morphocluster.extensions import database, redis_store, migrate
 import flask_migrate
+import csv
 
 app = Flask(__name__)
 
@@ -208,7 +209,16 @@ def export_classifications(root_id, classification_fn):
     with database.engine.connect() as conn:
         tree = Tree(conn)
         tree.export_classifications(root_id, classification_fn)
-    
+        
+@app.cli.command()
+@click.argument('node_id')
+@click.argument('filename')
+def export_direct_objects(node_id, filename):
+    with database.engine.connect() as conn, open(filename, "w") as f:
+        tree = Tree(conn)
+        
+        f.writelines("{}\n".format(o["object_id"]) for o in tree.get_objects(node_id))
+
     
 @app.route("/")
 def index():
