@@ -10,7 +10,7 @@ setup(
         'pandas',
         'sqlalchemy',
         'etaprogress',
-        'h5py',
+        'h5py>=2.8.0',
         'scikit-learn',
         'scipy',
         'redis',

@@ -27,6 +27,7 @@ from morphocluster.extensions import database, redis_store
 from pprint import pprint
 from flask.helpers import url_for
 from itertools import chain
+from flask_restful import reqparse
 
 
 api = Blueprint("api", __name__)
@@ -193,7 +194,7 @@ def _node(tree, node, include_children=False):
         "starred": node["starred"],
         "approved": node["approved"],
         "own_type_objects": node["_own_type_objects"],
-        "recursive_n_objects": node["_recursive_n_objects"],
+        "recursive_n_objects": int(node["_recursive_n_objects"]),
     }
     
     if include_children:
@@ -531,8 +532,6 @@ def get_node_members(node_id):
         List of members
     """
     
-    from flask_restful import reqparse
-    
     parser = reqparse.RequestParser()
     parser.add_argument("nodes", type=strtobool, default = 0)
     parser.add_argument("objects", type=strtobool, default = 0)
@@ -625,8 +624,12 @@ def patch_node(node_id):
         data = request.get_json()
         flags = {k: request.args.get(k, 0) for k in ("include_children",)}
         
+        # TODO: Use argparse
         if "starred" in data:
             data["starred"] = strtobool(str(data["starred"]))
+            
+        if "parent_id" in data:
+            raise ValueError("parent_id must not be set directly, use /nodes/<node_id>/adopt.")
         
         tree.update_node(node_id, data)
         
@@ -637,6 +640,33 @@ def patch_node(node_id):
         result = _node(tree, node, **flags)
         
         return jsonify(result)
+    
+@api.route("/nodes/<int:parent_id>/adopt_members", methods=["POST"])
+def node_adopt_members(parent_id):
+    """
+    Adopt a list of nodes.
+    
+    Parameters:
+        parent_id (int): ID of the node that accepts new members.
+        
+    Request data:
+        members: List of nodes ({node_id: ...}) and objects ({object_id: ...}).
+    
+    Returns:
+        Nothing.
+    """
+    with database.engine.connect() as connection:
+        tree = Tree(connection)
+        
+        members = request.get_json()["members"]
+        
+        node_ids = [int(m["node_id"]) for m in members if "node_id" in m]
+        object_ids = [m["object_id"] for m in members if "object_id" in m]
+        
+        tree.relocate_nodes(node_ids, parent_id)
+        tree.relocate_objects(object_ids, parent_id)
+        
+        return jsonify({})
         
 
 @api.route("/nodes/<int:node_id>/recommended_children", methods=["GET"])
