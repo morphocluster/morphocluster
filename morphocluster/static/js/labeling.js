@@ -60,8 +60,6 @@ function init_tree() {
 		
 		$nodeStatus.text("Loading node " + node_id + "...");
 		$.get("/api/nodes/" + node_id).done(function (node) {
-			$nodeStatus.empty();
-			
 			appState.node = node;
 			$.extend(appState, state);
 			
@@ -198,7 +196,7 @@ function init_tree() {
 		
 		var $node_pane = $("#node-pane").empty();
 			
-		node.recursive_n_objects_txt = Number.prototype.toLocaleString.apply(node.recursive_n_objects, ["en-US"])
+		node.n_objects_deep_txt = Number.prototype.toLocaleString.apply(node.n_objects_deep, ["en-US"])
 		$node_pane.append(node_template.render(node));
 		
 		$("#node-starred").prop("checked", node.starred);
@@ -244,7 +242,7 @@ function init_tree() {
 				next_url = "";
 			}
 			
-			$nodeStatus.empty();
+			$nodeStatus.text(flashMsg.get());
 			members_loading = false;
 		};
 		
@@ -551,7 +549,7 @@ function init_tree() {
 					    $(this).remove();
 					  });
 					
-					$nodeStatus.empty();
+					$nodeStatus.text(flashMsg.get());
 				}).fail(function (jqXHR, textStatus, errorThrown) {
 					console.log(jqXHR, textStatus, errorThrown);
 					$nodeStatus.text(textStatus + ", " + errorThrown);
@@ -829,7 +827,7 @@ function init_tree() {
 				// Update display
 				loadNode(current_node_id, appState);
 				
-				$nodeStatus.empty();
+				$nodeStatus.text(flashMsg.get());
 			}).fail(function (jqXHR, textStatus, errorThrown) {
 				console.log(jqXHR, textStatus, errorThrown);
 				$nodeStatus.text(textStatus + ", " + errorThrown);
@@ -843,7 +841,7 @@ function init_tree() {
 			node_adopt_members(parent_id, members).done(function (data) {
 				hide_member($member);
 				
-				$nodeStatus.empty();
+				$nodeStatus.text(flashMsg.get());
 			}).fail(function (jqXHR, textStatus, errorThrown) {
 				console.log(jqXHR, textStatus, errorThrown);
 				$nodeStatus.text(textStatus + ", " + errorThrown);
@@ -876,6 +874,30 @@ function init_tree() {
 		return getMemberIDs($(".member.ui-selected", context));
 	}
 	
+	/**
+	 * Select a whole range of selectables and return them.
+	 */
+	function _selectRange(that, event) {
+		var $selected = $(that).find('.member.ui-selected');
+		
+		if ($selected.length == 0) {
+			that._$lastSelected = null;
+			console.log("Unset _$lastSelected.");
+		} else if (that._$lastSelected != null && $selected.length == 1 && event.shiftKey) {
+			// Select all from this._$lastSelected to current selection
+			var $members = $(that).find('.member');
+			var start = $members.index(that._$lastSelected);
+			var stop = $members.index($selected.last()) + 1;
+			
+			$selected = $members.slice(start, stop).addClass("ui-selected highlight");
+		} else if ($selected.length > 0) {
+			that._$lastSelected = $selected.first();
+			console.log("Set _$lastSelected.");
+		} 
+		
+		return $selected;
+	}
+	
 	$("#node-pane").selectable({
 		filter: ".member",
 		appendTo: "#node-pane",
@@ -884,8 +906,9 @@ function init_tree() {
 		    "ui-selecting": "highlight",
 		    "ui-selected": "highlight",
 		},
-		stop: function () {
-			var selectedMembers = getSelectedMembers("#node-pane");
+		stop: function (event, ui) {
+			var $selected = _selectRange(this, event);
+			var selectedMembers = getMemberIDs($selected);
 			
 			$("#btn-group-selected").toggleClass("disabled", selectedMembers.length < 1);
 			
@@ -901,8 +924,9 @@ function init_tree() {
 		    "ui-selecting": "highlight",
 		    "ui-selected": "highlight",
 		},
-		stop: function (event) {
-			var selectedMembers = getSelectedMembers("#recommend-pane");
+		stop: function (event, ui) {
+			var $selected = _selectRange(this, event);
+			var selectedMembers = getMemberIDs($selected);
 			
 			$("#recommend-status").text("Selected " + selectedMembers.length + " candidates.");
 		}
@@ -966,14 +990,17 @@ function init_tree() {
 	 */
 	$("#btn-classify-members").on("click", function () {
 		var node_id = appState.node.node_id;
+		
 		console.log("Classifying", node_id);
 		
-		$nodeStatus.text("Classifying members of " + node_id + " into starred members...");
+		$nodeStatus.text("Classifying " + appState.display + " of " + node_id + " into starred members...");
+		
+		req_params = {};
+		req_params[appState.display == "children" ? "nodes" : "objects"] = 1;
 		
 		$.ajax({
 			type: "POST",
-			url: "/api/nodes/" + node_id + "/classify",
-			data: JSON.stringify({node_id: node_id}),
+			url: "/api/nodes/" + node_id + "/classify?" + $.param(req_params),
 			contentType: "application/json; charset=utf-8",
 			dataType: "json",
 		}).done(function (resonse) {
@@ -981,7 +1008,7 @@ function init_tree() {
 			// Display parent node
 			loadNode(node_id, appState);
 			
-			$nodeStatus.text(`Sorted ${resonse.n_predicted_children} children and ${resonse.n_predicted_objects} objects.`);
+			flashMsg.set(`Sorted ${resonse.n_predicted_children} children and ${resonse.n_predicted_objects} objects.`);
 		}).fail(function (jqXHR, textStatus, errorThrown) {
 			console.log(jqXHR, textStatus, errorThrown);
 			$nodeStatus.text(textStatus + ", " + errorThrown);

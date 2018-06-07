@@ -48,11 +48,13 @@ nodes = Table('nodes', metadata,
     Column('_type_objects', ARRAY(String), nullable = True),
     # object_ids of type objects directly under this node
     Column('_own_type_objects', ARRAY(String), nullable = True),
-    # Number of objects below this node
-    Column('_recursive_n_objects', BigInteger, nullable = True),
+    # Number of objects directly below this node
+    Column('_n_objects', BigInteger, nullable = True),
+    # Number of all objects anywhere below this node
+    Column('_n_objects_deep', BigInteger, nullable = True),
     
-    # Depth of cached values
-    Column('cache_depth', Integer, nullable = False, server_default = "0"),
+    # Validity of cached values
+    Column('cache_valid', Boolean, nullable = False, server_default = "f"),
     
     # An orig_id must be unique inside a project
     Index('idx_orig_proj', 'orig_id', 'project_id', unique = True),

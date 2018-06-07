@@ -12,7 +12,7 @@ from flask import jsonify as flask_jsonify, request
 from flask.blueprints import Blueprint
 from sklearn.manifold.isomap import Isomap
 
-from morphocluster.tree import Tree, DEFAULT_CACHE_DEPTH
+from morphocluster.tree import Tree
 from urllib.parse import urlencode
 import warnings
 from morphocluster.classifier import Classifier
@@ -26,8 +26,8 @@ from morphocluster import models
 from morphocluster.extensions import database, redis_store
 from pprint import pprint
 from flask.helpers import url_for
-from itertools import chain
 from flask_restful import reqparse
+from morphocluster.helpers import seq2array
 
 
 api = Blueprint("api", __name__)
@@ -170,7 +170,7 @@ def create_node():
         
         log(connection, "create_node", node_id = node_id)
             
-        node = tree.get_node(node_id, cache_depth=DEFAULT_CACHE_DEPTH)
+        node = tree.get_node(node_id)
           
         result = _node(tree, node)
         
@@ -194,7 +194,7 @@ def _node(tree, node, include_children=False):
         "starred": node["starred"],
         "approved": node["approved"],
         "own_type_objects": node["_own_type_objects"],
-        "recursive_n_objects": int(node["_recursive_n_objects"]),
+        "n_objects_deep": int(node["_n_objects_deep"]),
     }
     
     if include_children:
@@ -204,72 +204,6 @@ def _node(tree, node, include_children=False):
 
 def _object(object_):
     return {"object_id": object_["object_id"]}
-
-#@api.route("/nodes/<int:node_id>/children", methods=["GET"])
-def node_children(node_id):
-    """
-    Provide a collection of children for the given node.
-    
-    In the case of root, a singleton list is returned.
-    
-    This contains all fields required by jstree.
-    
-    Returns:
-        List of dict:
-            - id: node id
-            - text: node name
-            - children: true / false / list of child ids
-            - icon: Icon for the node
-            - n_children: number of children
-    """
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
-        
-        flags = {k: request.args.get(k, 0) for k in ("include_children")}
-        expensive_values = DEFAULT_CACHE_DEPTH if flags["include_type_objects"] else 0
-        
-        result = [ _node(tree, c, **flags) for c in tree.get_children(node_id, expensive_values) ]
-            
-        return jsonify(result)
-
-#@api.route("/nodes/<int:node_id>/leaves", methods=["GET"])
-def get_node_leaves(node_id):
-    """
-    Provide a collection of leaves for the given node.
-    
-    Data is in the same format as node_children.
-    
-    Returns:
-        List of dict:
-            - id: node id
-            - text: node name
-            - children: true / false / list of child ids
-            - icon: Icon for the node
-            - n_children: number of children
-    """
-    flags = {k: request.args.get(k, 0) for k in ("include_preview",)}
-    
-    result = [ _node(tree, c, **flags) for c in tree.get_leaves(node_id) ]
-        
-    return jsonify(result)
-
-#@api.route("/nodes/<int:node_id>/objects", methods=["GET"])
-def get_node_objects(node_id):
-    """
-    Provide a collection of objids for the given node.
-    
-    Returns:
-        List of objids
-    """
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
-    
-        objects = tree.get_objects(node_id)
-        
-        slice_ = slice(request.args.get("start", None, type=int),
-                       request.args.get("stop", None, type=int))
-        
-        return jsonify([o["object_id"] for o in objects[slice_]])
 
 
 def _arrange_by_sim(result):
@@ -295,8 +229,13 @@ def _arrange_by_sim(result):
         subsample = vectors[idxs]
     
     start = time.perf_counter()
-    isomap = Isomap(n_components=1, n_neighbors=ISOMAP_N_NEIGHBORS, n_jobs=4).fit(subsample)
-    order = np.squeeze(isomap.transform(vectors))
+    
+    try:
+        isomap = Isomap(n_components=1, n_neighbors=ISOMAP_N_NEIGHBORS, n_jobs=4).fit(subsample)
+        order = np.squeeze(isomap.transform(vectors))
+    except ValueError:
+        print(subsample)
+        raise
     elapsed = time.perf_counter() - start
     
     print("Arranging of {:,d} elements took {}s".format(len(vectors), elapsed))
@@ -346,7 +285,7 @@ def cache_serialize_page(func, page_size = 100, compress = True):
     `func` is expected to return a json-serializable list.
     It gains the `page` and `request_id` parameter. The resulting list is split into batches of `page_size` items.
     
-    Parameters:
+    URL parameters:
         func: func(*args, **kwargs) -> list
         
     Return:
@@ -419,31 +358,6 @@ def cache_serialize_page(func, page_size = 100, compress = True):
     
     return wrapper
     
-def seq2array(seq, dtype, length):
-    """
-    Converts a sequence consisting of `numpy array`s to a single array.
-    Elements that are None are converted to an appropriate zero entry.
-    """
-    
-    seq = iter(seq)
-    leading = []
-    zero = None
-    
-    for x in seq:
-        leading.append(x)
-        if x is not None:
-            zero = np.zeros_like(x)
-            break
-        
-    if zero is None:
-        raise ValueError("Empty sequence or only None")
-    
-    array = np.empty((length,) + zero.shape, zero.dtype)
-    for i, x in enumerate(chain(leading, seq)):
-        array[i] = zero if x is None else x 
-    
-    return array
-    
 def _arrange_by_starred_sim(result, starred):
     if len(starred) == 0:
         return _arrange_by_sim(result)
@@ -453,8 +367,8 @@ def _arrange_by_starred_sim(result, starred):
     
     # Get vectors
     vectors = seq2array((m["_centroid"] if "_centroid" in m else m["vector"] for m in result),
-                        float, len(result))
-    starred_vectors = seq2array((m["_centroid"] for m in starred), float, len(starred))
+                        len(result))
+    starred_vectors = seq2array((m["_centroid"] for m in starred), len(starred))
 
     try:
         classifier = Classifier(starred_vectors)
@@ -481,12 +395,12 @@ def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", 
         
         result = []
         if nodes:
-            result.extend(tree.get_children(node_id, cache_depth = DEFAULT_CACHE_DEPTH, include=sorted_nodes_include))
+            result.extend(tree.get_children(node_id, include=sorted_nodes_include))
         if objects:
             result.extend(tree.get_objects(node_id))
             
         if arrange_by == "starred_sim" or starred_first:
-            starred = tree.get_children(node_id, cache_depth = DEFAULT_CACHE_DEPTH, include="starred")
+            starred = tree.get_children(node_id, include="starred")
             
         if arrange_by != "":
             result = np.array(result, dtype=object)
@@ -496,7 +410,7 @@ def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", 
             elif arrange_by == "nleaves":
                 order = _arrange_by_nleaves(result)
             elif arrange_by == "starred_sim":
-                starred = tree.get_children(node_id, cache_depth = DEFAULT_CACHE_DEPTH, include="starred")
+                starred = tree.get_children(node_id, include="starred")
                 order = _arrange_by_starred_sim(result, starred)
             else:
                 warnings.warn("arrange_by={} not supported!".format(arrange_by))
@@ -517,7 +431,7 @@ def get_node_members(node_id):
     """
     Provide a collection of objects and/or children.
     
-    Parameters:
+    URL parameters:
         node_id (int): ID of a node
         
     Request parameters:
@@ -605,9 +519,9 @@ def get_node(node_id):
     with database.engine.connect() as connection:
         tree = Tree(connection)
         
-        flags = {k: request.args.get(k, 0) for k in ("include_children",)}
+        flags = {k: request.args.get(k, 0, strtobool) for k in ("include_children",)}
         
-        node = tree.get_node(node_id, cache_depth=DEFAULT_CACHE_DEPTH)
+        node = tree.get_node(node_id)
         
         log(connection, "get_node", node_id = node_id)
         
@@ -622,7 +536,7 @@ def patch_node(node_id):
         tree = Tree(connection)
         
         data = request.get_json()
-        flags = {k: request.args.get(k, 0) for k in ("include_children",)}
+        flags = {k: request.args.get(k, 0, strtobool) for k in ("include_children",)}
         
         # TODO: Use argparse
         if "starred" in data:
@@ -646,10 +560,10 @@ def node_adopt_members(parent_id):
     """
     Adopt a list of nodes.
     
-    Parameters:
+    URL parameters:
         parent_id (int): ID of the node that accepts new members.
         
-    Request data:
+    Request parameters:
         members: List of nodes ({node_id: ...}) and objects ({object_id: ...}).
     
     Returns:
@@ -674,8 +588,8 @@ def node_get_recommended_children(node_id):
     with database.engine.connect() as connection:
         tree = Tree(connection)
     
-        flags = {k: request.args.get(k, 0) for k in ("include_children",)}
-        result = [ _node(tree, c, **flags) for c in tree.recommend_children(node_id) ]
+        flags = {k: request.args.get(k, 0, strtobool) for k in ("include_children",)}
+        result = [ _node(tree, c, **flags) for c in tree.recommend_children(node_id, max_n = 10) ]
         
         return jsonify(result)
 
@@ -701,9 +615,9 @@ def node_get_n_sorted(node_id):
     with database.engine.connect() as connection:
         tree = Tree(connection)
         
-        nodes = tree.get_minlevel_starred(node_id, cache_depth = DEFAULT_CACHE_DEPTH)
+        nodes = tree.get_minlevel_starred(node_id)
         
-        n_sorted = sum(n["_recursive_n_objects"] for n in nodes)
+        n_sorted = sum(n["_n_objects_deep"] for n in nodes)
         
         return jsonify(n_sorted)
     
@@ -713,7 +627,7 @@ def post_node_merge_into(node_id):
     """
     Merge a node into another node.
     
-    Parameters:
+    URL parameters:
         node_id: Node that is merged.
         
     Request parameters:
@@ -736,15 +650,27 @@ def post_node_classify(node_id):
     """
     Classify the members of a node into their starred siblings.
     
-    Parameters:
+    URL parameters:
         node_id: Parent of the classified members.
+        
+    GET parameters:
+        nodes (boolean): Classify nodes? (Default: False)
+        objects (boolean): Classify objects? (Default: False)
     """
+    
+    flags = {k: request.args.get(k, 0, strtobool) for k in ("nodes","objects")}
+    
+    print(flags)
+    
+    n_predicted_children = 0
+    n_predicted_objects = 0
+    
     with database.engine.connect() as connection:
         tree = Tree(connection)
         
         # Split children into starred and unstarred
         with connection.begin():
-            children = tree.get_children(node_id, cache_depth = DEFAULT_CACHE_DEPTH)
+            children = tree.get_children(node_id)
             
             starred = []
             unstarred = []
@@ -752,43 +678,42 @@ def post_node_classify(node_id):
                 (starred if c["starred"] else unstarred).append(c)
                 
             starred_centroids = np.array([c["_centroid"] for c in starred])
-            unstarred_centroids = np.array([c["_centroid"] for c in unstarred])
-            unstarred_ids = np.array([c["node_id"] for c in unstarred])
             
+            # Initialize classifier
             classifier = Classifier(starred_centroids)
             
-            # Predict unstarred children (if any)
-            n_unstarred = len(unstarred_centroids)
-            if n_unstarred > 0:
-                print("Predicting {} unstarred children of {}...".format(n_unstarred, node_id))
-                type_predicted = classifier.classify(unstarred_centroids)
+            if flags["nodes"]:
+                unstarred_centroids = np.array([c["_centroid"] for c in unstarred])
+                unstarred_ids = np.array([c["node_id"] for c in unstarred])
                 
-                print(type_predicted)
+                # Predict unstarred children (if any)
+                n_unstarred = len(unstarred_centroids)
+                if n_unstarred > 0:
+                    print("Predicting {} unstarred children of {}...".format(n_unstarred, node_id))
+                    type_predicted = classifier.classify(unstarred_centroids)
+                    
+                    for i, starred_node in enumerate(starred):
+                        nodes_to_move = [int(n) for n in unstarred_ids[type_predicted == i]]
+                        tree.relocate_nodes(nodes_to_move, starred_node["node_id"])
+                        
+                    n_predicted_children = np.sum(type_predicted > -1)
+            
+            if flags["objects"]:
+                #Predict objects
+                objects = tree.get_objects(node_id)
+                print("Predicting {} objects of {}...".format(len(objects), node_id))
+                object_vectors = np.array([o["vector"] for o in objects])
+                object_ids = np.array([o["object_id"] for o in objects])
+                
+                type_predicted = classifier.classify(object_vectors)
                 
                 for i, starred_node in enumerate(starred):
-                    nodes_to_move = [int(n) for n in unstarred_ids[type_predicted == i]]
-                    tree.relocate_nodes(nodes_to_move, starred_node["node_id"])
+                    objects_to_move = [str(o) for o in object_ids[type_predicted == i]]
+                    tree.relocate_objects(objects_to_move, starred_node["node_id"])
                     
-                n_predicted_children = np.sum(type_predicted > -1)
-            else:
-                n_predicted_children = 0
+                n_predicted_objects = np.sum(type_predicted > -1)
             
-            
-            #Predict objects
-            objects = tree.get_objects(node_id)
-            print("Predicting {} objects of {}...".format(len(objects), node_id))
-            object_vectors = np.array([o["vector"] for o in objects])
-            object_ids = np.array([o["object_id"] for o in objects])
-            
-            type_predicted = classifier.classify(object_vectors)
-            
-            for i, starred_node in enumerate(starred):
-                objects_to_move = [str(o) for o in object_ids[type_predicted == i]]
-                tree.relocate_objects(objects_to_move, starred_node["node_id"])
-                
-            n_predicted_objects = np.sum(type_predicted > -1)
-            
-            log(connection, "classify_members", node_id = node_id)
+            log(connection, "classify_members(nodes={nodes},objects={objects})".format(**flags), node_id = node_id)
             
             return jsonify({"n_predicted_children": int(n_predicted_children),
                             "n_predicted_objects": int(n_predicted_objects)})

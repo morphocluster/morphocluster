@@ -16,7 +16,7 @@ from werkzeug import check_password_hash, generate_password_hash
 from morphocluster import models
 from morphocluster.api import api
 from morphocluster.models import objects, nodes, projects, nodes_objects
-from morphocluster.tree import Tree, CACHE_DEPTH_MAX
+from morphocluster.tree import Tree
 from time import sleep
 from morphocluster.extensions import database, redis_store, migrate
 import flask_migrate
@@ -54,7 +54,7 @@ def clear_cache():
         # Cached values are prefixed with an underscore
         cached_columns = list(c for c in nodes.columns.keys() if c.startswith("_"))
         values = {c: None for c in cached_columns}
-        values["cache_depth"] = 0
+        values["cache_valid"] = False
         stmt = nodes.update().values(values)
         txn.execute(stmt)
         
@@ -78,13 +78,12 @@ def clear_projects():
         
         
 @app.cli.command()
-@click.option('--depth', type=int, default = CACHE_DEPTH_MAX)
-def warm_cache(depth):
-    print("Warming the cache (depth {})...".format(depth))
+def warm_cache():
+    print("Warming the cache...")
     with database.engine.connect() as conn:
         tree = Tree(conn)
         for p in tree.get_projects():
-            tree.get_node(p["node_id"], cache_depth = depth)
+            tree.get_node(p["node_id"])
     
 
 @app.cli.command()

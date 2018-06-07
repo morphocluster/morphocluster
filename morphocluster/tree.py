@@ -18,10 +18,7 @@ import warnings
 from morphocluster.classifier import Classifier
 from morphocluster.extensions import database
 import csv
-
-
-DEFAULT_CACHE_DEPTH = 2
-CACHE_DEPTH_MAX = 0xFFFFFF
+from genericpath import commonprefix
 
 
 class TreeError(Exception):
@@ -41,6 +38,38 @@ def _roundrobin(iterables):
             # Remove the iterator we just exhausted from the cycle.
             num_active -= 1
             nexts = itertools.cycle(itertools.islice(nexts, num_active))
+
+
+
+def _paths_from_common_ancestor(paths):
+    """
+    Strips the common prefix (without the first common ancestor) from p1 and p2.
+    """
+    common_anestor_idx = len(commonprefix(paths)) - 1
+    return [p[common_anestor_idx:] for p in paths]
+
+
+def _paths_to_node_order(paths):
+    """
+    TODO: Returns nodes from list of paths in bottom-up order.
+    
+    Pop last element of longest path. Do not duplicate existing nodes.
+    """
+    
+    result = []
+    
+    while True:
+        longest_path = max(paths, key=len)
+        
+        if not longest_path:
+            break
+        
+        node = longest_path.pop()
+        
+        if node not in result:
+            result.append(node)
+    
+    return result
 
 
 class Tree(object):
@@ -119,7 +148,7 @@ class Tree(object):
         
         with self.connection.begin(), open(classification_fn, "w") as f:
             writer = csv.writer(f, delimiter=",")
-            starred_nodes = self.get_minlevel_starred(root_id, cache_depth = 0)
+            starred_nodes = self.get_minlevel_starred(root_id, cache_valid = False)
             
             bar = ProgressBar(len(starred_nodes), max_width=40)
             
@@ -260,20 +289,37 @@ class Tree(object):
         return node_id
     
     
-    def _calc_centroid(self, children, objects):
+    def _calc_centroid(self, node, children, objects):
         """
-        Calculate the centroid of a node as
-            a) the centroid of its children, or
-            b) the centroid of its objects, if the node is a leaf. 
+        Calculate the centroid of a node as the weighted mean of
+            a) the centroids of its children, and
+            b) the centroid of its own objects
         """
-        vectors = [ c["_centroid"] for c in children if c["_centroid"] is not None ]
+        # ToDo: Account for number of objects
+        
+        # Weight each child centroid with the number of objects it stands for
+        centroids = [c["_n_objects_deep"] * c["_centroid"] for c in children if c["_centroid"] is not None]
+        
+        # Calculate centroid for own objects    
+        object_vectors = [ o["vector"] for o in objects if o["vector"] is not None ]
+        
+        if len(object_vectors) > 0:
+            object_centroid = np.mean(object_vectors, axis=0)
             
-        if len(vectors) == 0:
-            vectors = [ o["vector"] for o in objects if o["vector"] is not None ]
+            # Weight object_centroid with the number of objects it stands for
+            object_centroid *= node["_n_objects"]
             
-        if len(vectors) > 0:
-            centroid = np.mean(vectors, axis=0)
-            centroid /= np.linalg.norm(centroid)
+            centroids.append(object_centroid)
+            
+        if len(centroids) > 0:
+            centroid = np.mean(centroids, axis=0)
+            
+            try:
+                # Divide by the number of objects it stands for
+                centroid /= node["_n_objects_deep"]
+            except TypeError:
+                print("_n_objects_deep:", repr(node["_n_objects_deep"]))
+                raise
             
             return centroid
         else:
@@ -326,19 +372,19 @@ class Tree(object):
             return []
         
         
-    def _calc_recursive_n_objects(self, children, n_objects):
+    def _calc_n_objects_deep(self, node, children):
         """
         Recursively calculate the number of objects.
         """
         
-        child_ns = [c["_recursive_n_objects"] for c in children]
+        child_ns = [c["_n_objects_deep"] for c in children]
         
         if any(n is None for n in child_ns):
             return None
         
-        return n_objects + sum(child_ns)
+        return int(node["_n_objects"] + sum(child_ns))
     
-    def _query_recursive_n_objects(self, node):
+    def _query_n_objects_deep(self, node):
         # Recursively select all descendants
         rquery = select([nodes]).where(nodes.c.node_id == node["node_id"]).cte(recursive=True)
         
@@ -359,7 +405,7 @@ class Tree(object):
         
         result = self.connection.scalar(stmt) or 0
         
-        return result
+        return int(result)
     
     def node_n_descendants(self, node_id):
         # Recursively select all descendants
@@ -378,62 +424,67 @@ class Tree(object):
         
         return result
     
-    def _upgrade_node(self, node, depth = DEFAULT_CACHE_DEPTH):
+    def _upgrade_node(self, node, require_valid = True, _rec_depth=0):
         """
         Parameters:
-            depth: Cache depth.
-                0: No calculations are performed
-                >0: The hierarchy is traversed to calculate meaningful values
+            node (dict): Fields of the node.
+            require_valid: Are valid cache values required?
         """
-        if depth == 0:
+        
+        # If no valid cache values are required or the node is already valid,
+        # return unchanged.
+        if not require_valid or node["cache_valid"]:
             return node
 
-        if node["cache_depth"] >= depth:
-            return node
-        
-        print("Upgrading node {}...".format(node["node_id"]))
+        print("{}Upgrading node {}...".format(" " * _rec_depth, node["node_id"]))
         
         if node["n_children"] > 0:
-            children = self.get_children(node["node_id"], cache_depth = depth - 1)
+            # The recursive calculation happens here
+            children = self.get_children(node["node_id"], require_valid, _rec_depth = _rec_depth + 1)
         else:
             children = []
+            
+        # Limit to 1000 objects to speed up the calculation
+        # TODO: Select objects randomly
         objects = self.get_objects(node["node_id"], limit = 1000)
         
-        n_objects = self.get_n_objects(node["node_id"])
+        node["_n_objects"] = self.get_n_objects(node["node_id"])
             
-        node["_centroid"] = self._calc_centroid(children, objects)
-        if node["_centroid"] is None:
-            print("Node {} has no centroid!".format(node["node_id"]))
-            
+        # Hint: Uses vectors
         node["_own_type_objects"] = self._calc_own_type_objects(children, objects)
         
         node["_type_objects"] = self._calc_type_objects(children, objects)
         
-        node["_recursive_n_objects"] = self._calc_recursive_n_objects(children, n_objects)
+        node["_n_objects_deep"] = self._calc_n_objects_deep(node, children)
         
         # TODO: Remove assertion if we're sure enough that this works
-        query_recursive_n_objects = self._query_recursive_n_objects(node)
+        query_n_objects_deep = self._query_n_objects_deep(node)
         
-        if node["_recursive_n_objects"] is None:
-            node["_recursive_n_objects"] = query_recursive_n_objects
+        if node["_n_objects_deep"] is None:
+            node["_n_objects_deep"] = query_n_objects_deep
             
         else:
-            if node["_recursive_n_objects"] != query_recursive_n_objects:
-                warnings.warn("_recursive_n_objects do not match! {}!={}".format(node["_recursive_n_objects"], query_recursive_n_objects))
-                node["_recursive_n_objects"] = query_recursive_n_objects
+            if node["_n_objects_deep"] != query_n_objects_deep:
+                warnings.warn("_n_objects_deep do not match! {}!={}".format(node["_n_objects_deep"], query_n_objects_deep))
+                node["_n_objects_deep"] = query_n_objects_deep
+                
+        # Hint: Uses vectors
+        node["_centroid"] = self._calc_centroid(node, children, objects)
+        if node["_centroid"] is None:
+            print("Node {} has no centroid!".format(node["node_id"]))
             
         
-        node["cache_depth"] = depth
+        node["cache_valid"] = True
         
         # Store these values
-        update_fields = ("cache_depth", "_centroid", "_type_objects", "_own_type_objects", "_recursive_n_objects")
+        update_fields = ("cache_valid", "_centroid", "_type_objects", "_own_type_objects", "_n_objects_deep", "_n_objects")
         stmt = nodes.update().values({k: node[k] for k in update_fields}).where(nodes.c.node_id == node["node_id"])
         self.connection.execute(stmt)
                 
         return node
         
         
-    def get_node(self, node_id, cache_depth = 0):
+    def get_node(self, node_id, require_valid = True):
         assert isinstance(node_id, Integral), "node_id is not integral: {!r}".format(node_id)
         
         #=======================================================================
@@ -457,13 +508,19 @@ class Tree(object):
         if result is None:
             raise TreeError("Node {} is unknown.".format(node_id))
         
-        return self._upgrade_node(dict(result), cache_depth)
+        return self._upgrade_node(dict(result), require_valid)
         
         
-    def get_children(self, node_id, cache_depth = 0, order_by = None, include = None):
+    def get_children(self, node_id,
+                     require_valid = True,
+                     order_by = None,
+                     include = None,
+                     _rec_depth = 0):
         """
         
         Parameters:
+            node_id: node_id of the parent node.
+            require_valid (bool): Are valid cache values required?
             include ("starred" | "unstarred" | None):
                 None: return all chilren.
                 "starred": Return only starred children.
@@ -491,7 +548,7 @@ class Tree(object):
             
         result = self.connection.execute(stmt, node_id = node_id).fetchall()
         
-        return [self._upgrade_node(dict(r), cache_depth) for r in result]
+        return [self._upgrade_node(dict(r), require_valid, _rec_depth) for r in result]
         
 
     def merge_node_into(self, node_id, dest_node_id):
@@ -517,6 +574,10 @@ class Tree(object):
             
             # Delete node
             stmt = nodes.delete(nodes.c.node_id == node_id)
+            self.connection.execute(stmt)
+            
+            # Invalidate dest node
+            stmt = nodes.update().values(cache_valid = False).where(nodes.c.node_id == dest_node_id)
             self.connection.execute(stmt)
             
             
@@ -552,7 +613,7 @@ class Tree(object):
             ON      p.node_id = q.parent_id
         )
         UPDATE nodes
-        SET cache_depth = 0
+        SET cache_valid = FALSE
         WHERE node_id IN (SELECT node_id from q);
         """)
         
@@ -560,7 +621,7 @@ class Tree(object):
         
         
     def recommend_children(self, node_id, max_n = 1000):
-        node = self.get_node(node_id, cache_depth=DEFAULT_CACHE_DEPTH)
+        node = self.get_node(node_id)
         
         # Get the path to the node
         path = self.get_path_ids(node_id)
@@ -569,7 +630,7 @@ class Tree(object):
         
         # Traverse the path in reverse (without the node itself)
         for parent_id in path[:-1][::-1]:
-            nodes.extend(c for c in self.get_children(parent_id, cache_depth = DEFAULT_CACHE_DEPTH) if c["node_id"] not in path)
+            nodes.extend(c for c in self.get_children(parent_id) if c["node_id"] not in path)
             
             # Break if we already have enough nodes
             if len(nodes) > max_n:
@@ -590,7 +651,7 @@ class Tree(object):
     
     
     def recommend_objects(self, node_id, max_n = 1000):
-        node = self.get_node(node_id, cache_depth=DEFAULT_CACHE_DEPTH)
+        node = self.get_node(node_id)
         
         # Get the path to the node (without the node itself)        
         path = self.get_path_ids(node_id)[:-1]
@@ -619,6 +680,18 @@ class Tree(object):
         return objects[order].tolist()
     
     
+    def invalidate_nodes(self, nodes_to_invalidate):
+        """
+        Invalidate the provided nodes.
+        
+        Parameters:
+            nodes_to_invalidate: Collection of `node_id`s
+        """
+        
+        stmt = nodes.update().values({nodes.c.cache_valid: False}).where(nodes.c.node_id.in_(nodes_to_invalidate))
+        self.connection.execute(stmt)
+    
+    
     def relocate_nodes(self, node_ids, parent_id):
         """
         Relocate nodes to another parent.
@@ -628,19 +701,38 @@ class Tree(object):
             return
         
         with self.connection.begin():
+            
+            new_parent_path = self.get_path_ids(parent_id)
         
             # Check if the new parent is below the node
-            parent_path = set(self.get_path_ids(parent_id))
+            new_parent_set = set(new_parent_path)
             for node_id in node_ids:
-                if node_id in parent_path:
+                if node_id in new_parent_set:
                     raise TreeError("Relocating {} to {} would create a circle!".format(node_id, parent_id))
         
-        
-            stmt = nodes.update().values({"parent_id": parent_id}).where(nodes.c.node_id.in_(node_ids))
-            self.connection.execute(stmt)
+            #stmt = nodes.update().values({"parent_id": parent_id}).where(nodes.c.node_id.in_(node_ids))
             
-            self.invalidate_node_and_parents(parent_id)
-        
+            # Return distinct old `parent_id`s
+            stmt = text("""
+            WITH updater AS (
+                UPDATE nodes x
+                SET parent_id = :new_parent_id
+                FROM  (SELECT node_id, parent_id FROM nodes WHERE node_id IN :node_ids FOR UPDATE) y
+                WHERE  x.node_id = y.node_id
+                RETURNING y.parent_id AS old_parent_id
+            )
+            SELECT DISTINCT old_parent_id FROM updater;
+            """)
+            
+            # Fetch old_parent_ids
+            result = self.connection.execute(stmt, new_parent_id=parent_id, node_ids=tuple(node_ids)).fetchall()
+
+            # Invalidate subtree rooted at first common ancestor            
+            parent_paths = [new_parent_path] + [self.get_path_ids(r["old_parent_id"]) for r in result]
+            paths_to_update = _paths_from_common_ancestor(parent_paths)
+            nodes_to_invalidate = set(sum(paths_to_update, []))
+            self.invalidate_nodes(nodes_to_invalidate)
+            
         
     def relocate_objects(self, object_ids, node_id):
         """
@@ -652,13 +744,41 @@ class Tree(object):
         
         with self.connection.begin():
             # Poject id of the new node
-            project_id = select([nodes.c.project_id]).where(nodes.c.node_id == node_id).as_scalar()
+            project_id = select([nodes.c.project_id]).where(nodes.c.node_id == node_id)
+            project_id = self.connection.execute(project_id).scalar()
             
-            stmt = nodes_objects.update().values({"node_id": node_id})\
-                .where((nodes_objects.c.object_id.in_(object_ids)) & (nodes_objects.c.project_id == project_id))
-            self.connection.execute(stmt)
+            new_node_path = self.get_path_ids(node_id)
             
-            self.invalidate_node_and_parents(node_id)
+            #===================================================================
+            # stmt = nodes_objects.update().values({"node_id": node_id})\
+            #     .where((nodes_objects.c.object_id.in_(object_ids)) & (nodes_objects.c.project_id == project_id))
+            #===================================================================
+            
+            # Return distinct old `parent_id`s
+            stmt = text("""
+            WITH updater AS (
+                UPDATE nodes_objects x
+                SET node_id = :node_id
+                FROM  (SELECT object_id, node_id FROM nodes_objects
+                    WHERE project_id = :project_id AND object_id IN :object_ids FOR UPDATE) y
+                WHERE  project_id = :project_id AND x.object_id = y.object_id
+                RETURNING y.node_id AS old_node_id
+            )
+            SELECT DISTINCT old_node_id FROM updater;
+            """)
+            
+            # Fetch old_parent_ids
+            result = self.connection.execute(stmt,
+                                             node_id=node_id,
+                                             project_id=project_id,
+                                             object_ids=tuple(object_ids)
+                                            ).fetchall()
+            
+            # Invalidate subtree rooted at first common ancestor
+            paths = [new_node_path] + [self.get_path_ids(r["old_node_id"]) for r in result]
+            paths_to_update = _paths_from_common_ancestor(paths)
+            nodes_to_invalidate = set(sum(paths_to_update, []))
+            self.invalidate_nodes(nodes_to_invalidate)
         
         
     #===========================================================================
@@ -806,7 +926,7 @@ class Tree(object):
         
         return self.connection.execute(stmt, node_id = node_id).scalar()
     
-    def get_minlevel_starred(self, root_node_id, cache_depth):
+    def get_minlevel_starred(self, root_node_id, require_valid = True):
         """
         Returns all starred nodes with minimal depth.
         
@@ -826,7 +946,7 @@ class Tree(object):
         
         result = self.connection.execute(stmt).fetchall()
         
-        return [self._upgrade_node(dict(r), depth = cache_depth) for r in result]
+        return [self._upgrade_node(dict(r), require_valid = require_valid) for r in result]
 
     
 if __name__ in ("__main__", "builtins"):
