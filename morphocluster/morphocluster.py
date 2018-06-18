@@ -140,15 +140,17 @@ def load_features(features_fns):
         
 @app.cli.command()
 @click.argument('project_path')
-def load_project(project_path):
+@click.argument('project_name', default=None)
+def load_project(project_path, project_name):
     with database.engine.connect() as conn:
         tree = Tree(conn)
         
-        name = os.path.basename(os.path.normpath(project_path))
+        if project_name is None:
+            project_name = os.path.basename(os.path.normpath(project_path))
         
         with conn.begin():
             print("Loading {}...".format(project_path))
-            project_id = tree.load_project(name, project_path)
+            project_id = tree.load_project(project_name, project_path)
             root_id = tree.get_root_id(project_id)
             print("Simplifying...")
             tree.flatten_tree(root_id)
