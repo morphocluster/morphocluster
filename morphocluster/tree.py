@@ -19,6 +19,7 @@ from morphocluster.classifier import Classifier
 from morphocluster.extensions import database
 import csv
 from genericpath import commonprefix
+from morphocluster.helpers import seq2array
 
 
 class TreeError(Exception):
@@ -639,7 +640,7 @@ class Tree(object):
         vectors = [n["_centroid"] for n in nodes]
         
         nodes = np.array(nodes, dtype=object)
-        vectors = np.array(vectors)
+        vectors = seq2array(vectors, len(vectors))
             
         distances = np.linalg.norm(vectors - node["_centroid"], axis=1)
         
