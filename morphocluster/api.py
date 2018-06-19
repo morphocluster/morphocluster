@@ -279,119 +279,129 @@ def jsonify(*args, **kwargs):
         pprint(kwargs)
         raise
 
+def _load_or_calc(func, func_kwargs, request_id, page, page_size = 100, compress = True):
+    cache_key = '{}:{}:{}'.format(func.__name__,
+                                  json_dumps(func_kwargs, sort_keys = True, separators=(',', ':')),
+                                  request_id)
+    
+    print("Load or calc {}...".format(cache_key))
+    
+    try:
+        page_result = redis_store.lindex(cache_key, page)
+    
+        if page_result is not None:
+            n_pages = redis_store.llen(cache_key)
+            
+            if compress:
+                page_result = zlib.decompress(page_result)
+                
+            #print("Returning page {} from cached result".format(page))
+            
+            return page_result, n_pages
+        
+    except RedisError as e:
+        warnings.warn("RedisError: {}".format(e))
+        
+    # Calculate result
+    result = func(**func_kwargs)
+    
+    # Paginate full_result
+    pages = batch(result, page_size)
+    
+    # Serialize individual pages
+    pages = [json_dumps(p) for p in pages]
+    
+    n_pages = len(pages)
+    
+    if n_pages:
+        if compress:
+            #raw_length = sum(len(p) for p in pages)
+            cache_pages = [zlib.compress(p.encode()) for p in pages]
+            #compressed_length = sum(len(p) for p in pages)
+            
+            #print("Compressed pages. Ratio: {:.2%}".format(compressed_length / raw_length))
+        else:
+            cache_pages = pages
+            
+        try:
+            redis_store.rpush(cache_key, *cache_pages)
+        except RedisError as e:
+            warnings.warn("RedisError: {}".format(e))
+    
+    if 0 <= page < n_pages:
+        return pages[page], n_pages
+    
+    return "[]", n_pages
+    
 
-def cache_serialize_page(page_size = 100, compress = True):
+def cache_serialize_page(endpoint, _endpoint_args=(), **kwargs):
     """
     `func` is expected to return a json-serializable list.
     It gains the `page` and `request_id` parameter. The resulting list is split into batches of `page_size` items.
     
-    URL parameters:
-        func: func(*args, **kwargs) -> list
+    Decorated Function:
+        func: func(**kwargs) -> list
+        
+        ! func is expected to only take keyword parameters !
         
     Return:
-        (page, n_pages):
-            page: `json.dumps`ed `page`-th batch of result of the call to `func`.
-            n_pages: Total number of pages
+        Response()
     
     Example:
-        @cache_serialize_page
+        @cache_serialize_page()
         def foo():
             return ["a", "b", "c"]
             
         foo(page=0) -> "a", True
     """
     
+    _endpoint_args = set(_endpoint_args)
+    
     def decorator(func):
         @wraps(func)
-        def wrapper(*args, page = None, request_id = None, **kwargs):
+        def wrapper(page = None, request_id = None, **func_kwargs):
             if page is None:
                 raise ValueError("page may not be None!")
             
-            cache_key = '{}:{}:{}'.format(func.__name__,
-                                          json_dumps([args, kwargs], sort_keys = True, separators=(',', ':')),
-                                          request_id)
+            result, n_pages = _load_or_calc(func, func_kwargs, request_id, page, **kwargs)
             
-            try:
-                page_result = redis_store.lindex(cache_key, page)
+            #===================================================================
+            # Construct response
+            #===================================================================
+            response = Response(result, mimetype=api.config['JSONIFY_MIMETYPE'])
             
-                if page_result is not None:
-                    n_pages = redis_store.llen(cache_key)
-                    
-                    if compress:
-                        page_result = zlib.decompress(page_result)
+            #=======================================================================
+            # Generate Link response header
+            #=======================================================================
+            link_header_fields = []
+            link_parameters = {k: v for k, v in func_kwargs.items() if k not in _endpoint_args}
+            link_parameters["request_id"] = request_id
+            
+            if 0 < page < n_pages:
+                # Link to previous page
+                link_parameters["page"] = page - 1
+                url = "{}?{}".format(url_for(endpoint, **func_kwargs), urlencode(link_parameters))
+                link_header_fields.append('<{}>; rel="previous"'.format(url))
+            
+            
+            if page + 1 < n_pages:
+                # Link to next page
+                link_parameters["page"] = page + 1
+                url = "{}?{}".format(url_for(endpoint, **func_kwargs), urlencode(link_parameters))
+                link_header_fields.append('<{}>; rel="next"'.format(url))
+                
+            # Link to last page
+            link_parameters["page"] = n_pages - 1
+            url = "{}?{}".format(url_for(endpoint, **func_kwargs), urlencode(link_parameters))
+            link_header_fields.append('<{}>; rel="last"'.format(url))
+            
+            response.headers["Link"] = ",". join(link_header_fields)
                         
-                    #print("Returning page {} from cached result".format(page))
-                    
-                    return page_result, n_pages
-                
-            except RedisError as e:
-                warnings.warn("RedisError: {}".format(e))
-                
-            # Calculate result
-            result = func(*args, **kwargs)
+            return response
             
-            # Paginate full_result
-            pages = batch(result, page_size)
-            
-            # Serialize individual pages
-            pages = [json_dumps(p) for p in pages]
-            
-            n_pages = len(pages)
-            
-            if n_pages:
-                if compress:
-                    #raw_length = sum(len(p) for p in pages)
-                    cache_pages = [zlib.compress(p.encode()) for p in pages]
-                    #compressed_length = sum(len(p) for p in pages)
-                    
-                    #print("Compressed pages. Ratio: {:.2%}".format(compressed_length / raw_length))
-                else:
-                    cache_pages = pages
-                    
-                try:
-                    redis_store.rpush(cache_key, *cache_pages)
-                except RedisError as e:
-                    warnings.warn("RedisError: {}".format(e))
-            
-            if 0 <= page < n_pages:
-                return pages[page], n_pages
-            
-            return "[]", n_pages
-        
         return wrapper
     
-    return decorator
-
-def cache_result_helper(base_url, result, n_pages, parameters):
-    response = Response(result, mimetype=api.config['JSONIFY_MIMETYPE'])
-    
-    #=======================================================================
-    # Generate Link response header
-    #=======================================================================
-    link_header_fields = []
-    link_parameters = dict(parameters)
-    if 0 < parameters.page < n_pages:
-        # Link to previous page
-        link_parameters["page"] = parameters.page - 1
-        url = "{}?{}".format(base_url, urlencode(link_parameters))
-        link_header_fields.append('<{}>; rel="previous"'.format(url))
-    
-    
-    if parameters.page + 1 < n_pages:
-        # Link to next page
-        link_parameters["page"] = parameters.page + 1
-        url = "{}?{}".format(base_url, urlencode(link_parameters))
-        link_header_fields.append('<{}>; rel="next"'.format(url))
-        
-    # Link to last page
-    link_parameters["page"] = n_pages - 1
-    url = "{}?{}".format(base_url, urlencode(link_parameters))
-    link_header_fields.append('<{}>; rel="last"'.format(url))
-    
-    response.headers["Link"] = ",". join(link_header_fields)
-                
-    return response
-    
+    return decorator    
     
 def _arrange_by_starred_sim(result, starred):
     if len(starred) == 0:
@@ -421,7 +431,7 @@ def _arrange_by_starred_sim(result, starred):
         raise
 
 
-@cache_serialize_page()
+@cache_serialize_page(".get_node_members", {"node_id"})
 def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", starred_first = False):
     with database.engine.connect() as connection:
         tree = Tree(connection)
@@ -493,16 +503,8 @@ def get_node_members(node_id):
     if arguments.request_id is None:
         arguments.request_id = uuid.uuid4().hex
     
-    result, n_pages = _get_node_members(node_id, arguments.nodes, arguments.objects, arguments.arrange_by,
-                                        arguments.starred_first,
-                                        page = arguments.page,
-                                        request_id = arguments.request_id)
+    return _get_node_members(node_id = node_id, **arguments)
     
-    return cache_result_helper(url_for(".get_node_members", node_id = node_id),
-                               result,
-                               n_pages,
-                               arguments)
-
 @api.route("/nodes/<int:node_id>/members", methods=["POST"])
 def post_node_members(node_id):
     data = request.get_json()
@@ -592,7 +594,7 @@ def node_adopt_members(parent_id):
         return jsonify({})
         
         
-@cache_serialize_page(page_size=20)
+@cache_serialize_page(".node_get_recommended_children", {"node_id"}, page_size=20)
 def _node_get_recommended_children(node_id, max_n):
     with database.engine.connect() as connection:
         tree = Tree(connection)
@@ -620,14 +622,9 @@ def node_get_recommended_children(node_id):
     # Limit max_n
     arguments.max_n = max(arguments.max_n, 1000)
     
-    result, n_pages = _node_get_recommended_children(node_id, **arguments)
-    
-    return cache_result_helper(url_for(".node_get_recommended_children", node_id = node_id),
-                               result,
-                               n_pages,
-                               arguments)
+    return _node_get_recommended_children(node_id = node_id, **arguments)
 
-@cache_serialize_page(page_size=20)
+@cache_serialize_page(".node_get_recommended_objects", {"node_id"}, page_size=20)
 def _node_get_recommended_objects(node_id, max_n):
     with database.engine.connect() as connection:
         tree = Tree(connection)
@@ -658,13 +655,8 @@ def node_get_recommended_objects(node_id):
     # Limit max_n
     arguments.max_n = max(arguments.max_n, 1000)
     
-    result, n_pages = _node_get_recommended_objects(node_id, **arguments)
-    
-    return cache_result_helper(url_for(".node_get_recommended_objects", node_id = node_id),
-                               result,
-                               n_pages,
-                               arguments)
-    
+    return _node_get_recommended_objects(node_id = node_id, **arguments)
+
     
 @api.route("/nodes/<int:node_id>/tip", methods=["GET"])
 def node_get_tip(node_id):
