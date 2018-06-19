@@ -6,13 +6,15 @@ function init_tree() {
 	var $nodeStatus = $("#node-status");
 	var $treeStatus = $("#tree-status");
 	var $nodePane = $('#node-pane');
+	var $recommendPane = $("#recommend-pane");
+	var $recommendStatus = $("#recommend-status");
 	
 	var appState = {
 			node: undefined,
 			display: "children"
 	};
 	
-	var nodePaneScrollHandler;
+	var nodePaneScrollHandler, recommendPaneScrollHandler;
 	
 	var flashMsg = new function FlashMsg() {
 		this.msg = "";
@@ -354,52 +356,85 @@ function init_tree() {
 	 * Display the recommendations this node.
 	 */
 	function display_recommendations(node_id, cause, callback) {
-		$("#recommend-status").text("Loading recommendations for " + node_id + "...");
-		$("#recommend-pane").empty();
+		$recommendStatus.text("Loading recommendations for " + node_id + "...");
 		
 		var node = appState.node;
 		
-		if (node.n_children == 0) {
-			// This node is a leaf. Recommend objects.
-			console.log("Recommending objects.");
-			
-			$.get("/api/nodes/" + node_id + '/recommended_objects', {max_n: 60}).done(function (response) {
-				var $row = $('<div class="row"/>').appendTo($("#recommend-pane"));
-				
-				$.each(response, function (k, member) {
-					$row.append($('<div class="col col-6" />').append(render_member(member, ["norecommend"])));
-				});
-				
-				$("#recommend-status").empty();
-			}).fail(function (jqXHR, textStatus, errorThrown) {
-				console.log(jqXHR, textStatus, errorThrown);
-				$("#recommend-status").text(textStatus + ", " + errorThrown);
+		$recommendPane.empty();
+		
+		/*$recommendPane.html("<h1>Recommended children for " + node_id + "</h1>");
+		$recommendPane.append('<p>' + response.length + ' recommendations.</p>');*/
+		
+		var $row = $('<div class="row"/>').appendTo($recommendPane);
+		
+		var $loading = $('<div class="col col-2"/>').text("Loading...").appendTo($row);
+		
+		var members_loading = false;
+		var next_url = "";
+		
+		var processResponse = function (response, textStatus, jqXHR) {
+			$loading.detach();
+			$.each(response, function (k, member) {
+				$row.append($('<div class="col col-6" />').append(render_member(member, ["uptohere"])));
 			});
 			
-		} else {
-			// This node is a inner node. Recommend children.
+			// See if there is more data
+			var links = parseLinkHeader(jqXHR.getResponseHeader("Link"));
+			if ("next" in links) {
+				next_url = links["next"];
+				$loading.appendTo($row);
+			} else {
+				next_url = "";
+			}
+			
+			$recommendStatus.empty();
+			members_loading = false;
+		};
+		
+		if (appState.display == "children") {
 			console.log("Recommending children.");
 			
-			$.get("/api/nodes/" + node_id + '/recommended_children', {max_n: 1000}).done(function (response) {
-				var $recommend_pane = $("#recommend-pane");
-				
-				$recommend_pane.html("<h1>Recommended children for " + node_id + "</h1>");
-				
-				$recommend_pane.append('<p>' + response.length + ' recommendations.</p>');
-				
-				var $row = $('<div class="row"/>').appendTo($recommend_pane);
-				
-				$.each(response, function (k, member) {
-					$row.append($('<div class="col col-6" />').append(render_member(member, ["norecommend"])));
-				});
-				
-				$("#recommend-status").empty();
-			}).fail(function (jqXHR, textStatus, errorThrown) {
-				console.log(jqXHR, textStatus, errorThrown);
-				$("#recommend-status").text(textStatus + ", " + errorThrown);
-			});
+			members_loading = true;
+			$.get("/api/nodes/" + node_id + '/recommended_children', {max_n: 1000}).done(processResponse).fail(
+					function (jqXHR, textStatus, errorThrown) {
+						console.log(jqXHR, textStatus, errorThrown);
+						$recommendStatus.text(textStatus + ", " + errorThrown);
+					});
+		} else {
+			console.log("Recommending objects.");
+			
+			members_loading = true;
+			$.get("/api/nodes/" + node_id + '/recommended_objects', {max_n: 60}).done(processResponse).fail(
+					function (jqXHR, textStatus, errorThrown) {
+						console.log(jqXHR, textStatus, errorThrown);
+						$recommendStatus.text(textStatus + ", " + errorThrown);
+					});
 		}
+		
+		recommendPaneScrollHandler = function () {
+			var scrollBottom = $recommendPane.prop('scrollHeight') - $recommendPane.height() - $recommendPane.scrollTop();
+			if(scrollBottom > 100) {
+				return;
+			}
+			
+			
+			if(!members_loading && next_url.length) {
+				members_loading = true;
+				$recommendStatus.text("Loading more...");
+				console.log("Loading", next_url);
+				$.get(next_url).done(processResponse).fail(function (jqXHR, textStatus, errorThrown) {
+					console.log(jqXHR, textStatus, errorThrown);
+					$recommendStatus.text(textStatus + ", " + errorThrown);
+				});
+			}
+		};
 	}
+	
+	$recommendPane.on("scroll", function () {
+		if(typeof(recommendPaneScrollHandler) == "function") {
+			recommendPaneScrollHandler();
+		}
+	});
 	
 	
 	$("#node-pane,#recommend-pane").tooltip({
@@ -477,6 +512,10 @@ function init_tree() {
 					icon: "mdi-arrow-expand-all",
 					title: "Expand this member"
 				};
+			},
+			"uptohere": {
+				icon: "mdi-arrow-collapse-right",
+				title: "Select all members up to this one"
 			}
 	};
 	
@@ -745,7 +784,7 @@ function init_tree() {
 		var selectedMembers = getSelectedMembers("#recommend-pane");
 		var node_id = appState.node.node_id;
 		
-		$("#recommend-status").text("Adding " + selectedMembers.length + " members to " + node_id + "...");
+		$recommendStatus.text("Adding " + selectedMembers.length + " members to " + node_id + "...");
 		
 		$.ajax({
 			type: "POST",
@@ -760,10 +799,10 @@ function init_tree() {
 			// Update node
 			loadNode(node_id, appState);
 			
-			$("#recommend-status").empty();
+			$recommendStatus.empty();
 		}).fail(function (jqXHR, textStatus, errorThrown) {
 			console.log(jqXHR, textStatus, errorThrown);
-			$("#recommend-status").text(textStatus + ", " + errorThrown);
+			$recommendStatus.text(textStatus + ", " + errorThrown);
 		});
 		
 		return false;
@@ -807,7 +846,6 @@ function init_tree() {
 		var $this = $(this);
 		var $member = $this.closest(".member");
 		var member_node_id = $member.data("node_id");
-		var member_node_id = $member.data("node_id");
 		var current_node_id = appState.node.node_id;
 		var action = $this.data("action");
 		
@@ -846,6 +884,12 @@ function init_tree() {
 				console.log(jqXHR, textStatus, errorThrown);
 				$nodeStatus.text(textStatus + ", " + errorThrown);
 			});
+		} else if (action == "uptohere") {
+			var $selectable = $member.closest(".ui-selectable");
+			var $members = $selectable.find(".member");
+			$selectable._$lastSelected = $members[0];
+			var stop = $members.index($member) + 1;
+			$members.slice(0, stop).addClass("ui-selected highlight");
 		}
 		
 		return false;
@@ -907,6 +951,8 @@ function init_tree() {
 		    "ui-selected": "highlight",
 		},
 		stop: function (event, ui) {
+			console.log(event, ui);
+			
 			var $selected = _selectRange(this, event);
 			var selectedMembers = getMemberIDs($selected);
 			
@@ -928,7 +974,7 @@ function init_tree() {
 			var $selected = _selectRange(this, event);
 			var selectedMembers = getMemberIDs($selected);
 			
-			$("#recommend-status").text("Selected " + selectedMembers.length + " candidates.");
+			$recommendStatus.text("Selected " + selectedMembers.length + " candidates.");
 		}
 	});
 	
