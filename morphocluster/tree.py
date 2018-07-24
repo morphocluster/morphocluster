@@ -165,7 +165,7 @@ class Tree(object):
                 object_idxs = raw_tree_objects[raw_tree_objects["parent"] == row.child]["child"]
                 object_ids = objids[object_idxs]
                 
-                name = row.name if pd.notnull(row.name) else None
+                name = row.name if hasattr(row, "name") and pd.notnull(row.name) else None
 
                 self.create_node(project_id,
                                  orig_node_id = row.child,
