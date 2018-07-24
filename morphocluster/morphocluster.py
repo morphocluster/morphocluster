@@ -20,7 +20,6 @@ from morphocluster.tree import Tree
 from time import sleep
 from morphocluster.extensions import database, redis_store, migrate
 import flask_migrate
-import csv
 
 app = Flask(__name__)
 
@@ -152,9 +151,40 @@ def load_project(project_path, project_name):
             print("Loading {}...".format(project_path))
             project_id = tree.load_project(project_name, project_path)
             root_id = tree.get_root_id(project_id)
-            print("Simplifying...")
-            tree.flatten_tree(root_id)
-            tree.prune_chains(root_id)
+            #print("Simplifying...")
+            #tree.flatten_tree(root_id)
+            #tree.prune_chains(root_id)
+            
+            
+@app.cli.command()
+@click.argument('root_id', type=int)
+def connect_supertree(root_id):
+    with database.engine.connect() as conn:
+        tree = Tree(conn)
+        
+        tree.connect_supertree(root_id)
+        
+@app.cli.command()
+@click.argument('root_id', type=int)
+def upgrade_nodes(root_id):
+    with database.engine.connect() as conn:
+        tree = Tree(conn)
+        
+        tree.upgrade_nodes(root_id)
+        
+@app.cli.command()
+@click.argument('root_id', type=int)
+def flatten_tree(root_id):
+    with database.engine.connect() as conn:
+        tree = Tree(conn)
+        tree.flatten_tree(root_id)
+        
+@app.cli.command()
+@click.argument('root_id', type=int)
+def consolidate(root_id):
+    with database.engine.connect() as conn:
+        tree = Tree(conn)
+        tree.consolidate_node(root_id)
         
         
 @app.cli.command()

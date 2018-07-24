@@ -40,13 +40,18 @@ nodes = Table('nodes', metadata,
     Column('approved', Boolean, default = False, nullable = False, server_default = "f"),
     
     #===========================================================================
+    # Super Node support
+    #===========================================================================
+    Column('superparent_id', None, ForeignKey('nodes.node_id', ondelete="SET NULL"), nullable = True),
+    
+    #===========================================================================
     # The following fields are cached values
     #===========================================================================
     # Pickle-serialized numpy array
     Column('_centroid', PickleType, nullable = True),
     # object_ids of type objects representative for all descendants (used as preview)
     Column('_type_objects', ARRAY(String), nullable = True),
-    # object_ids of type objects directly under this node
+    # object_ids of type objects directly under this node (used as preview for the node's objects)
     Column('_own_type_objects', ARRAY(String), nullable = True),
     # Number of objects directly below this node
     Column('_n_objects', BigInteger, nullable = True),
@@ -67,6 +72,7 @@ nodes_objects = Table('nodes_objects', metadata,
     Column('node_id', None, ForeignKey('nodes.node_id', ondelete="CASCADE"), nullable = False),
     Column('project_id', None, ForeignKey('projects.project_id', ondelete="CASCADE"), nullable = False),
     Column('object_id', None, ForeignKey('objects.object_id', ondelete="CASCADE"), nullable = False),
+    Column('by_user', Boolean, nullable = False, server_default = "f"),
     UniqueConstraint('project_id', 'object_id')
 )
 

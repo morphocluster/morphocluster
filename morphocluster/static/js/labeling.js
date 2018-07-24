@@ -137,7 +137,7 @@ function init_tree() {
 				treeView.deselect_all();
 				treeView.select_node(appState.node.node_id, true);
 				treeView.open_node(appState.node.node_id);
-				treeView.get_node(appState.node.node_id, true)[0].scrollIntoView();
+				treeView.get_node(appState.node.node_id, true)[0].scrollIntoViewIfNeeded(false);
 				$treeStatus.empty();
 			});
 		}
@@ -722,7 +722,7 @@ function init_tree() {
 	 * Button handlers *
 	 * * * * * * * * * */
 	
-	$("#btn-merge-into-parent").click(function () {
+	function _btnMerge() {
 		var node = appState.node;
 		var parent_id = node.path[node.path.length - 2];
 		
@@ -736,29 +736,30 @@ function init_tree() {
 		});
 		
 		return false;
-	});
+	}
+	$("#btn-merge-into-parent").click(_btnMerge);
 	
 	function nodeStatusErrorHandler(jqXHR, textStatus, errorThrown) {
 		console.log(jqXHR, textStatus, errorThrown);
 		$nodeStatus.text(textStatus + ", " + errorThrown);
 	}
 	
-	$("#btn-approve").click(function _btnApprove() {
+	function _btnApprove() {
 		/*
 		 * The descendants of this node look alike.
 		 * Approve and go to next node.
 		 */
 		var node = appState.node;
-		var root_id = node.path[0];
 		
-		// Star current node
+		// Approve current node
 		patchNode(node.node_id, {approved: true}).done(function (data) {
 			// Go to next deepest node
-			loadDeepestNode(root_id).fail(nodeStatusErrorHandler);
+			loadNextNode(node.node_id).fail(nodeStatusErrorHandler);
 		}).fail(nodeStatusErrorHandler);
 		
 		return false;
-	});
+	}
+	$("#btn-approve").click(_btnApprove);
 	
 	/*
 	 * Recommendation
@@ -1000,6 +1001,8 @@ function init_tree() {
 		var selectedMembers = getSelectedMembers("#node-pane");
 		console.log("Grouping: ", selectedMembers, "as new child of", parentNodeId, "with name", name);
 		
+		$nodeStatus.text("Saving umbrella term...");
+		
 		$.ajax({
 			type: "POST",
 			url: "/api/nodes",
@@ -1041,7 +1044,7 @@ function init_tree() {
 		
 		$nodeStatus.text("Classifying " + appState.display + " of " + node_id + " into starred members...");
 		
-		req_params = {};
+		req_params = {safe: false};
 		req_params[appState.display == "children" ? "nodes" : "objects"] = 1;
 		
 		$.ajax({
@@ -1067,28 +1070,29 @@ function init_tree() {
 	 * Tree controls
 	 */
 	
-	function loadDeepestNode(root_id) {
-		return $.get("/api/nodes/" + root_id  + "/tip").done(function (tipNodeId) {
+	function loadNextNode(node_id) {
+		return $.get("/api/nodes/" + node_id  + "/next").done(function (next_node_id) {
 			$("#tree-status").empty();
 			
-			loadNode(tipNodeId);
+			loadNode(next_node_id);
 		});
 	}
 	
-	$("#btn-deepest-node").on("click", function _btnDeepestNode() {
+	function _btnNextNode() {
 		if(typeof(appState.node) == "undefined") {
 			return;
 		}
 		
-		var root_id = appState.node.path[0];
+		var node_id = appState.node.node_id;
 		
-		$nodeStatus.text("Loading tip for " + root_id + "...");
-		console.log("root_id:", root_id);
+		$nodeStatus.text("Loading next node to approve after " + node_id + "...");
+		console.log("node_id:", node_id);
 		
-		loadDeepestNode(root_id).fail(function (jqXHR, textStatus, errorThrown) {
+		loadNextNode(node_id).fail(function (jqXHR, textStatus, errorThrown) {
 			$("#tree-status").text(textStatus + ", " + errorThrown);
 		});
-	});
+	}
+	$("#btn-next-node").on("click", _btnNextNode);
 	
 	$("#btn-up").on("click", function _btnUp() {
 		if(typeof(appState.node) == "undefined") {
@@ -1099,5 +1103,24 @@ function init_tree() {
 		var parent_id = path[path.length - 2];
 		
 		loadNode(parent_id);
+	});
+	
+	/*
+	 * Keyboard shortcuts
+	 */
+	$(document).keyup(function (e) {
+		if($(e.target).is("input,textarea")) {
+			return;
+		}
+		
+		if(e.key=="a") {
+			_btnApprove();
+		} else if(e.key=="m") {
+			_btnMerge();
+		} else if(e.key=="d") {
+			_btnNextNode();
+		} else {
+			console.log(e);
+		}
 	});
 }

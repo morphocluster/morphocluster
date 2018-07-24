@@ -5,7 +5,7 @@ Created on 13.03.2018
 '''
 from morphocluster.models import nodes, projects, nodes_objects, objects
 from sqlalchemy.sql import text
-from sqlalchemy.sql.expression import select, outerjoin
+from sqlalchemy.sql.expression import select, outerjoin, join
 import os
 import pandas as pd
 from etaprogress.progress import ProgressBar
@@ -20,6 +20,9 @@ from morphocluster.extensions import database
 import csv
 from genericpath import commonprefix
 from morphocluster.helpers import seq2array
+from sqlalchemy.sql.expression import literal
+from sqlalchemy.sql.elements import literal_column
+import sys
 
 
 class TreeError(Exception):
@@ -72,6 +75,48 @@ def _paths_to_node_order(paths):
     
     return result
 
+def _rquery_preds(node_id):
+    """
+    Constructs a selectable of precursers of node_id with all columns of `nodes` and an additional
+    `level`.
+    
+    `level` is 0 for the supplied `node_id` and decreases for each predecessor.
+    """
+    # Start with the last child
+    q = select([nodes, literal(0).label("level")]).where(nodes.c.node_id == node_id).cte(recursive=True).alias("q")
+    
+    p = nodes.alias("p")
+    
+    q = q.union_all(
+        select([p, literal_column("level") - 1]).where(q.c.parent_id == p.c.node_id))
+    
+    return q
+
+def _rquery_succs(node_id, recurse_cb=None):
+    """
+    Constructs a selectable of successors of node_id with all columns of `nodes` and an additional
+    `level`.
+    
+    `level` is 0 for the supplied `node_id` and increases for each successor.
+    
+    Parameters:
+        recurse_cb: A callback with two parameters (q, s). q is the recursive query, s is the successor.
+            The callback must return a clause that can be used in where().
+    """
+    q = select([nodes, literal(0).label("level")]).where(nodes.c.node_id == node_id).cte(recursive=True).alias("q")
+    
+    s = nodes.alias("s")
+    
+    rq = select([s, literal_column("level") + 1]).where(s.c.parent_id == q.c.node_id)
+    
+    if callable(recurse_cb):
+        condition = recurse_cb(q, s)
+        rq = rq.where(condition)
+    
+    q = q.union_all(rq)
+    
+    return q
+
 
 class Tree(object):
     def __init__(self, connection):
@@ -82,16 +127,21 @@ class Tree(object):
         tree_fn = os.path.join(path, "tree.csv")
         objids_fn = os.path.join(path, "objids.csv")
         
-        raw_tree = pd.read_csv(tree_fn, index_col=False)
+        raw_tree = pd.read_csv(tree_fn,
+                               index_col=False,
+                               dtype={
+                                   "parent": np.uint64,
+                                   "child": np.uint64,
+                                   "lambda_val": np.float64,
+                                   "child_size": np.uint64,
+                                   "name": str
+                                   }
+                               )
         
         objids = pd.read_csv(objids_fn, index_col=False, names=["objid"], header=None, squeeze = True)
         
-        raw_tree_nodes = raw_tree[raw_tree["child_size"] > 1]
+        raw_tree_nodes = raw_tree[raw_tree["child_size"] > 1].sort_values("parent")
         raw_tree_objects = raw_tree[raw_tree["child_size"] == 1]
-        
-        del raw_tree
-        
-        raw_tree_nodes.sort_values("parent", inplace = True)
         
         root_orig_id = int(raw_tree_nodes["parent"].iloc[0])
         
@@ -107,14 +157,22 @@ class Tree(object):
                 # row.child is the current node
                 # row.parent is its parent
                 
+                if row.child_size == 0:
+                    # Skip empty nodes
+                    continue
+                
                 # Get object ids for the current node
                 object_idxs = raw_tree_objects[raw_tree_objects["parent"] == row.child]["child"]
                 object_ids = objids[object_idxs]
+                
+                name = row.name if pd.notnull(row.name) else None
 
                 self.create_node(project_id,
                                  orig_node_id = row.child,
                                  orig_parent = row.parent,
-                                 object_ids = object_ids)
+                                 object_ids = object_ids,
+                                 name=name,
+                                 starred=name is not None)
                     
                 bar.numerator += len(object_ids)
                 
@@ -122,6 +180,42 @@ class Tree(object):
             print()
             
         return project_id
+    
+    def connect_supertree(self, root_id):
+        with self.connection.begin():
+            successors = _rquery_succs(root_id)
+            
+            supersuccessor_ids = (select([successors.c.node_id])
+                                 .where(successors.c.starred == True))
+            supersuccessor_ids = (self.connection.execute(supersuccessor_ids)
+                                  .fetchall())
+            supersuccessor_ids = [node_id for (node_id,) in supersuccessor_ids]
+            supersuccessor_ids.insert(0, root_id)
+            
+            bar = ProgressBar(len(supersuccessor_ids), max_width=40)
+            
+            for node_id in supersuccessor_ids:
+                def recurse_cb(q, _):
+                    return q.c.starred == False 
+                
+                successors = _rquery_succs(node_id, recurse_cb)
+                
+                #===============================================================
+                # UPDATE nodes
+                # SET superparent_id=node_id
+                # WHERE node_id IN (SELECT node_id from successors);
+                #===============================================================
+                successor_ids = select([successors.c.node_id]).where(successors.c.node_id != node_id)             
+                stmt = (nodes
+                        .update()
+                        .values(superparent_id=node_id)
+                        .where(nodes.c.node_id.in_(successor_ids)))
+                self.connection.execute(stmt)
+                
+                bar.numerator += 1
+                print(bar, end="\r")
+            print()
+                
     
     def get_objects_recursive(self, node_id):
         # Recursively select all descendants
@@ -419,7 +513,7 @@ class Tree(object):
             select([descendants]).where(descendants.c.parent_id == parents.c.node_id))
             
         # Count results
-        stmt = select([func.count(rquery)])
+        stmt = select([func.count()]).select_from(rquery)
         
         result = self.connection.scalar(stmt) or 0
         
@@ -483,6 +577,26 @@ class Tree(object):
         self.connection.execute(stmt)
                 
         return node
+    
+    def upgrade_nodes(self, root_id):
+        """
+        Parameters:
+            root_id: node_id of the root
+        """
+        
+        successors = _rquery_succs(root_id)
+        
+        stmt = (select([successors.c.node_id])
+                .where(successors.c.cache_valid==False)
+                .order_by(successors.c.level.desc()))
+        result = self.connection.execute(stmt).fetchall()
+        
+        bar = ProgressBar(len(result), max_width=40)
+        
+        for node_id, in result:
+            self.get_node(node_id)
+            bar.numerator += 1
+            print(bar, end="\r")
         
         
     def get_node(self, node_id, require_valid = True):
@@ -516,9 +630,9 @@ class Tree(object):
                      require_valid = True,
                      order_by = None,
                      include = None,
+                     supertree = False,
                      _rec_depth = 0):
         """
-        
         Parameters:
             node_id: node_id of the parent node.
             require_valid (bool): Are valid cache values required?
@@ -535,11 +649,20 @@ class Tree(object):
         assert isinstance(node_id, Integral), "node_id is not integral: {!r}".format(node_id)
         
         children = nodes.alias("children")
+        superchildren = nodes.alias("superchildren")
         
-        stmt = select([nodes, func.count(children.c.node_id).label("n_children")])\
-            .select_from(outerjoin(nodes, children, children.c.parent_id == nodes.c.node_id))\
-            .group_by(nodes.c.node_id)\
-            .having(nodes.c.parent_id == node_id)
+        stmt = select([nodes,
+                       func.count(children.c.node_id).label("n_children"),
+                       func.count(children.c.node_id).label("n_superchildren")])\
+            .select_from(nodes\
+                .outerjoin(children, children.c.parent_id == nodes.c.node_id)\
+                .outerjoin(superchildren, superchildren.c.superparent_id == nodes.c.node_id))\
+            .group_by(nodes.c.node_id)
+            
+        if supertree:
+            stmt = stmt.having(nodes.c.superparent_id == node_id)
+        else:
+            stmt = stmt.having(nodes.c.parent_id == node_id)
             
         if include is not None:
             stmt = stmt.having(nodes.c.starred == (include == "starred"))
@@ -549,8 +672,7 @@ class Tree(object):
             
         result = self.connection.execute(stmt, node_id = node_id).fetchall()
         
-        return [self._upgrade_node(dict(r), require_valid, _rec_depth) for r in result]
-        
+        return [self._upgrade_node(dict(r), require_valid, _rec_depth) for r in result]        
 
     def merge_node_into(self, node_id, dest_node_id):
         """
@@ -595,7 +717,7 @@ class Tree(object):
         
         return self.connection.execute(stmt, node_id = node_id).scalar()
         
-    
+    # TODO: Also remove approval for automatically classified members 
     def invalidate_node_and_parents(self, node_id):
         """
         Invalidate the cached values in the node and its parents.
@@ -795,8 +917,6 @@ class Tree(object):
             Else recurse in all children that have 2 children by themselves (grandchildren of n).
         """
         
-        
-        
         print("Flattening tree...")
         
         n_total = self.node_n_descendants(root_id)
@@ -811,12 +931,14 @@ class Tree(object):
             while len(queue) > 0:
                 node_id = queue.pop()
                 
-                children = self.get_children(node_id)
+                children = self.get_children(node_id, require_valid=False)
             
                 children_2 = [c for c in children if c["n_children"] == 2]
                 
                 # Count skipped children
                 n_processed += len(children) - len(children_2)
+                
+                # TODO: Skip nodes with name
                 
                 if len(children_2) == 0:
                     # Nothing to do for the current node
@@ -825,14 +947,17 @@ class Tree(object):
                     continue
                 
                 if len(children_2) == 1:
-                    # Merge this child and restart with this node
                     child_to_merge = children_2[0]
-                    self.merge_node_into(child_to_merge["node_id"], node_id)
-                    n_merged += 1
                     
-                    # Current node is not yet done
-                    queue.append(node_id)
-                    continue
+                    # If the child is not starred
+                    if not child_to_merge["starred"]:
+                        # Merge this child and restart with this current node
+                        self.merge_node_into(child_to_merge["node_id"], node_id)
+                        n_merged += 1
+                        
+                        # Current node is not yet done
+                        queue.append(node_id)
+                        continue
                 
                 # Else recurse into every child that has 2 children by itself
                 for c in children_2:
@@ -948,6 +1073,77 @@ class Tree(object):
         result = self.connection.execute(stmt).fetchall()
         
         return [self._upgrade_node(dict(r), require_valid = require_valid) for r in result]
+    
+    def get_next_unapproved(self, node_id):
+        """
+        Get the id of the next unapproved node.
+        
+        This is either        
+            a) the deepest unapproved node below, if this current node is not approved, or
+            b) the first unapproved node below a predecessor of the current node. 
+        """
+        
+        node = self.connection.execute(nodes.select(nodes.c.node_id == node_id)).first()
+        
+        if node["approved"]:
+            if node["parent_id"]:
+                return self.get_next_unapproved(node["parent_id"])
+            return None
+        
+            #===================================================================
+            # preds = self._rquery_preds(node_id)
+            # 
+            # stmt = select([nodes.c.node_id]).\
+            #     select_from(join(preds, nodes, nodes.c.parent_id == preds.c.node_id)).\
+            #     where(nodes.c.approved == False).\
+            #     order_by(preds.c.level.desc()).\
+            #     limit(1)
+            #     
+            # return self.connection.execute(stmt).scalar()
+            #===================================================================
+            
+        else:
+            stmt = text("""
+            WITH    RECURSIVE
+            q AS
+            (
+                SELECT  node_id, 1 as level
+                FROM    nodes AS n
+                WHERE   node_id = :node_id
+                UNION ALL
+                SELECT  nd.node_id, level + 1
+                FROM    q
+                JOIN    nodes AS nd
+                ON      nd.parent_id = q.node_id
+                WHERE nd.approved = 'f'
+            )
+            SELECT q.node_id
+            FROM q
+            ORDER BY q.level desc
+            LIMIT 1
+            """)
+            
+            return self.connection.execute(stmt, node_id = node_id).scalar()
+        
+    def consolidate_node(self, node_id):
+        """
+        Ensures that the calculated values of this node are valid.
+        """
+        
+        # Only recurse into invalid successors
+        def recurse_cb(q, _):
+            return q.c.cache_valid==False
+        
+        successors = _rquery_succs(node_id, recurse_cb)
+        
+        stmt = select([successors]).order_by(successors.c.level.desc())
+        
+        successors = pd.read_sql_query(stmt, self.connection, index_col="node_id")
+        
+        print(successors)
+        
+        # TODO: Iterate over DataFrame fixing the values along the way
+        ...
 
     
 if __name__ in ("__main__", "builtins"):

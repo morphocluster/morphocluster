@@ -11,8 +11,8 @@
 <div id="grid">
 	<div id="tree-header" class="bg-light px-1">
 		 <form class="form-inline" autocomplete="off">
-			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-deepest-node"
-				title="Go to the deepest node">
+			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-next-node"
+				title="Go to the deepest node (D)">
 				<i class="mdi mdi-chevron-double-right"></i>
 			</button>
 			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-up"
@@ -24,22 +24,12 @@
 	<div id="node-header" class="bg-light px-1">
 		<form class="form-inline" autocomplete="off">
 			This Node:
-			<div class="btn-group ml-2">
-				<button type="button" class="btn btn-secondary btn-sm" id="btn-approve"
-					title="The descendants of this node look alike." data-action="next">
-					<i class="mdi mdi-approval"></i> Approve + Next
-				</button>
-				<button type="button" class="btn btn-sm btn-secondary dropdown-toggle dropdown-toggle-split" data-toggle="dropdown">
-					<span class="sr-only">Toggle Dropdown</span>
-				</button>
-				<div class="dropdown-menu">
-					<a class="dropdown-item" href="#" data-action="">Approve</a>
-					<a class="dropdown-item" href="#" data-action="next">Approve + Next</a>
-					<a class="dropdown-item" href="#" data-action="up">Approve + Up</a>
-				</div>
-			</div>
+			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-approve"
+				title="All members of this node look alike. (A)">
+				<i class="mdi mdi-approval"></i> Approve
+			</button>
 			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-merge-into-parent"
-				title="The children of this node are too diverse. Move all of them to the parent.">
+				title="The children of this node are too diverse. Move all of them to the parent. (M)">
 				<i class="mdi mdi-call-merge"></i> Merge into parent
 			</button>
 			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-recommend">
@@ -90,6 +80,7 @@
 <script src="/static/js/jsrender.min.js"></script>
 <script src="/static/jquery-ui/jquery-ui.min.js"></script>
 
+<script src="/static/js/scrollIntoViewIfNeededPolyfill.js"></script>
 <script src="/static/js/labeling.js" defer></script>
 
 {% raw %}

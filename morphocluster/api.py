@@ -77,11 +77,11 @@ def _tree_root(project):
     
     return project
 
-def _tree_node(node):
+def _tree_node(node, supertree=False):
     result = {
         "id": node["node_id"],
         "text": "{} ({})".format(node["name"] or node["node_id"], node["n_children"]),
-        "children": node["n_children"] > 0,
+        "children": node["n_superchildren"] > 0 if supertree else node["n_children"] > 0,
         "icon": _node_icon(node)
     }
     
@@ -97,12 +97,17 @@ def get_tree_root():
     
 @api.route("/tree/<int:node_id>", methods=["GET"])
 def get_subtree(node_id):
+    flags = {k: request.args.get(k, 0, strtobool) for k in ("supertree",)}
+    
     with database.engine.connect() as connection:
         tree = Tree(connection)
         
-        children = tree.get_children(node_id, order_by="n_children DESC")
+        if flags["supertree"]:
+            children = tree.get_children(node_id, order_by="n_children DESC", supertree=True, include="starred")
+        else:
+            children = tree.get_children(node_id, order_by="n_children DESC")
         
-        result = [_tree_node(c) for c in children]
+        result = [_tree_node(c, flags["supertree"]) for c in children]
         
         return jsonify(result)
     
@@ -217,8 +222,8 @@ def _arrange_by_sim(result):
         return ()
     
     # Get vector values
-    vectors = np.array([ m["_centroid"] if "_centroid" in m else m["vector"] for m in result ],
-                       dtype = float)
+    vectors = seq2array([ m["_centroid"] if "_centroid" in m else m["vector"] for m in result ],
+                        len(result))
             
     print("Arranging {:,d} elements by similarity...".format(len(vectors)))
     
@@ -334,7 +339,7 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size = 100, compress
     return "[]", n_pages
     
 
-def cache_serialize_page(endpoint, _endpoint_args=(), **kwargs):
+def cache_serialize_page(endpoint, **kwargs):
     """
     `func` is expected to return a json-serializable list.
     It gains the `page` and `request_id` parameter. The resulting list is split into batches of `page_size` items.
@@ -355,8 +360,6 @@ def cache_serialize_page(endpoint, _endpoint_args=(), **kwargs):
         foo(page=0) -> "a", True
     """
     
-    _endpoint_args = set(_endpoint_args)
-    
     def decorator(func):
         @wraps(func)
         def wrapper(page = None, request_id = None, **func_kwargs):
@@ -374,25 +377,25 @@ def cache_serialize_page(endpoint, _endpoint_args=(), **kwargs):
             # Generate Link response header
             #=======================================================================
             link_header_fields = []
-            link_parameters = {k: v for k, v in func_kwargs.items() if k not in _endpoint_args}
+            link_parameters = func_kwargs.copy()
             link_parameters["request_id"] = request_id
             
             if 0 < page < n_pages:
                 # Link to previous page
                 link_parameters["page"] = page - 1
-                url = "{}?{}".format(url_for(endpoint, **func_kwargs), urlencode(link_parameters))
+                url = url_for(endpoint, **link_parameters)
                 link_header_fields.append('<{}>; rel="previous"'.format(url))
             
             
             if page + 1 < n_pages:
                 # Link to next page
                 link_parameters["page"] = page + 1
-                url = "{}?{}".format(url_for(endpoint, **func_kwargs), urlencode(link_parameters))
+                url = url_for(endpoint, **link_parameters)
                 link_header_fields.append('<{}>; rel="next"'.format(url))
                 
             # Link to last page
             link_parameters["page"] = n_pages - 1
-            url = "{}?{}".format(url_for(endpoint, **func_kwargs), urlencode(link_parameters))
+            url = url_for(endpoint, **link_parameters)
             link_header_fields.append('<{}>; rel="last"'.format(url))
             
             response.headers["Link"] = ",". join(link_header_fields)
@@ -431,7 +434,7 @@ def _arrange_by_starred_sim(result, starred):
         raise
 
 
-@cache_serialize_page(".get_node_members", {"node_id"})
+@cache_serialize_page(".get_node_members")
 def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", starred_first = False):
     with database.engine.connect() as connection:
         tree = Tree(connection)
@@ -455,8 +458,10 @@ def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", 
             elif arrange_by == "nleaves":
                 order = _arrange_by_nleaves(result)
             elif arrange_by == "starred_sim":
-                starred = tree.get_children(node_id, include="starred")
-                order = _arrange_by_starred_sim(result, starred)
+                # If no starred members yet, arrange by distance to regular children
+                anchors = starred if len(starred) else tree.get_children(node_id)
+                
+                order = _arrange_by_starred_sim(result, anchors)
             else:
                 warnings.warn("arrange_by={} not supported!".format(arrange_by))
                 order = ()
@@ -594,7 +599,7 @@ def node_adopt_members(parent_id):
         return jsonify({})
         
         
-@cache_serialize_page(".node_get_recommended_children", {"node_id"}, page_size=20)
+@cache_serialize_page(".node_get_recommended_children", page_size=20)
 def _node_get_recommended_children(node_id, max_n):
     with database.engine.connect() as connection:
         tree = Tree(connection)
@@ -624,7 +629,7 @@ def node_get_recommended_children(node_id):
     
     return _node_get_recommended_children(node_id = node_id, **arguments)
 
-@cache_serialize_page(".node_get_recommended_objects", {"node_id"}, page_size=20)
+@cache_serialize_page(".node_get_recommended_objects", page_size=20)
 def _node_get_recommended_objects(node_id, max_n):
     with database.engine.connect() as connection:
         tree = Tree(connection)
@@ -664,6 +669,13 @@ def node_get_tip(node_id):
         tree = Tree(connection)
     
         return jsonify(tree.get_tip(node_id))
+    
+@api.route("/nodes/<int:node_id>/next", methods=["GET"])
+def node_get_next(node_id):
+    with database.engine.connect() as connection:
+        tree = Tree(connection)
+    
+        return jsonify(tree.get_next_unapproved(node_id))
     
     
 @api.route("/nodes/<int:node_id>/n_sorted", methods=["GET"])
@@ -714,7 +726,7 @@ def post_node_classify(node_id):
         objects (boolean): Classify objects? (Default: False)
     """
     
-    flags = {k: request.args.get(k, 0, strtobool) for k in ("nodes","objects")}
+    flags = {k: request.args.get(k, 0, strtobool) for k in ("nodes","objects","safe")}
     
     print(flags)
     
@@ -746,7 +758,7 @@ def post_node_classify(node_id):
                 n_unstarred = len(unstarred_centroids)
                 if n_unstarred > 0:
                     print("Predicting {} unstarred children of {}...".format(n_unstarred, node_id))
-                    type_predicted = classifier.classify(unstarred_centroids)
+                    type_predicted = classifier.classify(unstarred_centroids, safe=flags["safe"])
                     
                     for i, starred_node in enumerate(starred):
                         nodes_to_move = [int(n) for n in unstarred_ids[type_predicted == i]]
@@ -761,7 +773,7 @@ def post_node_classify(node_id):
                 object_vectors = np.array([o["vector"] for o in objects])
                 object_ids = np.array([o["object_id"] for o in objects])
                 
-                type_predicted = classifier.classify(object_vectors)
+                type_predicted = classifier.classify(object_vectors, safe=flags["safe"])
                 
                 for i, starred_node in enumerate(starred):
                     objects_to_move = [str(o) for o in object_ids[type_predicted == i]]

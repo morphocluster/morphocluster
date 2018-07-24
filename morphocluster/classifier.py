@@ -35,7 +35,7 @@ class Classifier(object):
         return distances
     
         
-    def classify(self, X):
+    def classify(self, X, safe=True):
         """
         Classifies X into the types.
         
@@ -51,9 +51,11 @@ class Classifier(object):
         min_dist_idx = np.argmin(distances, axis=0)
         
         min_dist = distances[min_dist_idx, np.arange(X.shape[0])]
-        threshold = self.radius[min_dist_idx]
         
-        return np.where(min_dist < threshold, min_dist_idx, -1)
+        if safe:
+            threshold = self.radius[min_dist_idx]
+            return np.where(min_dist < threshold, min_dist_idx, -1)
+        return min_dist_idx
 
 if __name__ in ("builtins", "__main__"):
     n_starred = 100
