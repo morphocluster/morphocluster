@@ -26,15 +26,20 @@ objects = Table('objects', metadata,
 projects = Table('projects', metadata,
     Column('project_id', Integer, primary_key = True),
     Column('name', String),
-    Column('creation_date', DateTime, default = datetime.datetime.now)
+    Column('creation_date', DateTime, default = datetime.datetime.now),
+    Column('visible', Boolean, nullable = False, server_default = "t"),
 )
 
 #: :type nodes: sqlalchemy.sql.schema.Table
 nodes = Table('nodes', metadata,
     Column('node_id', BigInteger, primary_key = True),
     Column('orig_id', BigInteger, nullable = True),
-    Column('project_id', None, ForeignKey('projects.project_id', ondelete="CASCADE"), nullable = False),
-    Column('parent_id', None, ForeignKey('nodes.node_id', ondelete="SET NULL"), nullable = True),
+    Column('project_id', None,
+            ForeignKey('projects.project_id', ondelete="CASCADE"),
+            index=True, nullable = False),
+    Column('parent_id', None,
+           ForeignKey('nodes.node_id', ondelete="SET NULL"),
+           index=True, nullable = True),
     Column('name', String),
     Column('starred', Boolean, default = False, nullable = False),
     Column('approved', Boolean, default = False, nullable = False, server_default = "f"),
@@ -42,7 +47,9 @@ nodes = Table('nodes', metadata,
     #===========================================================================
     # Super Node support
     #===========================================================================
-    Column('superparent_id', None, ForeignKey('nodes.node_id', ondelete="SET NULL"), nullable = True),
+    Column('superparent_id', None,
+           ForeignKey('nodes.node_id', ondelete="SET NULL"),
+           index=True, nullable = True),
     
     #===========================================================================
     # The following fields are cached values
@@ -69,10 +76,17 @@ nodes = Table('nodes', metadata,
 )
 
 nodes_objects = Table('nodes_objects', metadata,
-    Column('node_id', None, ForeignKey('nodes.node_id', ondelete="CASCADE"), nullable = False),
-    Column('project_id', None, ForeignKey('projects.project_id', ondelete="CASCADE"), nullable = False),
-    Column('object_id', None, ForeignKey('objects.object_id', ondelete="CASCADE"), nullable = False),
-    Column('by_user', Boolean, nullable = False, server_default = "f"),
+    Column('node_id', None,
+           ForeignKey('nodes.node_id', ondelete="CASCADE"),
+           index=True, nullable = False),
+    Column('project_id', None,
+           ForeignKey('projects.project_id', ondelete="CASCADE"),
+           index=True, nullable = False),
+    Column('object_id', None,
+           ForeignKey('objects.object_id', ondelete="CASCADE"),
+           nullable = False),
+    Column('by_user', Boolean,
+           nullable = False, server_default = "f"),
     UniqueConstraint('project_id', 'object_id')
 )
 

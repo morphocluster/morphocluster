@@ -74,15 +74,6 @@ def clear_projects():
         affected_tables = [nodes, projects, nodes_objects]
         database.metadata.drop_all(txn, tables = affected_tables)
         database.metadata.create_all(txn, tables = affected_tables)
-        
-        
-@app.cli.command()
-def warm_cache():
-    print("Warming the cache...")
-    with database.engine.connect() as conn:
-        tree = Tree(conn)
-        for p in tree.get_projects():
-            tree.get_node(p["node_id"])
     
 
 @app.cli.command()
@@ -184,7 +175,8 @@ def flatten_tree(root_id):
 def consolidate(root_id):
     with database.engine.connect() as conn:
         tree = Tree(conn)
-        tree.consolidate_node(root_id)
+        res = tree.consolidate_node(root_id)
+        print(repr(res))
         
         
 @app.cli.command()

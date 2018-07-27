@@ -205,6 +205,7 @@ function init_tree() {
 		
 		if(node.n_children == 0) {
 			appState.display = "objects";
+			
 		}
 		
 		$(document).trigger("node_loaded.morphocluster");
@@ -214,7 +215,7 @@ function init_tree() {
 		var parameters = {
 				objects: displayObjects,
 				nodes: !displayObjects,
-				arrange_by: "starred_sim",
+				arrange_by: node.n_children == 0 ? "interleaved" : "starred_sim",
 				// Always show starred objects first
 				starred_first: true
 		};
@@ -727,9 +728,9 @@ function init_tree() {
 		var parent_id = node.path[node.path.length - 2];
 		
 		node_merge_into(node.node_id, parent_id).done(function (data) {
-			// Go to parent node
 			flashMsg.set("Merged " + node.id + ".");
-			loadNode(parent_id);
+			// Go to next deepest node
+			loadNextNode(parent_id).fail(nodeStatusErrorHandler);
 		}).fail(function (jqXHR, textStatus, errorThrown) {
 			console.log(jqXHR, textStatus, errorThrown);
 			$nodeStatus.text(textStatus + ", " + errorThrown);
@@ -1031,6 +1032,7 @@ function init_tree() {
 			return;
 		}
 		
+		$("#dialog-umbrella-input-term").val("");
 		$umbrellaTermDialog.dialog("open");
 	});
 	
@@ -1044,7 +1046,7 @@ function init_tree() {
 		
 		$nodeStatus.text("Classifying " + appState.display + " of " + node_id + " into starred members...");
 		
-		req_params = {safe: false};
+		req_params = {safe: false, subnode: true};
 		req_params[appState.display == "children" ? "nodes" : "objects"] = 1;
 		
 		$.ajax({
@@ -1094,7 +1096,7 @@ function init_tree() {
 	}
 	$("#btn-next-node").on("click", _btnNextNode);
 	
-	$("#btn-up").on("click", function _btnUp() {
+	function _btnUp() {
 		if(typeof(appState.node) == "undefined") {
 			return;
 		}
@@ -1103,7 +1105,8 @@ function init_tree() {
 		var parent_id = path[path.length - 2];
 		
 		loadNode(parent_id);
-	});
+	}
+	$("#btn-up").on("click", _btnUp);
 	
 	/*
 	 * Keyboard shortcuts
@@ -1119,7 +1122,9 @@ function init_tree() {
 			_btnMerge();
 		} else if(e.key=="d") {
 			_btnNextNode();
-		} else {
+		} else if(e.key=="u") {
+			_btnUp();
+		} else  {
 			console.log(e);
 		}
 	});

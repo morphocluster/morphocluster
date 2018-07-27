@@ -27,7 +27,9 @@ from morphocluster.extensions import database, redis_store
 from pprint import pprint
 from flask.helpers import url_for
 from flask_restful import reqparse
-from morphocluster.helpers import seq2array
+from morphocluster.helpers import seq2array, keydefaultdict
+from _collections import defaultdict
+from timer_cm import Timer
 
 
 api = Blueprint("api", __name__)
@@ -199,7 +201,7 @@ def _node(tree, node, include_children=False):
         "starred": node["starred"],
         "approved": node["approved"],
         "own_type_objects": node["_own_type_objects"],
-        "n_objects_deep": int(node["_n_objects_deep"]),
+        "n_objects_deep": node["_n_objects_deep"] or 0,
     }
     
     if include_children:
@@ -225,15 +227,11 @@ def _arrange_by_sim(result):
     vectors = seq2array([ m["_centroid"] if "_centroid" in m else m["vector"] for m in result ],
                         len(result))
             
-    print("Arranging {:,d} elements by similarity...".format(len(vectors)))
-    
     if vectors.shape[0] <= ISOMAP_FIT_SUBSAMPLE_N:
         subsample = vectors
     else:
         idxs = np.random.choice(vectors.shape[0], ISOMAP_FIT_SUBSAMPLE_N, replace=False)
         subsample = vectors[idxs]
-    
-    start = time.perf_counter()
     
     try:
         isomap = Isomap(n_components=1, n_neighbors=ISOMAP_N_NEIGHBORS, n_jobs=4).fit(subsample)
@@ -241,9 +239,6 @@ def _arrange_by_sim(result):
     except ValueError:
         print(subsample)
         raise
-    elapsed = time.perf_counter() - start
-    
-    print("Arranging of {:,d} elements took {}s".format(len(vectors), elapsed))
     
     order = np.argsort(order)
         
@@ -413,10 +408,15 @@ def _arrange_by_starred_sim(result, starred):
     if len(result) == 0:
         return ()
     
-    # Get vectors
-    vectors = seq2array((m["_centroid"] if "_centroid" in m else m["vector"] for m in result),
-                        len(result))
-    starred_vectors = seq2array((m["_centroid"] for m in starred), len(starred))
+    try:
+        # Get vectors
+        vectors = seq2array((m["_centroid"] if "_centroid" in m else m["vector"] for m in result),
+                            len(result))
+        starred_vectors = seq2array((m["_centroid"] for m in starred),
+                                    len(starred))
+    except ValueError as e:
+        print(e)
+        return ()
 
     try:
         classifier = Classifier(starred_vectors)
@@ -436,32 +436,45 @@ def _arrange_by_starred_sim(result, starred):
 
 @cache_serialize_page(".get_node_members")
 def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", starred_first = False):
-    with database.engine.connect() as connection:
+    with database.engine.connect() as connection, Timer("_get_node_members") as timer:
         tree = Tree(connection)
         
         sorted_nodes_include = "unstarred" if starred_first else None
         
         result = []
         if nodes:
-            result.extend(tree.get_children(node_id, include=sorted_nodes_include))
+            with timer.child("tree.get_children()"):
+                result.extend(tree.get_children(node_id, include=sorted_nodes_include))
         if objects:
-            result.extend(tree.get_objects(node_id))
+            with timer.child("tree.get_objects()"):
+                result.extend(tree.get_objects(node_id))
             
         if arrange_by == "starred_sim" or starred_first:
-            starred = tree.get_children(node_id, include="starred")
+            with timer.child("tree.get_children(starred)"):
+                starred = tree.get_children(node_id, include="starred")
             
         if arrange_by != "":
             result = np.array(result, dtype=object)
             
             if arrange_by == "sim":
-                order = _arrange_by_sim(result)
+                with timer.child("sim"):
+                    order = _arrange_by_sim(result)
             elif arrange_by == "nleaves":
-                order = _arrange_by_nleaves(result)
+                with timer.child("nleaves"):
+                    order = _arrange_by_nleaves(result)
             elif arrange_by == "starred_sim":
-                # If no starred members yet, arrange by distance to regular children
-                anchors = starred if len(starred) else tree.get_children(node_id)
-                
-                order = _arrange_by_starred_sim(result, anchors)
+                with timer.child("starred_sim"):
+                    # If no starred members yet, arrange by distance to regular children
+                    anchors = starred if len(starred) else tree.get_children(node_id)
+                    
+                    order = _arrange_by_starred_sim(result, anchors)
+            elif arrange_by == "interleaved":
+                with timer.child("interleaved"):
+                    order = _arrange_by_sim(result)
+                    if len(order):
+                        order0, order1 = np.array_split(order, 2)
+                        order[::2] = order0
+                        order[1::2] = order1[::-1]
             else:
                 warnings.warn("arrange_by={} not supported!".format(arrange_by))
                 order = ()
@@ -706,6 +719,7 @@ def post_node_merge_into(node_id):
         
         data = request.get_json()
         
+        # TODO: Unapprove
         tree.merge_node_into(node_id, data["dest_node_id"])
         
         log(connection, "merge_node_into({}, {})".format(node_id, data["dest_node_id"]),
@@ -724,9 +738,11 @@ def post_node_classify(node_id):
     GET parameters:
         nodes (boolean): Classify nodes? (Default: False)
         objects (boolean): Classify objects? (Default: False)
+        safe (boolean): Perform safe classification (Default: False)
+        subnode (boolean): Move classified objects into a child of the target node. (Default: False)
     """
     
-    flags = {k: request.args.get(k, 0, strtobool) for k in ("nodes","objects","safe")}
+    flags = {k: request.args.get(k, 0, strtobool) for k in ("nodes","objects","safe","subnode")}
     
     print(flags)
     
@@ -747,8 +763,17 @@ def post_node_classify(node_id):
                 
             starred_centroids = np.array([c["_centroid"] for c in starred])
             
+            print("|starred_centroids|", np.linalg.norm(starred_centroids, axis=1))
+            
             # Initialize classifier
             classifier = Classifier(starred_centroids)
+            
+            if flags["subnode"]:
+                def _subnode_for(node_id):
+                    return tree.create_node(parent_id=node_id, name="classified")
+                target_nodes = keydefaultdict(_subnode_for) 
+            else:
+                target_nodes = keydefaultdict(lambda k: k) 
             
             if flags["nodes"]:
                 unstarred_centroids = np.array([c["_centroid"] for c in unstarred])
@@ -762,7 +787,12 @@ def post_node_classify(node_id):
                     
                     for i, starred_node in enumerate(starred):
                         nodes_to_move = [int(n) for n in unstarred_ids[type_predicted == i]]
-                        tree.relocate_nodes(nodes_to_move, starred_node["node_id"])
+                        
+                        if len(nodes_to_move):
+                            target_node_id = target_nodes[starred_node["node_id"]]
+                            tree.relocate_nodes(nodes_to_move,
+                                                target_node_id,
+                                                unapprove=True)
                         
                     n_predicted_children = np.sum(type_predicted > -1)
             
@@ -777,7 +807,12 @@ def post_node_classify(node_id):
                 
                 for i, starred_node in enumerate(starred):
                     objects_to_move = [str(o) for o in object_ids[type_predicted == i]]
-                    tree.relocate_objects(objects_to_move, starred_node["node_id"])
+                    if len(objects_to_move):
+                        target_node_id = target_nodes[starred_node["node_id"]]
+                        print("Moving objects {!r} -> {}".format(objects_to_move, target_node_id))
+                        tree.relocate_objects(objects_to_move,
+                                              target_node_id,
+                                              unapprove=True)
                     
                 n_predicted_objects = np.sum(type_predicted > -1)
             
