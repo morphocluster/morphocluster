@@ -24,6 +24,7 @@ from sqlalchemy.sql.expression import literal
 from sqlalchemy.sql.elements import literal_column
 import sys
 from timer_cm import Timer
+from etaprogress import progress
 
 
 class TreeError(Exception):
@@ -149,19 +150,26 @@ class Tree(object):
         
         with self.connection.begin():
             project_id = self.create_project(name)
-            root_node_id = self.create_node(project_id, root_orig_id)
             
-            print("Created root (orig/real):", root_orig_id, root_node_id)
-        
-            bar = ProgressBar(len(raw_tree_objects), max_width=40)
+            bar = ProgressBar(len(raw_tree_objects) + len(raw_tree_nodes), max_width=40)
+            
+            def progress_cb(nadd):
+                bar.numerator += nadd
+                print(bar, end="\r")
+            
+            # Get object ids for the root
+            object_idxs = raw_tree_objects[raw_tree_objects["parent"] == root_orig_id]["child"]
+            object_ids = objids[object_idxs]
+            
+            # Create root
+            root_node_id = self.create_node(project_id,
+                                            root_orig_id,
+                                            object_ids=object_ids,
+                                            progress_cb=progress_cb)
             
             for row in raw_tree_nodes.itertuples():
                 # row.child is the current node
                 # row.parent is its parent
-                
-                if row.child_size == 0:
-                    # Skip empty nodes
-                    continue
                 
                 # Get object ids for the current node
                 object_idxs = raw_tree_objects[raw_tree_objects["parent"] == row.child]["child"]
@@ -174,12 +182,14 @@ class Tree(object):
                                  orig_parent = row.parent,
                                  object_ids = object_ids,
                                  name=name,
-                                 starred=name is not None)
-                    
-                bar.numerator += len(object_ids)
+                                 starred=name is not None,
+                                 progress_cb=progress_cb)
+                bar.numerator += 1
                 
-                print(bar, end="\r")
             print()
+            
+        print("Done after {}s.".format(bar._eta.elapsed))
+        print("Created root (orig/real):", root_orig_id, root_node_id)
             
         return project_id
     
@@ -346,7 +356,7 @@ class Tree(object):
         return project_id
     
     
-    def create_node(self, project_id=None, orig_node_id=None, parent_id = None, orig_parent=None, object_ids=None, name=None, starred = False):
+    def create_node(self, project_id=None, orig_node_id=None, parent_id = None, orig_parent=None, object_ids=None, name=None, starred = False, progress_cb=None):
         """
         Create a node.
         
@@ -390,6 +400,9 @@ class Tree(object):
                     break
                 
                 self.connection.execute(nodes_objects.insert(), data)
+                
+                if callable(progress_cb):
+                    progress_cb(len(data))
         return node_id
     
     
@@ -635,7 +648,7 @@ class Tree(object):
         assert isinstance(node_id, Integral), "node_id is not integral: {!r}".format(node_id)
         
         if require_valid:
-            self.consolidate_node(node_id, deep=True)
+            self.consolidate_node(node_id, depth="children")
         
         children = nodes.alias("children")
         superchildren = nodes.alias("superchildren")
@@ -1125,7 +1138,7 @@ class Tree(object):
             
             return self.connection.execute(stmt, node_id = node_id).scalar()
         
-    def consolidate_node(self, node_id, deep=False, max_n=None):
+    def consolidate_node(self, node_id, depth=False, max_n=None):
         """
         Ensures that the calculated values of this node are valid.
         
@@ -1148,10 +1161,10 @@ class Tree(object):
                 return q.c.cache_valid==False
             
             # Also recurse into invalid successors
-            def recurse_cb_deep(q, s):
+            def recurse_cb_children(q, s):
                 return (q.c.cache_valid==False) | (s.c.cache_valid==False)
             
-            invalid_subtree = _rquery_subtree(node_id, recurse_cb_deep if deep else recurse_cb)
+            invalid_subtree = _rquery_subtree(node_id, recurse_cb_children if depth == "children" else recurse_cb)
             
             # Readily query real n_objects
             n_objects = (select([nodes_objects.c.node_id, func.count().label("_n_objects_")])

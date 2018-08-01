@@ -169,24 +169,25 @@ def create_node():
         
         print(data)
         
-        node_id = tree.create_node(int(project_id), parent_id = parent_id, name = name, starred = starred)
-        
-        tree.relocate_nodes(node_ids, node_id)
-        
-        tree.relocate_objects(object_ids, node_id)
-        
-        log(connection, "create_node", node_id = node_id)
+        with connection.begin():
+            node_id = tree.create_node(int(project_id), parent_id = parent_id, name = name, starred = starred)
             
-        node = tree.get_node(node_id)
-          
+            tree.relocate_nodes(node_ids, node_id)
+            
+            tree.relocate_objects(object_ids, node_id)
+            
+            log(connection, "create_node", node_id = node_id)
+                
+            node = tree.get_node(node_id, require_valid=True)
+           
         result = _node(tree, node)
-        
+         
         return jsonify(result)
 
 
 def _node(tree, node, include_children=False):
     if node["name"] is None:
-        node["name"] = node["node_id"]
+        node["name"] = node["orig_id"]
     
     result = {
         "node_id": node["node_id"],
@@ -472,12 +473,22 @@ def _get_node_members(node_id, nodes = False, objects = False, arrange_by = "", 
                 with timer.child("interleaved"):
                     order = _arrange_by_sim(result)
                     if len(order):
-                        order0, order1 = np.array_split(order, 2)
+                        order0, order1 = np.array_split(order.copy(), 2)
                         order[::2] = order0
                         order[1::2] = order1[::-1]
             else:
                 warnings.warn("arrange_by={} not supported!".format(arrange_by))
                 order = ()
+                
+            #===================================================================
+            # if len(order):
+            #     try:
+            #         assert np.all(np.bincount(order) == 1)
+            #     except:
+            #         print(order)
+            #         print(np.bincount(order))
+            #         raise
+            #===================================================================
             
             result = result[order].tolist()
             
@@ -574,11 +585,14 @@ def patch_node(node_id):
         if "parent_id" in data:
             raise ValueError("parent_id must not be set directly, use /nodes/<node_id>/adopt.")
         
-        tree.update_node(node_id, data)
-        
-        log(connection, "update_node", node_id = node_id)
-        
-        node = tree.get_node(node_id, True)
+        with connection.begin():
+            tree.update_node(node_id, data)
+            
+            log(connection,
+                "update_node({})".format(json.dumps(data, sort_keys=True)),
+                node_id = node_id)
+            
+            node = tree.get_node(node_id, True)
         
         result = _node(tree, node, **flags)
         
@@ -606,8 +620,9 @@ def node_adopt_members(parent_id):
         node_ids = [int(m["node_id"]) for m in members if "node_id" in m]
         object_ids = [m["object_id"] for m in members if "object_id" in m]
         
-        tree.relocate_nodes(node_ids, parent_id)
-        tree.relocate_objects(object_ids, parent_id)
+        with connection.begin():
+            tree.relocate_nodes(node_ids, parent_id)
+            tree.relocate_objects(object_ids, parent_id)
         
         return jsonify({})
         

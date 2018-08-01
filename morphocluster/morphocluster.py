@@ -15,7 +15,6 @@ from werkzeug import check_password_hash, generate_password_hash
 
 from morphocluster import models
 from morphocluster.api import api
-from morphocluster.models import objects, nodes, projects, nodes_objects
 from morphocluster.tree import Tree
 from time import sleep
 from morphocluster.extensions import database, redis_store, migrate
@@ -31,6 +30,10 @@ app.config.from_object(__name__) # load config from this file , flaskr.py
 database.init_app(app)
 redis_store.init_app(app)
 migrate.init_app(app, database)
+
+# Enable batch mode
+with app.app_context():
+    database.engine.dialect.psycopg2_batch_mode = True
 
 @app.cli.command()
 def reset_db():
@@ -48,13 +51,20 @@ def reset_db():
         flask_migrate.stamp()
         
 @app.cli.command()
+def init_db():
+    with database.engine.begin() as txn:
+        database.metadata.create_all(txn)
+        
+        flask_migrate.stamp()
+        
+@app.cli.command()
 def clear_cache():
     with database.engine.begin() as txn:
         # Cached values are prefixed with an underscore
-        cached_columns = list(c for c in nodes.columns.keys() if c.startswith("_"))
+        cached_columns = list(c for c in models.nodes.columns.keys() if c.startswith("_"))
         values = {c: None for c in cached_columns}
         values["cache_valid"] = False
-        stmt = nodes.update().values(values)
+        stmt = models.nodes.update().values(values)
         txn.execute(stmt)
         
     print("Cache was cleared.")
@@ -69,9 +79,11 @@ def clear_projects():
         print("Canceled.")
         return
     
+    # TODO: Cascade drop https://stackoverflow.com/a/38679457/1116842
+    
     print("Clearing project data...")
     with database.engine.begin() as txn:
-        affected_tables = [nodes, projects, nodes_objects]
+        affected_tables = [models.nodes, models.projects, models.nodes_objects]
         database.metadata.drop_all(txn, tables = affected_tables)
         database.metadata.create_all(txn, tables = affected_tables)
     
@@ -110,7 +122,7 @@ def load_features(features_fns):
             object_ids = f_features["objids"]
             vectors = f_features["features"]
             
-            stmt = objects.update().where(objects.c.object_id == bindparam('_object_id')).values({
+            stmt = models.objects.update().where(models.objects.c.object_id == bindparam('_object_id')).values({
                 'vector': bindparam('vector')
             })
             
@@ -241,6 +253,13 @@ def export_direct_objects(node_id, filename):
         tree = Tree(conn)
         
         f.writelines("{}\n".format(o["object_id"]) for o in tree.get_objects(node_id))
+        
+@app.cli.command()
+@click.argument('filename')
+def export_log(filename):
+    with database.engine.connect() as conn:
+        log = pd.read_sql_query(models.log.select(), conn, index_col="log_id")
+        log.to_csv(filename)
 
     
 @app.route("/")
@@ -262,7 +281,12 @@ def get_obj_image(objid):
     if result is None:
         abort(404)
         
-    return send_from_directory(app.config["DATASET_PATH"], result["path"])
+    response = send_from_directory(app.config["DATASET_PATH"], result["path"],
+                                   conditional=True)
+    
+    response.headers['Cache-Control'] += ", immutable"
+    
+    return response
     
     
 # Register api
