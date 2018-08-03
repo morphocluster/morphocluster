@@ -60,6 +60,8 @@ nodes = Table('nodes', metadata,
     Column('_type_objects', ARRAY(String), nullable = True),
     # object_ids of type objects directly under this node (used as preview for the node's objects)
     Column('_own_type_objects', ARRAY(String), nullable = True),
+    # Number of children of this node
+    Column('_n_children', BigInteger, nullable = True),
     # Number of objects directly below this node
     Column('_n_objects', BigInteger, nullable = True),
     # Number of all objects anywhere below this node

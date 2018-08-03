@@ -5,7 +5,7 @@ Created on 13.03.2018
 '''
 from morphocluster.models import nodes, projects, nodes_objects, objects
 from sqlalchemy.sql import text
-from sqlalchemy.sql.expression import select, outerjoin, join, bindparam
+from sqlalchemy.sql.expression import select, bindparam
 import os
 import pandas as pd
 from etaprogress.progress import ProgressBar
@@ -22,9 +22,6 @@ from genericpath import commonprefix
 from morphocluster.helpers import seq2array
 from sqlalchemy.sql.expression import literal
 from sqlalchemy.sql.elements import literal_column
-import sys
-from timer_cm import Timer
-from etaprogress import progress
 
 
 class TreeError(Exception):
@@ -611,12 +608,8 @@ class Tree(object):
             # TODO: Directly use values instead of reading again from DB
             self.consolidate_node(node_id)
         
-        children = nodes.alias("children")
-        
-        stmt = select([nodes, func.count(children.c.node_id).label("n_children")])\
-            .select_from(outerjoin(nodes, children, children.c.parent_id == nodes.c.node_id))\
-            .group_by(nodes.c.node_id)\
-            .having(nodes.c.node_id == node_id)
+        stmt = (select([nodes])
+                .where(nodes.c.node_id == node_id))
         
         result = self.connection.execute(stmt, node_id = node_id).fetchone()
         
@@ -650,24 +643,15 @@ class Tree(object):
         if require_valid:
             self.consolidate_node(node_id, depth="children")
         
-        children = nodes.alias("children")
-        superchildren = nodes.alias("superchildren")
-        
-        stmt = select([nodes,
-                       func.count(children.c.node_id).label("n_children"),
-                       func.count(children.c.node_id).label("n_superchildren")])\
-            .select_from(nodes\
-                .outerjoin(children, children.c.parent_id == nodes.c.node_id)\
-                .outerjoin(superchildren, superchildren.c.superparent_id == nodes.c.node_id))\
-            .group_by(nodes.c.node_id)
+        stmt = select([nodes])
             
         if supertree:
-            stmt = stmt.having(nodes.c.superparent_id == node_id)
+            stmt = stmt.where(nodes.c.superparent_id == node_id)
         else:
-            stmt = stmt.having(nodes.c.parent_id == node_id)
+            stmt = stmt.where(nodes.c.parent_id == node_id)
             
         if include is not None:
-            stmt = stmt.having(nodes.c.starred == (include == "starred"))
+            stmt = stmt.where(nodes.c.starred == (include == "starred"))
             
         if order_by is not None:
             stmt = stmt.order_by(text(order_by))
@@ -1138,7 +1122,7 @@ class Tree(object):
             
             return self.connection.execute(stmt, node_id = node_id).scalar()
         
-    def consolidate_node(self, node_id, depth=False, max_n=None):
+    def consolidate_node(self, node_id, depth=0, max_n=None):
         """
         Ensures that the calculated values of this node are valid.
         
@@ -1153,27 +1137,38 @@ class Tree(object):
             True if node_id is now valid. (Might not be the case if max_n is set)
         """
         
+        if isinstance(depth, str):
+            if depth == "children":
+                depth = 1
+            else:
+                raise NotImplementedError("Unknown depth string: {}".format(depth))
+        
         # Wrap everything in a transaction
         with self.connection.begin():
-        
-            # Only recurse into invalid nodes
-            def recurse_cb(q, _):
-                return q.c.cache_valid==False
+            def recurse_cb_level(q, _):
+                # Only recurse into invalid nodes
+                # Ensure validity up to a certain level
+                return (q.c.cache_valid==False) | (q.c.level < depth)
             
-            # Also recurse into invalid successors
-            def recurse_cb_children(q, s):
-                return (q.c.cache_valid==False) | (s.c.cache_valid==False)
-            
-            invalid_subtree = _rquery_subtree(node_id, recurse_cb_children if depth == "children" else recurse_cb)
+            invalid_subtree = _rquery_subtree(node_id, recurse_cb_level)
             
             # Readily query real n_objects
-            n_objects = (select([nodes_objects.c.node_id, func.count().label("_n_objects_")])
+            n_objects = (select([func.count()])
                           .select_from(nodes_objects)
-                          .group_by(nodes_objects.c.node_id)
-                          .alias("n_objects"))
+                          .where(nodes_objects.c.node_id == invalid_subtree.c.node_id)
+                          .as_scalar()
+                          .label("_n_objects_"))
             
-            stmt = (select([invalid_subtree, func.coalesce(n_objects.c._n_objects_, 0).label("_n_objects_")])
-                    .select_from(outerjoin(invalid_subtree, n_objects, n_objects.c.node_id == invalid_subtree.c.node_id))
+            # Readily query real n_children
+            n_children = (select([func.count()])
+                          .select_from(nodes)
+                          .where(nodes.c.parent_id == invalid_subtree.c.node_id)
+                          .as_scalar()
+                          .label("_n_children_"))
+            
+            stmt = (select([invalid_subtree,
+                            n_objects,
+                            n_children])
                     .order_by(invalid_subtree.c.level.desc()))
             
             if max_n is not None:
@@ -1185,13 +1180,18 @@ class Tree(object):
                 # If no successor are invalid, this node is also valid
                 return True
             
-            # 1. _n_objects
+            # 1. _n_objects, _n_children
             invalid_subtree["_n_objects"] = invalid_subtree["_n_objects_"]
+            invalid_subtree["_n_children"] = invalid_subtree["_n_children_"]
             
             # Iterate over DataFrame fixing the values along the way
             bar = ProgressBar(len(invalid_subtree), max_width=40)
             for node_id in invalid_subtree.index:
-                print(node_id, bar, end="    \r")
+                if invalid_subtree.at[node_id, "cache_valid"]:
+                    # Don't recalculate valid nodes as invalid_subtree (rightly)
+                    # doesn't include their children.
+                    continue
+                
                 child_selector = (invalid_subtree['parent_id'] == node_id)
                 children = invalid_subtree.loc[child_selector]
                 children_dict = children.reset_index().to_dict('records')
@@ -1222,7 +1222,7 @@ class Tree(object):
                     print("\nNode {} has no centroid!".format(node_id))
                     
                 bar.numerator += 1
-                
+                print(node_id, bar, end="    \r")
             print()
                 
             # Convert _n_objects_deep to int (might be object when containing NULL values in the database)
@@ -1234,7 +1234,7 @@ class Tree(object):
             # Write results back to database
             update_fields = ["cache_valid", "_centroid", "_type_objects",
                              "_own_type_objects", "_n_objects_deep",
-                             "_n_objects"]
+                             "_n_objects", "_n_children"]
 
             
             stmt = (nodes.update()

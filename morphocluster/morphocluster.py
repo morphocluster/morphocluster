@@ -24,7 +24,6 @@ app = Flask(__name__)
 
 app.config.from_object('morphocluster.config_default')
 app.config.from_envvar('MORPHOCLUSTER_SETTINGS')
-app.config.from_object(__name__) # load config from this file , flaskr.py
 
 # Initialize extensions
 database.init_app(app)

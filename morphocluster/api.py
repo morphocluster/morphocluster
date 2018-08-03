@@ -4,7 +4,6 @@ Created on 19.03.2018
 @author: mschroeder
 '''
 import datetime
-import time
 from distutils.util import strtobool
 
 import numpy as np
@@ -13,7 +12,6 @@ from flask.blueprints import Blueprint
 from sklearn.manifold.isomap import Isomap
 
 from morphocluster.tree import Tree
-from urllib.parse import urlencode
 import warnings
 from morphocluster.classifier import Classifier
 from functools import wraps
@@ -28,7 +26,6 @@ from pprint import pprint
 from flask.helpers import url_for
 from flask_restful import reqparse
 from morphocluster.helpers import seq2array, keydefaultdict
-from _collections import defaultdict
 from timer_cm import Timer
 
 
@@ -82,8 +79,8 @@ def _tree_root(project):
 def _tree_node(node, supertree=False):
     result = {
         "id": node["node_id"],
-        "text": "{} ({})".format(node["name"] or node["node_id"], node["n_children"]),
-        "children": node["n_superchildren"] > 0 if supertree else node["n_children"] > 0,
+        "text": "{} ({})".format(node["name"] or node["node_id"], node["_n_children"]),
+        "children": node["n_superchildren"] > 0 if supertree else node["_n_children"] > 0,
         "icon": _node_icon(node)
     }
     
@@ -105,10 +102,10 @@ def get_subtree(node_id):
         tree = Tree(connection)
         
         if flags["supertree"]:
-            children = tree.get_children(node_id, order_by="n_children DESC", supertree=True, include="starred")
+            children = tree.get_children(node_id, supertree=True, include="starred", order_by="_n_children DESC")
         else:
-            children = tree.get_children(node_id, order_by="n_children DESC")
-        
+            children = tree.get_children(node_id, order_by="_n_children DESC")
+            
         result = [_tree_node(c, flags["supertree"]) for c in children]
         
         return jsonify(result)
@@ -125,14 +122,6 @@ def get_projects():
     with database.engine.connect() as connection:
         tree = Tree(connection)
         return jsonify(tree.get_projects())
-    
-    
-@api.route("/projects/<int:project_id>/", methods=["GET"])
-def get_project(project_id):
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
-        log(connection, "get_project({})".format(project_id))
-        return jsonify(_project(tree.get_project(project_id)))
 
 #===============================================================================
 # /nodes
@@ -193,10 +182,10 @@ def _node(tree, node, include_children=False):
         "node_id": node["node_id"],
         "id": node["node_id"],
         "path": tree.get_path_ids(node["node_id"]),
-        "text": "{} ({})".format(node["name"], node["n_children"]),
+        "text": "{} ({})".format(node["name"], node["_n_children"]),
         "name": node["name"],
-        "children": node["n_children"] > 0,
-        "n_children": node["n_children"],
+        "children": node["_n_children"] > 0,
+        "n_children": node["_n_children"],
         "icon": _node_icon(node),
         "type_objects": node["_type_objects"],
         "starred": node["starred"],
