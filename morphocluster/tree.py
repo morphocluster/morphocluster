@@ -1175,6 +1175,9 @@ class Tree(object):
                 stmt = stmt.limit(max_n)
                 
             invalid_subtree = pd.read_sql_query(stmt, self.connection, index_col="node_id")
+            
+            if len(invalid_subtree) == 0:
+                raise TreeError("Unknown node: {}".format(node_id))
                 
             if len(invalid_subtree) == 1:
                 # If no successor are invalid, this node is also valid
@@ -1223,7 +1226,6 @@ class Tree(object):
                     
                 bar.numerator += 1
                 print(node_id, bar, end="    \r")
-            print()
                 
             # Convert _n_objects_deep to int (might be object when containing NULL values in the database)
             invalid_subtree["_n_objects_deep"] = invalid_subtree["_n_objects_deep"].astype(int)
