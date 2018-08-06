@@ -1179,13 +1179,15 @@ class Tree(object):
             if len(invalid_subtree) == 0:
                 raise TreeError("Unknown node: {}".format(node_id))
                 
-            if len(invalid_subtree) == 1:
-                # If no successor are invalid, this node is also valid
+            if invalid_subtree["cache_valid"].all():
+                # All nodes are valid
                 return True
             
             # 1. _n_objects, _n_children
             invalid_subtree["_n_objects"] = invalid_subtree["_n_objects_"]
             invalid_subtree["_n_children"] = invalid_subtree["_n_children_"]
+            
+            invalid_subtree["__updated"] = False
             
             # Iterate over DataFrame fixing the values along the way
             bar = ProgressBar(len(invalid_subtree), max_width=40)
@@ -1224,6 +1226,8 @@ class Tree(object):
                 if invalid_subtree.loc[node_id, "_centroid"] is None:
                     print("\nNode {} has no centroid!".format(node_id))
                     
+                invalid_subtree.at[node_id, "__updated"] = True
+                    
                 bar.numerator += 1
                 print(node_id, bar, end="    \r")
                 
@@ -1243,8 +1247,11 @@ class Tree(object):
                     .where(nodes.c.node_id == bindparam('_node_id'))
                     .values({k: bindparam(k) for k in update_fields}))
             
+            # Mask for updated rows
+            updated_selection = invalid_subtree["__updated"] == True
+            
             # Build the result list of dicts with _node_id and only update_fields
-            result = invalid_subtree[update_fields]
+            result = invalid_subtree.loc[updated_selection, update_fields]
             result.index.rename('_node_id', inplace=True)
             result.reset_index(inplace=True)
             

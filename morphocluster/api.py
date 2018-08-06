@@ -168,6 +168,8 @@ def create_node():
             log(connection, "create_node", node_id = node_id)
                 
             node = tree.get_node(node_id, require_valid=True)
+            
+            print("Created node {}.".format(node_id))
            
         result = _node(tree, node)
          
