@@ -817,6 +817,11 @@ function init_tree() {
 		return false;
 	});
 	
+	$("#btn-rec-jump-end").click(function () {
+		$recommendPane.scrollTop($recommendPane.prop('scrollHeight'))
+		return false;
+	});
+	
 	/* * * * * * * * * *
 	 * Event handlers  *
 	 * * * * * * * * * */
