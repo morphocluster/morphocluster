@@ -50,13 +50,6 @@ def reset_db():
         flask_migrate.stamp()
         
 @app.cli.command()
-def init_db():
-    with database.engine.begin() as txn:
-        database.metadata.create_all(txn)
-        
-        flask_migrate.stamp()
-        
-@app.cli.command()
 def clear_cache():
     with database.engine.begin() as txn:
         # Cached values are prefixed with an underscore
@@ -117,7 +110,7 @@ def load_object_locations(collection_fn):
 def load_features(features_fns):
     for features_fn in features_fns:
         print("Loading {}...".format(features_fn))
-        with h5py.File(features_fn, "r", libver="latest") as f_features, database.engine.begin() as txn:
+        with h5py.File(features_fn, "r", libver="latest") as f_features, database.engine.begin() as conn:
             object_ids = f_features["objids"]
             vectors = f_features["features"]
             
@@ -131,7 +124,7 @@ def load_features(features_fns):
                 chunk = tuple(itertools.islice(obj_iter, 1000))
                 if not chunk:
                     break
-                txn.execute(stmt, [{"_object_id": str(object_id), "vector": vector} for (object_id, vector) in chunk])
+                conn.execute(stmt, [{"_object_id": str(object_id), "vector": vector} for (object_id, vector) in chunk])
                   
                 bar.numerator += len(chunk)
                 print(bar, end="\r")

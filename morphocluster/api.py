@@ -648,12 +648,12 @@ def node_get_recommended_children(node_id):
     
     return _node_get_recommended_children(node_id = node_id, **arguments)
 
-@cache_serialize_page(".node_get_recommended_objects", page_size=20)
+@cache_serialize_page(".node_get_recommended_objects", page_size=100)
 def _node_get_recommended_objects(node_id, max_n):
     with database.engine.connect() as connection:
         tree = Tree(connection)
     
-        result = [ _object(o) for o in tree.recommend_objects(node_id) ]
+        result = [ _object(o) for o in tree.recommend_objects(node_id, max_n) ]
         
         return result
     

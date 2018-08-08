@@ -769,11 +769,13 @@ class Tree(object):
         
         # Traverse the parse in reverse
         for parent_id in path[::-1]:
-            objects.extend(self.get_objects(parent_id))
+            n_left = max_n - len(objects)
             
             # Break if we already have enough nodes
-            if len(objects) > max_n:
+            if n_left <= 0:
                 break
+            
+            objects.extend(self.get_objects(parent_id, limit=n_left))
             
         vectors = [o["vector"] for o in objects]
         

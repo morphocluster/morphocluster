@@ -15,6 +15,7 @@ function init_tree() {
 	};
 	
 	var nodePaneScrollHandler, recommendPaneScrollHandler;
+	var recommendJumpToPage, recommendNextPage;
 	
 	var flashMsg = new function FlashMsg() {
 		this.msg = "";
@@ -362,6 +363,7 @@ function init_tree() {
 		var node = appState.node;
 		
 		$recommendPane.empty();
+		recommendJumpToPage = recommendNextPage = 0;
 		
 		/*$recommendPane.html("<h1>Recommended children for " + node_id + "</h1>");
 		$recommendPane.append('<p>' + response.length + ' recommendations.</p>');*/
@@ -383,13 +385,16 @@ function init_tree() {
 			var links = parseLinkHeader(jqXHR.getResponseHeader("Link"));
 			if ("next" in links) {
 				next_url = links["next"];
+				recommendNextPage = parseInt((new URLSearchParams(next_url.split("?")[1])).get("page"));
 				$loading.appendTo($row);
 			} else {
 				next_url = "";
+				recommendJumpToPage = recommendNextPage = 0;
 			}
 			
 			$recommendStatus.empty();
 			members_loading = false;
+			$(document).trigger("recommend_do_scroll.morphocluster");
 		};
 		
 		if (appState.display == "children") {
@@ -405,7 +410,7 @@ function init_tree() {
 			console.log("Recommending objects.");
 			
 			members_loading = true;
-			$.get("/api/nodes/" + node_id + '/recommended_objects', {max_n: 60}).done(processResponse).fail(
+			$.get("/api/nodes/" + node_id + '/recommended_objects', {max_n: 10000}).done(processResponse).fail(
 					function (jqXHR, textStatus, errorThrown) {
 						console.log(jqXHR, textStatus, errorThrown);
 						$recommendStatus.text(textStatus + ", " + errorThrown);
@@ -434,6 +439,15 @@ function init_tree() {
 	$recommendPane.on("scroll", function () {
 		if(typeof(recommendPaneScrollHandler) == "function") {
 			recommendPaneScrollHandler();
+		}
+	});
+	
+	$(document).on("recommend_do_scroll.morphocluster", function () {
+		if(recommendJumpToPage >= recommendNextPage) {
+			$recommendPane.scrollTop($recommendPane.prop('scrollHeight'));
+			setTimeout(function () {
+				$(document).trigger("recommend_do_scroll.morphocluster");
+			}, 500);
 		}
 	});
 	
@@ -817,8 +831,12 @@ function init_tree() {
 		return false;
 	});
 	
-	$("#btn-rec-jump-end").click(function () {
-		$recommendPane.scrollTop($recommendPane.prop('scrollHeight'))
+	$(".btn-rec-jump").click(function () {
+		var npages = parseInt($(this).data("npages"));
+		console.log("Jump", npages)
+		recommendJumpToPage = recommendNextPage + npages;
+		$(document).trigger("recommend_do_scroll.morphocluster");
+		//$recommendPane.scrollTop($recommendPane.prop('scrollHeight'))
 		return false;
 	});
 	
