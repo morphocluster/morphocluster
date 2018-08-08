@@ -1073,58 +1073,57 @@ class Tree(object):
         
         return [self._upgrade_node(dict(r), require_valid = require_valid) for r in result]
     
-    def get_next_unapproved(self, node_id):
+    def get_next_unapproved(self, node_id, leaf=False):
         """
         Get the id of the next unapproved node.
         
         This is either        
             a) the deepest unapproved node below, if this current node is not approved, or
-            b) the first unapproved node below a predecessor of the current node. 
+            b) the first unapproved node below a predecessor of the current node.
+            
+        Parameters:
+            node_id
+            leaf: Only return leaves.
         """
         
+        # First try if there are candidates below this node
+        def recurse_cb(_, s):
+                return s.c.approved == False
+            
+        subtree = _rquery_subtree(node_id, recurse_cb)
+        
+        children = nodes.alias("children")
+        n_children = (select([func.count()])
+                      .select_from(children)
+                      .where(children.c.parent_id == subtree.c.node_id)
+                      .as_scalar()
+                      .label("n_children"))
+        
+        stmt = (select([subtree.c.node_id])
+                .where(subtree.c.approved == False))
+        
+        if leaf:
+            stmt = stmt.where(n_children == 0)
+        
+        stmt = (stmt
+                .order_by(subtree.c.level.desc())
+                .limit(1))
+        
+        result = self.connection.execute(stmt).scalar()
+        
+        if result is not None:
+            return result
+        
+        # Otherwise go to parent
         node = self.connection.execute(nodes.select(nodes.c.node_id == node_id)).first()
         
-        if node["approved"]:
-            if node["parent_id"]:
-                return self.get_next_unapproved(node["parent_id"])
-            return None
-        
-            #===================================================================
-            # preds = self._rquery_preds(node_id)
-            # 
-            # stmt = select([nodes.c.node_id]).\
-            #     select_from(join(preds, nodes, nodes.c.parent_id == preds.c.node_id)).\
-            #     where(nodes.c.approved == False).\
-            #     order_by(preds.c.level.desc()).\
-            #     limit(1)
-            #     
-            # return self.connection.execute(stmt).scalar()
-            #===================================================================
+        if node["parent_id"]:
+            print("No unapproved children, trying parent: {}".format(node["parent_id"]))
+            return self.get_next_unapproved(node["parent_id"], leaf)
+        return None
             
-        else:
-            stmt = text("""
-            WITH    RECURSIVE
-            q AS
-            (
-                SELECT  node_id, 1 as level
-                FROM    nodes AS n
-                WHERE   node_id = :node_id
-                UNION ALL
-                SELECT  nd.node_id, level + 1
-                FROM    q
-                JOIN    nodes AS nd
-                ON      nd.parent_id = q.node_id
-                WHERE nd.approved = 'f'
-            )
-            SELECT q.node_id
-            FROM q
-            ORDER BY q.level desc
-            LIMIT 1
-            """)
-            
-            return self.connection.execute(stmt, node_id = node_id).scalar()
         
-    def consolidate_node(self, node_id, depth=0, max_n=None):
+    def consolidate_node(self, node_id, depth=0, return_=None):
         """
         Ensures that the calculated values of this node are valid.
         
@@ -1133,10 +1132,10 @@ class Tree(object):
         Parameters:
             node_id: Root of the subtree that gets consolidated.
             deep: Consolidate all successors? (Default: False)
-            max_n: If not None, consolidate only the max_n deepest nodes.
+            return_: None | "node" | "children". Return this node or its children.
             
         Returns:
-            True if node_id is now valid. (Might not be the case if max_n is set)
+            node dict or list of children, depending on return_ parameter.
         """
         
         if isinstance(depth, str):
@@ -1162,9 +1161,10 @@ class Tree(object):
                           .label("_n_objects_"))
             
             # Readily query real n_children
+            children = nodes.alias("children")
             n_children = (select([func.count()])
-                          .select_from(nodes)
-                          .where(nodes.c.parent_id == invalid_subtree.c.node_id)
+                          .select_from(children)
+                          .where(children.c.parent_id == invalid_subtree.c.node_id)
                           .as_scalar()
                           .label("_n_children_"))
             
@@ -1173,9 +1173,6 @@ class Tree(object):
                             n_children])
                     .order_by(invalid_subtree.c.level.desc()))
             
-            if max_n is not None:
-                stmt = stmt.limit(max_n)
-                
             invalid_subtree = pd.read_sql_query(stmt, self.connection, index_col="node_id")
             
             if len(invalid_subtree) == 0:
@@ -1261,9 +1258,12 @@ class Tree(object):
             
             print("Done.")
             
-            # Return validity of node_id
-            return node_id in invalid_subtree.index
+            if return_ == "node":
+                return invalid_subtree.loc[node_id].to_dict()
             
+            if return_ == "children":
+                return (invalid_subtree[invalid_subtree["parent_id"] == node_id]
+                        .to_dict("records"))
     
 if __name__ in ("__main__", "builtins"):
     #: :type conn: sqlalchemy.engine.base.Connection

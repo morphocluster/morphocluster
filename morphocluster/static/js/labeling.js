@@ -1095,8 +1095,10 @@ function init_tree() {
 	 * Tree controls
 	 */
 	
-	function loadNextNode(node_id) {
-		return $.get("/api/nodes/" + node_id  + "/next").done(function (next_node_id) {
+	function loadNextNode(node_id, leaf) {
+		leaf = (typeof leaf !== 'undefined') ? leaf : false;
+		console.log("leaf:", leaf);
+		return $.get("/api/nodes/" + node_id  + "/next", {leaf: leaf}).done(function (next_node_id) {
 			$("#tree-status").empty();
 			
 			loadNode(next_node_id);
@@ -1118,6 +1120,22 @@ function init_tree() {
 		});
 	}
 	$("#btn-next-node").on("click", _btnNextNode);
+	
+	function _btnNextLeaf() {
+		if(typeof(appState.node) == "undefined") {
+			return;
+		}
+		
+		var node_id = appState.node.node_id;
+		
+		$nodeStatus.text("Loading next leaf to approve after " + node_id + "...");
+		console.log("node_id:", node_id);
+		
+		loadNextNode(node_id, true).fail(function (jqXHR, textStatus, errorThrown) {
+			$("#tree-status").text(textStatus + ", " + errorThrown);
+		});
+	}
+	$("#btn-next-leaf").on("click", _btnNextLeaf);
 	
 	function _btnUp() {
 		if(typeof(appState.node) == "undefined") {
@@ -1143,8 +1161,10 @@ function init_tree() {
 			_btnApprove();
 		} else if(e.key=="m") {
 			_btnMerge();
-		} else if(e.key=="d") {
+		} else if(e.key=="n") {
 			_btnNextNode();
+		} else if(e.key=="l") {
+			_btnNextLeaf();
 		} else if(e.key=="u") {
 			_btnUp();
 		} else  {

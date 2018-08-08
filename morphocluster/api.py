@@ -691,10 +691,16 @@ def node_get_tip(node_id):
     
 @api.route("/nodes/<int:node_id>/next", methods=["GET"])
 def node_get_next(node_id):
+    parser = reqparse.RequestParser()
+    parser.add_argument("leaf", type = strtobool, default = False)
+    arguments = parser.parse_args(strict=True)
+    
+    print(arguments)
+    
     with database.engine.connect() as connection:
         tree = Tree(connection)
     
-        return jsonify(tree.get_next_unapproved(node_id))
+        return jsonify(tree.get_next_unapproved(node_id, arguments["leaf"]))
     
     
 @api.route("/nodes/<int:node_id>/n_sorted", methods=["GET"])
