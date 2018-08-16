@@ -11,19 +11,24 @@
 <div id="grid">
 	<div id="tree-header" class="bg-light px-1">
 		 <form class="form-inline" autocomplete="off">
-			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-next-node"
-				title="Go to next node (N)">
-				<i class="mdi mdi-chevron-double-right"></i>
-			</button>
-			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-next-leaf"
-				title="Go to next leaf (L)">
-				<i class="mdi mdi-chevron-double-right"></i>
-				<i class="mdi mdi-leaf"></i>
-			</button>
-			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-up"
+		 	<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-up"
 				title="Go up. (U)">
 				<i class="mdi mdi-chevron-up"></i>
 			</button>
+			
+			<div class="btn-group ml-2">
+			  <button type="button" class="btn btn-secondary btn-sm" id="btn-next"
+				title="Go to next node (N)" data-strategy="node">
+				<i class="mdi mdi-chevron-double-right"></i>
+				<i class="mdi next-icon mdi-hexagon-multiple"></i>
+			</button>
+			  <button type="button" class="btn btn-secondary btn-sm dropdown-toggle dropdown-toggle-split" data-toggle="dropdown">
+			  </button>
+			  <div class="dropdown-menu">
+			    <a class="dropdown-item btn-next-strategy" href="#" data-strategy="leaf"><i class="mdi mdi-leaf"></i>Leaf</a>
+			    <a class="dropdown-item btn-next-strategy" href="#" data-strategy="node"><i class="mdi mdi-hexagon-multiple"></i>Node</a>
+			  </div>
+			</div>
 		</form>
 	</div>
 	<div id="node-header" class="bg-light px-1">

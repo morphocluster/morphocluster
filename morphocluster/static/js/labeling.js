@@ -765,11 +765,12 @@ function init_tree() {
 		 * Approve and go to next node.
 		 */
 		var node = appState.node;
+		var strategy = $("#btn-next").data("strategy");
 		
 		// Approve current node
 		patchNode(node.node_id, {approved: true}).done(function (data) {
 			// Go to next deepest node
-			loadNextNode(node.node_id).fail(nodeStatusErrorHandler);
+			loadNextNode(node.node_id, strategy=="leaf").fail(nodeStatusErrorHandler);
 		}).fail(nodeStatusErrorHandler);
 		
 		return false;
@@ -1105,37 +1106,35 @@ function init_tree() {
 		});
 	}
 	
-	function _btnNextNode() {
+	$(".btn-next-strategy").on("click", function (e) {
+		var $this = $(this);
+		var $btnNext = $("#btn-next");
+		var strategy = $this.data("strategy");
+		console.log(strategy);
+		
+		$btnNext.data("strategy", strategy);
+		$btnNext.find(".next-icon").toggleClass("mdi-leaf", strategy=="leaf");
+		$btnNext.find(".next-icon").toggleClass("mdi-hexagon-multiple", strategy=="node");
+		
+		e.preventDefault();
+	});
+	
+	function _btnNext() {
 		if(typeof(appState.node) == "undefined") {
 			return;
 		}
 		
 		var node_id = appState.node.node_id;
+		var strategy = $("#btn-next").data("strategy");
 		
 		$nodeStatus.text("Loading next node to approve after " + node_id + "...");
 		console.log("node_id:", node_id);
 		
-		loadNextNode(node_id).fail(function (jqXHR, textStatus, errorThrown) {
+		loadNextNode(node_id, strategy=="leaf").fail(function (jqXHR, textStatus, errorThrown) {
 			$("#tree-status").text(textStatus + ", " + errorThrown);
 		});
 	}
-	$("#btn-next-node").on("click", _btnNextNode);
-	
-	function _btnNextLeaf() {
-		if(typeof(appState.node) == "undefined") {
-			return;
-		}
-		
-		var node_id = appState.node.node_id;
-		
-		$nodeStatus.text("Loading next leaf to approve after " + node_id + "...");
-		console.log("node_id:", node_id);
-		
-		loadNextNode(node_id, true).fail(function (jqXHR, textStatus, errorThrown) {
-			$("#tree-status").text(textStatus + ", " + errorThrown);
-		});
-	}
-	$("#btn-next-leaf").on("click", _btnNextLeaf);
+	$("#btn-next").on("click", _btnNext);
 	
 	function _btnUp() {
 		if(typeof(appState.node) == "undefined") {
@@ -1162,9 +1161,7 @@ function init_tree() {
 		} else if(e.key=="m") {
 			_btnMerge();
 		} else if(e.key=="n") {
-			_btnNextNode();
-		} else if(e.key=="l") {
-			_btnNextLeaf();
+			_btnNext();
 		} else if(e.key=="u") {
 			_btnUp();
 		} else  {

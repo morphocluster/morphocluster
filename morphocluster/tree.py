@@ -19,9 +19,11 @@ from morphocluster.classifier import Classifier
 from morphocluster.extensions import database
 import csv
 from genericpath import commonprefix
-from morphocluster.helpers import seq2array
+from morphocluster.helpers import seq2array, combine_covariances
 from sqlalchemy.sql.expression import literal
 from sqlalchemy.sql.elements import literal_column
+from morphocluster.member import MemberCollection
+from _functools import reduce
 
 
 class TreeError(Exception):
@@ -403,44 +405,46 @@ class Tree(object):
         return node_id
     
     
-    def _calc_centroid(self, node, children, objects):
-        """
-        Calculate the centroid of a node as the weighted mean of
-            a) the centroids of its children, and
-            b) the centroid of its own objects
-        """
-        # ToDo: Account for number of objects
-        
-        if not node["_n_objects_deep"]:
-            return None
-        
-        # Weight each child centroid with the number of objects it stands for
-        centroids = [c["_n_objects_deep"] * c["_centroid"] for c in children if c["_centroid"] is not None]
-        
-        # Calculate centroid for own objects    
-        object_vectors = [ o["vector"] for o in objects if o["vector"] is not None ]
-        
-        if len(object_vectors) > 0:
-            object_centroid = np.mean(object_vectors, axis=0)
-            
-            # Weight object_centroid with the number of objects it stands for
-            object_centroid *= node["_n_objects"]
-            
-            centroids.append(object_centroid)
-            
-        if len(centroids) > 0:
-            centroid = np.mean(centroids, axis=0)
-            
-            try:
-                # Divide by the number of objects it stands for
-                centroid /= node["_n_objects_deep"]
-            except TypeError:
-                print("_n_objects_deep:", repr(node["_n_objects_deep"]))
-                raise
-            
-            return centroid
-        else:
-            return None
+    #===========================================================================
+    # def _calc_centroid(self, node, children, objects_):
+    #     """
+    #     Calculate the centroid of a node as the weighted mean of
+    #         a) the centroids of its children, and
+    #         b) the centroid of its own objects_
+    #     """
+    #     # ToDo: Account for number of objects_
+    #     
+    #     if not node["_n_objects_deep"]:
+    #         return None
+    #     
+    #     # Weight each child centroid with the number of objects_ it stands for
+    #     centroids = [c["_n_objects_deep"] * c["_centroid"] for c in children if c["_centroid"] is not None]
+    #     
+    #     # Calculate centroid for own objects_    
+    #     object_vectors = [ o["vector"] for o in objects_ if o["vector"] is not None ]
+    #     
+    #     if len(object_vectors) > 0:
+    #         object_centroid = np.mean(object_vectors, axis=0)
+    #         
+    #         # Weight object_centroid with the number of objects_ it stands for
+    #         object_centroid *= node["_n_objects"]
+    #         
+    #         centroids.append(object_centroid)
+    #         
+    #     if len(centroids) > 0:
+    #         centroid = np.mean(centroids, axis=0)
+    #         
+    #         try:
+    #             # Divide by the number of objects_ it stands for
+    #             centroid /= node["_n_objects_deep"]
+    #         except TypeError:
+    #             print("_n_objects_deep:", repr(node["_n_objects_deep"]))
+    #             raise
+    #         
+    #         return centroid
+    #     else:
+    #         return None
+    #===========================================================================
         
                 
     def _calc_type_objects(self, children, objects):
@@ -458,31 +462,27 @@ class Tree(object):
         else:
             return [o["object_id"] for o in objects[:9]]
         
-    def _calc_own_type_objects(self, children, objects):
+    def _calc_own_type_objects(self, children, objects_):
         """
-        Calculate nine own type objects for a node as
-            a) the nine objects with maximum distance to the children, or
+        Calculate nine own type objects_ for a node as
+            a) the nine objects_ with maximum distance to the children, or
             b) [], if the node is a leaf.
         """
         
-        child_vectors = np.array([ c["_centroid"] for c in children if c["_centroid"] is not None ])
-        object_vectors = np.array([ o["vector"] for o in objects ])
-        
-        if len(child_vectors) > 0 and len(objects) > 0:
-        
+        if len(children) > 0 and len(objects_) > 0:
             try:
-                classifier = Classifier(child_vectors)
-                distances = classifier.distances(object_vectors)
+                classifier = Classifier(children.vectors)
+                distances = classifier.distances(objects_.vectors)
                 max_dist = np.max(distances, axis=0)
                 max_dist_idx = np.argsort(max_dist)[::-1]
                 
-                assert len(max_dist_idx) == len(objects), "{} != {}".format(len(max_dist_idx), len(objects))
+                assert len(max_dist_idx) == len(objects_), "{} != {}".format(len(max_dist_idx), len(objects_))
                 
-                return [objects[i]["object_id"] for i in max_dist_idx[:9]]
+                return [objects_[i]["object_id"] for i in max_dist_idx[:9]]
                 
             except:
-                print("child_vectors", child_vectors.shape)
-                print("object_vectors", object_vectors.shape)
+                print("child_vectors", children.vectors.shape)
+                print("object_vectors", object.vectors.shape)
                 raise
 
         else:
@@ -541,64 +541,66 @@ class Tree(object):
         
         return result
     
-    def _upgrade_node(self, node, require_valid = True, _rec_depth=0):
-        """
-        Parameters:
-            node (dict): Fields of the node.
-            require_valid: Are valid cache values required?
-        """
-        
-        # If no valid cache values are required or the node is already valid,
-        # return unchanged.
-        if not require_valid or node["cache_valid"]:
-            return node
-
-        print("{}Upgrading node {}...".format(" " * _rec_depth, node["node_id"]))
-        
-        if node["n_children"] > 0:
-            # The recursive calculation happens here
-            children = self.get_children(node["node_id"], require_valid, _rec_depth = _rec_depth + 1)
-        else:
-            children = []
-            
-        # Limit to 1000 objects to speed up the calculation
-        # TODO: Select objects randomly
-        objects = self.get_objects(node["node_id"], limit = 1000)
-        
-        node["_n_objects"] = self.get_n_objects(node["node_id"])
-            
-        # Hint: Uses vectors
-        node["_own_type_objects"] = self._calc_own_type_objects(children, objects)
-        
-        node["_type_objects"] = self._calc_type_objects(children, objects)
-        
-        node["_n_objects_deep"] = self._calc_n_objects_deep(node, children)
-        
-        # TODO: Remove assertion if we're sure enough that this works
-        query_n_objects_deep = self._query_n_objects_deep(node)
-        
-        if node["_n_objects_deep"] is None:
-            node["_n_objects_deep"] = query_n_objects_deep
-            
-        else:
-            if node["_n_objects_deep"] != query_n_objects_deep:
-                warnings.warn("_n_objects_deep do not match! {}!={}".format(node["_n_objects_deep"], query_n_objects_deep))
-                node["_n_objects_deep"] = query_n_objects_deep
-                
-        # Hint: Uses vectors
-        node["_centroid"] = self._calc_centroid(node, children, objects)
-        if node["_centroid"] is None:
-            print("Node {} has no centroid!".format(node["node_id"]))
-            
-        
-        node["cache_valid"] = True
-        
-        # Store these values
-        update_fields = ("cache_valid", "_centroid", "_type_objects", "_own_type_objects", "_n_objects_deep", "_n_objects")
-        stmt = nodes.update().values({k: node[k] for k in update_fields}).where(nodes.c.node_id == node["node_id"])
-        self.connection.execute(stmt)
-                
-        return node
+#===============================================================================
+#     def _upgrade_node(self, node, require_valid = True, _rec_depth=0):
+#         """
+#         Parameters:
+#             node (dict): Fields of the node.
+#             require_valid: Are valid cache values required?
+#         """
+#         
+#         # If no valid cache values are required or the node is already valid,
+#         # return unchanged.
+#         if not require_valid or node["cache_valid"]:
+#             return node
+# 
+#         print("{}Upgrading node {}...".format(" " * _rec_depth, node["node_id"]))
+#         
+#         if node["n_children"] > 0:
+#             # The recursive calculation happens here
+#             children = self.get_children(node["node_id"], require_valid, _rec_depth = _rec_depth + 1)
+#         else:
+#             children = []
+#             
+#         # Limit to 1000 objects to speed up the calculation
+#         # TODO: Select objects randomly
+#         objects = self.get_objects(node["node_id"], limit = 1000)
+#         
+#         node["_n_objects"] = self.get_n_objects(node["node_id"])
+#             
+#         # Hint: Uses vectors
+#         node["_own_type_objects"] = self._calc_own_type_objects(children, objects)
+#         
+#         node["_type_objects"] = self._calc_type_objects(children, objects)
+#         
+#         node["_n_objects_deep"] = self._calc_n_objects_deep(node, children)
+#         
+#         # TODO: Remove assertion if we're sure enough that this works
+#         query_n_objects_deep = self._query_n_objects_deep(node)
+#         
+#         if node["_n_objects_deep"] is None:
+#             node["_n_objects_deep"] = query_n_objects_deep
+#             
+#         else:
+#             if node["_n_objects_deep"] != query_n_objects_deep:
+#                 warnings.warn("_n_objects_deep do not match! {}!={}".format(node["_n_objects_deep"], query_n_objects_deep))
+#                 node["_n_objects_deep"] = query_n_objects_deep
+#                 
+#         # Hint: Uses vectors
+#         node["_centroid"] = self._calc_centroid(node, children, objects)
+#         if node["_centroid"] is None:
+#             print("Node {} has no centroid!".format(node["node_id"]))
+#             
+#         
+#         node["cache_valid"] = True
+#         
+#         # Store these values
+#         update_fields = ("cache_valid", "_centroid", "_type_objects", "_own_type_objects", "_n_objects_deep", "_n_objects")
+#         stmt = nodes.update().values({k: node[k] for k in update_fields}).where(nodes.c.node_id == node["node_id"])
+#         self.connection.execute(stmt)
+#                 
+#         return node
+#===============================================================================
         
         
     def get_node(self, node_id, require_valid = True):
@@ -690,8 +692,18 @@ class Tree(object):
             self.connection.execute(stmt)
             
             
-    def get_objects(self, node_id, offset = None, limit = None):
-        stmt = select([objects]).select_from(objects.join(nodes_objects)).where(nodes_objects.c.node_id == node_id).offset(offset).limit(limit)
+    def get_objects(self, node_id, offset = None, limit = None, order_by=None):
+        """
+        Get objects directly below a node.
+        """
+        stmt = select([objects]).select_from(objects.join(nodes_objects)).where(nodes_objects.c.node_id == node_id)
+        
+        if order_by is not None:
+            stmt = stmt.order_by(order_by)
+        if offset is not None:
+            stmt = stmt.offset(offset)
+        if limit is not None:
+            stmt = stmt.limit(limit)
         
         result = self.connection.execute(stmt, node_id = node_id).fetchall()
         
@@ -739,6 +751,7 @@ class Tree(object):
         
         # Traverse the path in reverse (without the node itself)
         for parent_id in path[:-1][::-1]:
+            # TODO: limit number of children like in recommend_objects
             nodes.extend(c for c in self.get_children(parent_id) if c["node_id"] not in path)
             
             # Break if we already have enough nodes
@@ -1122,6 +1135,44 @@ class Tree(object):
             return self.get_next_unapproved(node["parent_id"], leaf)
         return None
             
+    def _calc_obj_mean_cov(self, objects_):
+        '''
+        Calculate mean and covariance of the features of the objects.
+        
+        :param objects_: MemberCollection of objects
+        '''
+        mean = np.mean(objects_.vectors, axis=0)
+        cov = np.cov(objects_.vectors.T, bias=True)
+        
+        return mean, cov
+    
+    def _combine_mean_cov_n(self, a, b):
+        """
+        a and b are node dicts.
+        """
+        
+        if a["_n_objects_deep"] == 0:
+            return b
+        if b["_n_objects_deep"] == 0:
+            return a
+        
+        n = a["_n_objects_deep"] + b["_n_objects_deep"]
+        
+        mean = (a["_n_objects_deep"] * a["_centroid"]
+                + b["_n_objects_deep"] * b["_centroid"]) / n
+                
+        #FIXME: Normalize mean
+        ...
+        
+        cov = combine_covariances(a["_centroid"], b["_centroid"],
+                                  a["_covariance"], b["_covariance"],
+                                  a["_n_objects_deep"], b["_n_objects_deep"])
+        
+        return {
+            "_centroid": mean,
+            "_covariance": cov,
+            "_n_objects_deep": n
+        }
         
     def consolidate_node(self, node_id, depth=0, return_=None):
         """
@@ -1146,6 +1197,7 @@ class Tree(object):
         
         # Wrap everything in a transaction
         with self.connection.begin():
+
             def recurse_cb_level(q, _):
                 # Only recurse into invalid nodes
                 # Ensure validity up to a certain level
@@ -1198,37 +1250,57 @@ class Tree(object):
                 
                 child_selector = (invalid_subtree['parent_id'] == node_id)
                 children = invalid_subtree.loc[child_selector]
-                children_dict = children.reset_index().to_dict('records')
+                children_dict = MemberCollection(children.reset_index().to_dict('records'),
+                                                 "zero")
                 
                 # 2. _n_objects_deep
-                invalid_subtree.at[node_id, "_n_objects_deep"] = (
-                    invalid_subtree.loc[node_id, "_n_objects"]
+                _n_objects = invalid_subtree.loc[node_id, "_n_objects"]
+                _n_objects_deep = (
+                    _n_objects
                     + children["_n_objects_deep"].sum())
+                invalid_subtree.at[node_id, "_n_objects_deep"] = _n_objects_deep
                 
-                # Limit to 1000 objects to speed up the calculation
-                # TODO: Select objects randomly
-                objects = self.get_objects(node_id, limit = 1000)
+                # Sample 1000 objects to speed up the calculation
+                objects_ = MemberCollection(self.get_objects(node_id, order_by=objects.c.rand, limit = 1000),
+                                                "raise")
                 
                 # 3. _own_type_objects, _type_objects, _n_objects_deep
                 invalid_subtree.at[node_id, "_own_type_objects"] = (
-                        self._calc_own_type_objects(children_dict, objects))
+                        self._calc_own_type_objects(children_dict, objects_))
           
                 invalid_subtree.at[node_id, "_type_objects"] = (
-                        self._calc_type_objects(children_dict, objects))
+                        self._calc_type_objects(children_dict, objects_))
                 
-                # 4. _centroid
-                # (Create node dict just now after all other values have been calculated)
-                node_dict = dict(invalid_subtree.loc[node_id]) 
-                invalid_subtree.at[node_id, "_centroid"] = (
-                        self._calc_centroid(node_dict, children_dict, objects))
+                # 4. _n_objects_deep, _centroid and _covariance
+                obj_mean, obj_cov = self._calc_obj_mean_cov(objects_)
+                
+                init = {
+                    "_centroid": obj_mean,
+                    "_covariance": obj_cov,
+                    "_n_objects_deep": _n_objects
+                    }
+                
+                mean_cov_n = reduce(self._combine_mean_cov_n,
+                                    children_dict,
+                                    init)
+                
+                print(mean_cov_n)
+                
+                for k in mean_cov_n:
+                    invalid_subtree.at[node_id, k] = mean_cov_n[k]
                 
                 if invalid_subtree.loc[node_id, "_centroid"] is None:
                     print("\nNode {} has no centroid!".format(node_id))
                     
+                if invalid_subtree.loc[node_id, "_covariance"] is None:
+                    print("\nNode {} has no covariance!".format(node_id))
+                    
+                # Finally, flag as updated    
                 invalid_subtree.at[node_id, "__updated"] = True
                     
                 bar.numerator += 1
                 print(node_id, bar, end="    \r")
+            print()
                 
             # Convert _n_objects_deep to int (might be object when containing NULL values in the database)
             invalid_subtree["_n_objects_deep"] = invalid_subtree["_n_objects_deep"].astype(int)
@@ -1255,8 +1327,6 @@ class Tree(object):
             result.reset_index(inplace=True)
             
             self.connection.execute(stmt, result.to_dict('records'))
-            
-            print("Done.")
             
             if return_ == "node":
                 return invalid_subtree.loc[node_id].to_dict()

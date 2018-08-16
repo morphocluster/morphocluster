@@ -49,3 +49,18 @@ class keydefaultdict(defaultdict):
         else:
             ret = self[key] = self.default_factory(key)
             return ret
+        
+def combine_covariances(m1, m2, S1, S2, n1, n2):
+    """
+    Combine the covariances of two samples.
+    
+    Recipe: Tim Michels
+    """
+    A = n1 * S1 + n2 * S2
+    b = n1 * n2 / (n1 + n2)
+    d = m1 - m2
+    D1, D2 = np.meshgrid(d, d, indexing="ij")
+    
+    B = b * D1 * D2
+    
+    return 1 / (n1 + n2 ) * (A + B)

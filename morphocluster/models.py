@@ -7,7 +7,7 @@ from sqlalchemy import Table, Column, ForeignKey, Index
 
 import datetime
 
-from sqlalchemy.types import Integer, BigInteger, String, DateTime, PickleType, Boolean, Text
+from sqlalchemy.types import Integer, BigInteger, String, DateTime, PickleType, Boolean, Text, Float
 from sqlalchemy.sql.schema import UniqueConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.sql import func
@@ -19,7 +19,8 @@ metadata = database.metadata
 objects = Table('objects', metadata,
     Column('object_id', String, primary_key = True),
     Column('path', String, nullable = False),
-    Column('vector', PickleType, nullable = True)
+    Column('vector', PickleType, nullable = True),
+    Column('rand', Float, server_default = func.random())
 )
 
 #: :type projects: sqlalchemy.sql.schema.Table
@@ -54,7 +55,7 @@ nodes = Table('nodes', metadata,
     #===========================================================================
     # The following fields are cached values
     #===========================================================================
-    # Pickle-serialized numpy array
+    # Mean feature vector
     Column('_centroid', PickleType, nullable = True),
     # object_ids of type objects representative for all descendants (used as preview)
     Column('_type_objects', ARRAY(String), nullable = True),
@@ -66,6 +67,8 @@ nodes = Table('nodes', metadata,
     Column('_n_objects', BigInteger, nullable = True),
     # Number of all objects anywhere below this node
     Column('_n_objects_deep', BigInteger, nullable = True),
+    # Covariance
+    Column('_covariance', PickleType, nullable = True),
     
     # Validity of cached values
     Column('cache_valid', Boolean, nullable = False, server_default = "f"),
@@ -87,8 +90,6 @@ nodes_objects = Table('nodes_objects', metadata,
     Column('object_id', None,
            ForeignKey('objects.object_id', ondelete="CASCADE"),
            nullable = False),
-    Column('by_user', Boolean,
-           nullable = False, server_default = "f"),
     UniqueConstraint('project_id', 'object_id')
 )
 

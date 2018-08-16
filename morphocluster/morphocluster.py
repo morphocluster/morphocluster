@@ -19,6 +19,7 @@ from morphocluster.tree import Tree
 from time import sleep
 from morphocluster.extensions import database, redis_store, migrate
 import flask_migrate
+from timer_cm import Timer
 
 app = Flask(__name__)
 
@@ -177,10 +178,9 @@ def flatten_tree(root_id):
 @app.cli.command()
 @click.argument('root_id', type=int)
 def consolidate(root_id):
-    with database.engine.connect() as conn:
+    with database.engine.connect() as conn, Timer("Consolidate"):
         tree = Tree(conn)
-        res = tree.consolidate_node(root_id)
-        print(repr(res))
+        tree.consolidate_node(root_id)
         
         
 @app.cli.command()

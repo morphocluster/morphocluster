@@ -532,9 +532,6 @@ def post_node_members(node_id):
     object_ids = [d["object_id"] for d in data if "object_id" in d]
     node_ids = [d["node_id"] for d in data if "node_id" in d]
     
-    print("new nodes:", node_ids)
-    print("new objects:", object_ids)
-    
     with database.engine.connect() as connection:
         tree = Tree(connection)
 
