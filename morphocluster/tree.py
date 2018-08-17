@@ -1277,7 +1277,7 @@ class Tree(object):
                 obj_mean = np.sum(objects_.vectors, axis=0)
                 obj_mean /= np.linalg.norm(obj_mean)
 
-                node_mean = np.sum(children_dict.cardinalities * children_dict.vectors,
+                node_mean = np.sum(children_dict.cardinalities[:,np.newaxis] * children_dict.vectors,
                                    axis=0)
                 node_mean += _n_objects * obj_mean
                 node_mean /= np.linalg.norm(node_mean)
