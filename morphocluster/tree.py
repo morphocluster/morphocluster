@@ -1264,36 +1264,28 @@ class Tree(object):
                 objects_ = MemberCollection(self.get_objects(node_id, order_by=objects.c.rand, limit = 1000),
                                                 "raise")
                 
-                # 3. _own_type_objects, _type_objects, _n_objects_deep
+                # 3. _own_type_objects, _type_objects
                 invalid_subtree.at[node_id, "_own_type_objects"] = (
                         self._calc_own_type_objects(children_dict, objects_))
           
                 invalid_subtree.at[node_id, "_type_objects"] = (
                         self._calc_type_objects(children_dict, objects_))
+
+                # 4. _centroid
                 
-                # 4. _n_objects_deep, _centroid and _covariance
-                obj_mean, obj_cov = self._calc_obj_mean_cov(objects_)
-                
-                init = {
-                    "_centroid": obj_mean,
-                    "_covariance": obj_cov,
-                    "_n_objects_deep": _n_objects
-                    }
-                
-                mean_cov_n = reduce(self._combine_mean_cov_n,
-                                    children_dict,
-                                    init)
-                
-                print(mean_cov_n)
-                
-                for k in mean_cov_n:
-                    invalid_subtree.at[node_id, k] = mean_cov_n[k]
+                # Object mean, weighted with number of objects
+                obj_mean = np.sum(objects_.vectors, axis=0)
+                obj_mean /= np.linalg.norm(obj_mean, axis=1)[:,np.newaxis]
+                obj_mean *= _n_objects
+
+                node_mean = np.sum(children_dict.cardinalities * children_dict.vectors, axis=0)
+                node_mean += obj_mean
+                node_mean /= np.linalg.norm(node_mean, axis=1)[:,np.newaxis]
+
+                invalid_subtree.at[node_id, "_centroid"] = node_mean
                 
                 if invalid_subtree.loc[node_id, "_centroid"] is None:
                     print("\nNode {} has no centroid!".format(node_id))
-                    
-                if invalid_subtree.loc[node_id, "_covariance"] is None:
-                    print("\nNode {} has no covariance!".format(node_id))
                     
                 # Finally, flag as updated    
                 invalid_subtree.at[node_id, "__updated"] = True

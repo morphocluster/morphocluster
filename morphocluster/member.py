@@ -41,6 +41,17 @@ class MemberCollection(Sequence):
                 NotImplementedError(self.none_action)
                 
             return self._vectors
+
+    @property
+    def cardinalities(self):
+        try:
+            return self._cardinalities
+        except AttributeError:
+            cardinalities = [ m["_n_objects_deep"] if "_n_objects_deep" in m else 1 for m in self.members ]
+            
+            self._cardinalities = np.array(cardinalities)
+                
+            return self._cardinalities
         
     # Abstract methods
     def __getitem__(self, index):
