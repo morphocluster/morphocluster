@@ -1272,17 +1272,26 @@ class Tree(object):
                         self._calc_type_objects(children_dict, objects_))
 
                 # 4. _centroid
+
+                _centroid = []
                 
-                # Object mean, weighted with number of objects
-                obj_mean = np.sum(objects_.vectors, axis=0)
-                obj_mean /= np.linalg.norm(obj_mean)
+                if len(objects_) > 0:
+                    # Object mean, weighted with number of objects
+                    obj_mean = np.sum(objects_.vectors, axis=0)
+                    obj_mean /= np.linalg.norm(obj_mean)
+                    _centroid.append(_n_objects * obj_mean)
+                if len(children_dict) > 0:
+                    children_mean = np.sum(children_dict.cardinalities[:,np.newaxis] * children_dict.vectors,
+                                           axis=0)
+                    _centroid.append(children_mean)
 
-                node_mean = np.sum(children_dict.cardinalities[:,np.newaxis] * children_dict.vectors,
-                                   axis=0)
-                node_mean += _n_objects * obj_mean
-                node_mean /= np.linalg.norm(node_mean)
+                if len(_centroid) > 0:
+                    _centroid = np.sum(_centroid, axis=0)
+                    _centroid /= np.linalg.norm(_centroid)
+                else:
+                    _centroid = None
 
-                invalid_subtree.at[node_id, "_centroid"] = node_mean
+                invalid_subtree.at[node_id, "_centroid"] = _centroid
                 
                 if invalid_subtree.loc[node_id, "_centroid"] is None:
                     print("\nNode {} has no centroid!".format(node_id))
