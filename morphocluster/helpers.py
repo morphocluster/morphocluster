@@ -13,6 +13,9 @@ def seq2array(seq, length):
     Converts a sequence consisting of `numpy array`s to a single array.
     Elements that are None are converted to an appropriate zero entry.
     """
+
+    if length == 0:
+        return np.empty(0)
     
     seq = iter(seq)
     leading = []

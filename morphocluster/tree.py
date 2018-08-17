@@ -1276,10 +1276,10 @@ class Tree(object):
                 # Object mean, weighted with number of objects
                 obj_mean = np.sum(objects_.vectors, axis=0)
                 obj_mean /= np.linalg.norm(obj_mean)
-                obj_mean *= _n_objects
 
-                node_mean = np.sum(children_dict.cardinalities * children_dict.vectors, axis=0)
-                node_mean += obj_mean
+                node_mean = np.sum(children_dict.cardinalities * children_dict.vectors,
+                                   axis=0)
+                node_mean += _n_objects * obj_mean
                 node_mean /= np.linalg.norm(node_mean, axis=1)[:,np.newaxis]
 
                 invalid_subtree.at[node_id, "_centroid"] = node_mean
