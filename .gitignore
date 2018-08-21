@@ -11,3 +11,4 @@ activate
 *.log
 *.pid
 .settings/*
+.vscode/**

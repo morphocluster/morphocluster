@@ -232,8 +232,9 @@ function init_tree() {
 		var next_url = "";
 		
 		var processResponse = function (response, textStatus, jqXHR) {
+			var data = response.data;
 			$loading.detach();
-			$.each(response, function (k, member) {
+			$.each(data, function (k, member) {
 				$row.append($('<div class="col col-2" />').append(render_member(member, ["moveup", "expand"])));
 			});
 			
@@ -376,8 +377,9 @@ function init_tree() {
 		var next_url = "";
 		
 		var processResponse = function (response, textStatus, jqXHR) {
+			var data = response.data;
 			$loading.detach();
-			$.each(response, function (k, member) {
+			$.each(data, function (k, member) {
 				$row.append($('<div class="col col-6" />').append(render_member(member, ["uptohere"])));
 			});
 			
@@ -597,7 +599,8 @@ function init_tree() {
 					data: JSON.stringify(droppedMemberIDs),
 					contentType: "application/json; charset=utf-8",
 					dataType: "json",
-				}).done(function (data) {
+				}).done(function (response) {
+					var data = response.data;
 					// Remove members from the view
 					$membersDragging.closest(".col").fadeOut(1000, function() {
 					    $(this).remove();

@@ -13,6 +13,11 @@
 	grid-template-areas: "thead nhead rhead" "tree node recommend" "tstat nstat rstat";
 }
 
+#tree-header, #node-header, #recommend-header {
+	margin: 0.2em 0;
+	padding: 0.1em 0;
+}
+
 #tree-header {
 	grid-area: thead;
 }

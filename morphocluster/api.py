@@ -285,7 +285,7 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size = 100, compress
             n_pages = redis_store.llen(cache_key)
             
             if compress:
-                page_result = zlib.decompress(page_result)
+                page_result = zlib.decompress(page_result).decode()
                 
             #print("Returning page {} from cached result".format(page))
             
@@ -353,8 +353,35 @@ def cache_serialize_page(endpoint, **kwargs):
             if page is None:
                 raise ValueError("page may not be None!")
             
-            result, n_pages = _load_or_calc(func, func_kwargs, request_id, page, **kwargs)
-            
+            raw_result, n_pages = _load_or_calc(func, func_kwargs, request_id, page, **kwargs)
+
+            meta = {
+                'request_id': request_id,
+                'last_page': n_pages - 1,
+            }
+
+            if 0 < page < n_pages:
+                meta['previous_page'] = page - 1
+
+            if page + 1 < n_pages:
+                meta['next_page'] = page + 1
+
+            link_parameters = func_kwargs.copy()
+            link_parameters["request_id"] = request_id
+            links = {
+                'self': url_for(endpoint, **link_parameters)
+            }
+
+            result = {
+                'meta': meta,
+                'links': links,
+                'data': "$data-placeholder$"
+            }
+
+            result = json_dumps(result)
+
+            result = result.replace('"$data-placeholder$"', raw_result)
+
             #===================================================================
             # Construct response
             #===================================================================
@@ -364,8 +391,6 @@ def cache_serialize_page(endpoint, **kwargs):
             # Generate Link response header
             #=======================================================================
             link_header_fields = []
-            link_parameters = func_kwargs.copy()
-            link_parameters["request_id"] = request_id
             
             if 0 < page < n_pages:
                 # Link to previous page
@@ -611,6 +636,8 @@ def node_adopt_members(parent_id):
         with connection.begin():
             tree.relocate_nodes(node_ids, parent_id)
             tree.relocate_objects(object_ids, parent_id)
+
+        print("{} adopted {} nodes and {} objects.".format(parent_id, len(node_ids), len(object_ids)))
         
         return jsonify({})
         
