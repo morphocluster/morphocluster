@@ -50,9 +50,9 @@
 			<button type="button" class="btn btn-secondary disabled btn-sm ml-2" id="btn-group-selected">
 				<i class="mdi mdi-basket-fill"></i> Create umbrella term
 			</button>
-			<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-classify-members">
+			{#<button type="button" class="btn btn-secondary btn-sm ml-2" id="btn-classify-members">
 				<i class="mdi mdi-auto-fix"></i> Classify into starred members.
-			</button>
+			</button>#}
 		</form>
 	</div>
 	<div id="recommend-header" class="bg-light px-1">
@@ -63,7 +63,10 @@
 			<button type="button" class="btn btn-secondary btn-sm ml-2 mr-2" id="btn-rec-reload">
 				<i class="mdi mdi-reload"></i> Reload
 			</button>
-			<button type="button" class="btn btn-secondary btn-sm ml-2 mr-2 btn-rec-jump" data-npages="0">
+			<a role="button" class="btn btn-secondary btn-sm ml-2 mr-2" href="#" id="btn-bisect">
+				<i class="mdi mdi-arrow-split-vertical"></i> Bisect
+			</a>
+			{#<button type="button" class="btn btn-secondary btn-sm ml-2 mr-2 btn-rec-jump" data-npages="0">
 				<i class="mdi mdi-chevron-down"></i>
 			</button>
 			<button type="button" class="btn btn-secondary btn-sm ml-2 mr-2 btn-rec-jump" data-npages="9">
@@ -71,7 +74,7 @@
 			</button>
 			<button type="button" class="btn btn-secondary btn-sm ml-2 mr-2 btn-rec-jump" data-npages="49">
 				<i class="mdi mdi-chevron-down"></i>50
-			</button>
+			</button>#}
 		</form>
 	</div>
 	

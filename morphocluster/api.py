@@ -637,7 +637,8 @@ def node_adopt_members(parent_id):
             tree.relocate_nodes(node_ids, parent_id)
             tree.relocate_objects(object_ids, parent_id)
 
-        print("{} adopted {} nodes and {} objects.".format(parent_id, len(node_ids), len(object_ids)))
+        print("Node {} adopted {} nodes and {} objects."
+              .format(parent_id, len(node_ids), len(object_ids)))
         
         return jsonify({})
         
@@ -672,7 +673,7 @@ def node_get_recommended_children(node_id):
     
     return _node_get_recommended_children(node_id = node_id, **arguments)
 
-@cache_serialize_page(".node_get_recommended_objects", page_size=100)
+@cache_serialize_page(".node_get_recommended_objects", page_size=50)
 def _node_get_recommended_objects(node_id, max_n):
     with database.engine.connect() as connection:
         tree = Tree(connection)

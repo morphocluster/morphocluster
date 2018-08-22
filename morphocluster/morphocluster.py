@@ -263,6 +263,10 @@ def index():
 def labeling():
     return render_template('pages/labeling.html')
 
+@app.route("/bisect/<path:path>")
+def vue(path):
+    return app.send_static_file('vue/index.html')
+
 
 @app.route("/get_obj_image/<objid>")
 def get_obj_image(objid):
