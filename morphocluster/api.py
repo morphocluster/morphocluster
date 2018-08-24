@@ -61,7 +61,7 @@ def _node_icon(node):
         return "mdi mdi-star"
     
     if node["approved"]:
-        return "mdi mdi-approval"
+        return "mdi mdi-check-decagram"
     
     return "mdi mdi-hexagon-multiple"
 

@@ -751,7 +751,8 @@ function init_tree() {
 		node_merge_into(node.node_id, parent_id).done(function (data) {
 			flashMsg.set("Merged " + node.id + ".");
 			// Go to next deepest node
-			loadNextNode(parent_id).fail(nodeStatusErrorHandler);
+			var strategy = $("#btn-next").data("strategy");
+			loadNextNode(parent_id, strategy=="leaf").fail(nodeStatusErrorHandler);
 		}).fail(function (jqXHR, textStatus, errorThrown) {
 			console.log(jqXHR, textStatus, errorThrown);
 			$nodeStatus.text(textStatus + ", " + errorThrown);
