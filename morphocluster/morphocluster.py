@@ -136,7 +136,9 @@ def load_features(features_fns):
 @app.cli.command()
 @click.argument('project_path')
 @click.argument('project_name', default=None)
-def load_project(project_path, project_name):
+@click.option('--root-first', "root_first", flag_value=True, default=True)
+@click.option('--root-last', "root_first", flag_value=False)
+def load_project(project_path, project_name, root_first):
     with database.engine.connect() as conn:
         tree = Tree(conn)
         
@@ -144,14 +146,11 @@ def load_project(project_path, project_name):
             project_name = os.path.basename(os.path.normpath(project_path))
         
         with conn.begin():
-            print("Loading {}...".format(project_path))
-            project_id = tree.load_project(project_name, project_path)
-            root_id = tree.get_root_id(project_id)
-            #print("Simplifying...")
-            #tree.flatten_tree(root_id)
-            #tree.prune_chains(root_id)
-            
-            
+            print("Loading {} with root_first={!r}...".format(project_path, root_first))
+            project_id = tree.load_project(project_name, project_path, root_first)
+            tree.get_root_id(project_id)
+
+
 @app.cli.command()
 @click.argument('root_id', type=int)
 def connect_supertree(root_id):
