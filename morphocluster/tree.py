@@ -1222,6 +1222,8 @@ class Tree(object):
 
         # Wrap everything in a transaction
         with self.connection.begin():
+            # Acquire exclusive lock on nodes
+            self.connection.execute("LOCK TABLE nodes;")
 
             def recurse_cb_level(q, _):
                 # Only recurse into invalid nodes
@@ -1248,7 +1250,6 @@ class Tree(object):
             stmt = (select([invalid_subtree,
                             n_objects,
                             n_children])
-                    .with_for_update(of=nodes)
                     .order_by(invalid_subtree.c.level.desc()))
 
             invalid_subtree = pd.read_sql_query(
