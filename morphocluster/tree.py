@@ -844,6 +844,8 @@ class Tree(object):
             return
 
         with self.connection.begin():
+            # Acquire exclusive lock
+            self.connection.execute("LOCK TABLE nodes;")
 
             new_parent_path = self.get_path_ids(parent_id)
 
@@ -891,6 +893,9 @@ class Tree(object):
             return
 
         with self.connection.begin():
+            # Acquire exclusive lock
+            self.connection.execute("LOCK TABLE nodes;")
+            
             # Poject id of the new node
             project_id = select([nodes.c.project_id]).where(
                 nodes.c.node_id == node_id)
@@ -1243,6 +1248,7 @@ class Tree(object):
             stmt = (select([invalid_subtree,
                             n_objects,
                             n_children])
+                    .with_for_update(of=nodes_objects)
                     .order_by(invalid_subtree.c.level.desc()))
 
             invalid_subtree = pd.read_sql_query(
