@@ -493,7 +493,7 @@ class Tree(object):
 
             except:
                 print("child_vectors", children.vectors.shape)
-                print("object_vectors", object.vectors.shape)
+                print("object_vectors", objects_.vectors.shape)
                 raise
 
         else:
@@ -1371,39 +1371,41 @@ class Tree(object):
 
 
 if __name__ in ("__main__", "builtins"):
-    #: :type conn: sqlalchemy.engine.base.Connection
-    with database.engine.connect() as conn:
-        # =======================================================================
-        # conn.execute("DROP TABLE IF EXISTS nodes_objects, nodes, projects;")
-        # database.metadata.create_all(conn)
-        # =======================================================================
+    def main():
+        #: :type conn: sqlalchemy.engine.base.Connection
+        with database.engine.connect() as conn:
+            # =======================================================================
+            # conn.execute("DROP TABLE IF EXISTS nodes_objects, nodes, projects;")
+            # database.metadata.create_all(conn)
+            # =======================================================================
 
-        tree = Tree(conn)
+            tree = Tree(conn)
 
-        path = "/data1/mschroeder/NoveltyDetection/Results/CV-Clustering/2018-02-08-12-55-06/min_cluster_size-20_split-0"
-        name = os.path.basename(os.path.normpath(path))
-        print("Loading...")
-        project_id = tree.load_project(name, path)
-        root_id = tree.get_root_id(project_id)
-        print(project_id, root_id)
-        print("Simplifying...")
-        tree.flatten_tree(root_id)
-        tree.prune_chains(root_id)
+            project_path = "/data1/mschroeder/NoveltyDetection/Results/CV-Clustering/2018-02-08-12-55-06/min_cluster_size-20_split-0"
+            project_name = os.path.basename(os.path.normpath(path))
+            print("Loading...")
+            project_id = tree.load_project(project_name, project_path)
+            root_id = tree.get_root_id(project_id)
+            print(project_id, root_id)
+            print("Simplifying...")
+            tree.flatten_tree(root_id)
+            tree.prune_chains(root_id)
 
-    # ===========================================================================
-    #     root_id = tree.get_root_id(1)
-    #
-    #     print("Root", root_id)
-    #
-    #     print("Children of root (before flattening):", tree.get_children(root_id))
-    #
-    #     tree.flatten_tree(root_id)
-    #
-    #     print("Children of root (after flattening):", tree.get_children(root_id))
-    #
-    #     tree.prune_chains(root_id)
-    #
-    #     print("Children of root (after pruning):", tree.get_children(root_id))
-    # ===========================================================================
+        # ===========================================================================
+        #     root_id = tree.get_root_id(1)
+        #
+        #     print("Root", root_id)
+        #
+        #     print("Children of root (before flattening):", tree.get_children(root_id))
+        #
+        #     tree.flatten_tree(root_id)
+        #
+        #     print("Children of root (after flattening):", tree.get_children(root_id))
+        #
+        #     tree.prune_chains(root_id)
+        #
+        #     print("Children of root (after pruning):", tree.get_children(root_id))
+        # ===========================================================================
 
-        print(tree.get_projects())
+            print(tree.get_projects())
+    main()
