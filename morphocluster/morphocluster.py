@@ -136,9 +136,13 @@ def load_features(features_fns):
 @app.cli.command()
 @click.argument('project_path')
 @click.argument('project_name', default=None)
-@click.option('--root-first', "root_first", flag_value=True, default=True)
 @click.option('--root-last', "root_first", flag_value=False)
+@click.option('--root-first', "root_first", flag_value=True, default=True)
 def load_project(project_path, project_name, root_first):
+    """
+    Load a project from tree.csv and objids.csv.
+    """
+
     with database.engine.connect() as conn:
         tree = Tree(conn)
         
