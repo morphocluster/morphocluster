@@ -27,6 +27,9 @@ from _functools import reduce
 
 
 class TreeError(Exception):
+    """
+    Raised by Tree if an error occurs.
+    """
     pass
 
 
@@ -84,15 +87,16 @@ def _rquery_preds(node_id):
     `level` is 0 for the supplied `node_id` and decreases for each predecessor.
     """
     # Start with the last child
-    q = select([nodes, literal(0).label("level")]).where(
-        nodes.c.node_id == node_id).cte(recursive=True).alias("q")
+    query = (select([nodes, literal(0).label("level")])
+             .where(nodes.c.node_id == node_id)
+             .cte(recursive=True).alias("q"))
 
-    p = nodes.alias("p")
+    preds = nodes.alias("p")
 
-    q = q.union_all(
-        select([p, literal_column("level") - 1]).where(q.c.parent_id == p.c.node_id))
+    query = query.union_all(
+        select([preds, literal_column("level") - 1]).where(query.c.parent_id == preds.c.node_id))
 
-    return q
+    return query
 
 
 def _rquery_subtree(node_id, recurse_cb=None):
@@ -453,7 +457,7 @@ class Tree(object):
     #         return None
     # ===========================================================================
 
-    def _calc_type_objects(self, children, objects):
+    def _calc_type_objects(self, children, objects_):
         """
         Calculate nine type objects for a node as
             a) a sample of nine type objects from its children, or
@@ -463,14 +467,15 @@ class Tree(object):
             # Randomly subsample children
             subsample = np.random.choice(
                 children, min(len(children), 9), replace=False)
-            result = list(itertools.islice(_roundrobin([c["_type_objects"] for c in subsample]), 9))
+            result = list(itertools.islice(_roundrobin(
+                [c["_type_objects"] for c in subsample]), 9))
 
             if len(result) == 0:
                 print("\n", subsample)
 
             return result
         else:
-            return [o["object_id"] for o in objects[:9]]
+            return [o["object_id"] for o in objects_[:9]]
 
     def _calc_own_type_objects(self, children, objects_):
         """
@@ -762,21 +767,21 @@ class Tree(object):
         # Get the path to the node
         path = self.get_path_ids(node_id)
 
-        nodes = []
+        nodes_ = []
 
         # Traverse the path in reverse (without the node itself)
         for parent_id in path[:-1][::-1]:
             # TODO: limit number of children like in recommend_objects
-            nodes.extend(c for c in self.get_children(
+            nodes_.extend(c for c in self.get_children(
                 parent_id) if c["node_id"] not in path)
 
             # Break if we already have enough nodes
-            if len(nodes) > max_n:
+            if len(nodes_) > max_n:
                 break
 
-        vectors = [n["_centroid"] for n in nodes]
+        vectors = [n["_centroid"] for n in nodes_]
 
-        nodes = np.array(nodes, dtype=object)
+        nodes_ = np.array(nodes_, dtype=object)
         vectors = seq2array(vectors, len(vectors))
 
         distances = np.linalg.norm(vectors - node["_centroid"], axis=1)
@@ -785,7 +790,7 @@ class Tree(object):
 
         order = np.argsort(distances)[:max_n]
 
-        return nodes[order].tolist()
+        return nodes_[order].tolist()
 
     def recommend_objects(self, node_id, max_n=1000):
         node = self.get_node(node_id)
@@ -793,21 +798,21 @@ class Tree(object):
         # Get the path to the node (without the node itself)
         path = self.get_path_ids(node_id)[:-1]
 
-        objects = []
+        objects_ = []
 
         # Traverse the parse in reverse
         for parent_id in path[::-1]:
-            n_left = max_n - len(objects)
+            n_left = max_n - len(objects_)
 
             # Break if we already have enough nodes
             if n_left <= 0:
                 break
 
-            objects.extend(self.get_objects(parent_id, limit=n_left))
+            objects_.extend(self.get_objects(parent_id, limit=n_left))
 
-        vectors = [o["vector"] for o in objects]
+        vectors = [o["vector"] for o in objects_]
 
-        objects = np.array(objects, dtype=object)
+        objects_ = np.array(objects_, dtype=object)
         vectors = np.array(vectors)
 
         distances = np.linalg.norm(vectors - node["_centroid"], axis=1)
@@ -816,7 +821,7 @@ class Tree(object):
 
         order = np.argsort(distances)[:max_n]
 
-        return objects[order].tolist()
+        return objects_[order].tolist()
 
     def invalidate_nodes(self, nodes_to_invalidate, unapprove=False):
         """
@@ -1100,9 +1105,9 @@ class Tree(object):
 
         rquery = rquery.union_all(
             # Include descendants when the parent is not starred
-            select([descendants]).where((parents.c.starred == False) & (descendants.c.parent_id == parents.c.node_id)))
+            select([descendants]).where((not parents.c.starred) & (descendants.c.parent_id == parents.c.node_id)))
 
-        stmt = select([rquery]).where(rquery.c.starred == True)
+        stmt = select([rquery]).where(rquery.c.starred)
 
         result = self.connection.execute(stmt).fetchall()
 
@@ -1123,7 +1128,7 @@ class Tree(object):
 
         # First try if there are candidates below this node
         def recurse_cb(_, s):
-            return s.c.approved == False
+            return not s.c.approved
 
         subtree = _rquery_subtree(node_id, recurse_cb)
 
@@ -1135,7 +1140,7 @@ class Tree(object):
                       .label("n_children"))
 
         stmt = (select([subtree.c.node_id])
-                .where(subtree.c.approved == False))
+                .where(not subtree.c.approved))
 
         if leaf:
             stmt = stmt.where(n_children == 0)
