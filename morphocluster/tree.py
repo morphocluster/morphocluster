@@ -1203,109 +1203,106 @@ class Tree(object):
             if len(invalid_subtree) == 0:
                 raise TreeError("Unknown node: {}".format(node_id))
 
-            if invalid_subtree["cache_valid"].all():
-                # All nodes are valid
-                return True
+            if not invalid_subtree["cache_valid"].all() or (depth == -1):
+                # 1. _n_objects, _n_children
+                invalid_subtree["_n_objects"] = invalid_subtree["_n_objects_"]
+                invalid_subtree["_n_children"] = invalid_subtree["_n_children_"]
 
-            # 1. _n_objects, _n_children
-            invalid_subtree["_n_objects"] = invalid_subtree["_n_objects_"]
-            invalid_subtree["_n_children"] = invalid_subtree["_n_children_"]
+                invalid_subtree["__updated"] = False
 
-            invalid_subtree["__updated"] = False
+                # Iterate over DataFrame fixing the values along the way
+                bar = ProgressBar(len(invalid_subtree), max_width=40)
+                for node_id in invalid_subtree.index:
+                    if invalid_subtree.at[node_id, "cache_valid"] and (depth != -1):
+                        # Don't recalculate valid nodes as invalid_subtree (rightly)
+                        # doesn't include their children.
+                        continue
 
-            # Iterate over DataFrame fixing the values along the way
-            bar = ProgressBar(len(invalid_subtree), max_width=40)
-            for node_id in invalid_subtree.index:
-                if invalid_subtree.at[node_id, "cache_valid"]:
-                    # Don't recalculate valid nodes as invalid_subtree (rightly)
-                    # doesn't include their children.
-                    continue
+                    child_selector = (invalid_subtree['parent_id'] == node_id)
+                    children = invalid_subtree.loc[child_selector]
+                    children_dict = MemberCollection(children.reset_index().to_dict('records'),
+                                                    "zero")
 
-                child_selector = (invalid_subtree['parent_id'] == node_id)
-                children = invalid_subtree.loc[child_selector]
-                children_dict = MemberCollection(children.reset_index().to_dict('records'),
-                                                 "zero")
+                    # 2. _n_objects_deep
+                    _n_objects = invalid_subtree.loc[node_id, "_n_objects"]
+                    _n_objects_deep = (
+                        _n_objects
+                        + children["_n_objects_deep"].sum())
+                    invalid_subtree.at[node_id,
+                                    "_n_objects_deep"] = _n_objects_deep
 
-                # 2. _n_objects_deep
-                _n_objects = invalid_subtree.loc[node_id, "_n_objects"]
-                _n_objects_deep = (
-                    _n_objects
-                    + children["_n_objects_deep"].sum())
-                invalid_subtree.at[node_id,
-                                   "_n_objects_deep"] = _n_objects_deep
+                    # Sample 1000 objects to speed up the calculation
+                    objects_ = MemberCollection(self.get_objects(node_id, order_by=objects.c.rand, limit=1000),
+                                                "raise")
 
-                # Sample 1000 objects to speed up the calculation
-                objects_ = MemberCollection(self.get_objects(node_id, order_by=objects.c.rand, limit=1000),
-                                            "raise")
+                    # 3. _own_type_objects, _type_objects
+                    invalid_subtree.at[node_id, "_own_type_objects"] = (
+                        self._calc_own_type_objects(children_dict, objects_))
 
-                # 3. _own_type_objects, _type_objects
-                invalid_subtree.at[node_id, "_own_type_objects"] = (
-                    self._calc_own_type_objects(children_dict, objects_))
+                    invalid_subtree.at[node_id, "_type_objects"] = (
+                        self._calc_type_objects(children_dict, objects_))
 
-                invalid_subtree.at[node_id, "_type_objects"] = (
-                    self._calc_type_objects(children_dict, objects_))
+                    if len(children_dict) > 0 and len(invalid_subtree.at[node_id, "_type_objects"]) == 0:
+                        print(
+                            "\nNode {} has no type objects although it has children!".format(node_id))
 
-                if len(children_dict) > 0 and len(invalid_subtree.at[node_id, "_type_objects"]) == 0:
-                    print(
-                        "\nNode {} has no type objects although it has children!".format(node_id))
+                    # 4. _centroid
 
-                # 4. _centroid
+                    _centroid = []
 
-                _centroid = []
+                    if len(objects_) > 0:
+                        # Object mean, weighted with number of objects
+                        obj_mean = np.sum(objects_.vectors, axis=0)
+                        obj_mean /= np.linalg.norm(obj_mean)
+                        _centroid.append(_n_objects * obj_mean)
+                    if len(children_dict) > 0:
+                        children_mean = np.sum(children_dict.cardinalities[:, np.newaxis] * children_dict.vectors,
+                                            axis=0)
+                        _centroid.append(children_mean)
 
-                if len(objects_) > 0:
-                    # Object mean, weighted with number of objects
-                    obj_mean = np.sum(objects_.vectors, axis=0)
-                    obj_mean /= np.linalg.norm(obj_mean)
-                    _centroid.append(_n_objects * obj_mean)
-                if len(children_dict) > 0:
-                    children_mean = np.sum(children_dict.cardinalities[:, np.newaxis] * children_dict.vectors,
-                                           axis=0)
-                    _centroid.append(children_mean)
+                    if len(_centroid) > 0:
+                        _centroid = np.sum(_centroid, axis=0)
+                        _centroid /= np.linalg.norm(_centroid)
+                    else:
+                        _centroid = None
 
-                if len(_centroid) > 0:
-                    _centroid = np.sum(_centroid, axis=0)
-                    _centroid /= np.linalg.norm(_centroid)
-                else:
-                    _centroid = None
+                    invalid_subtree.at[node_id, "_centroid"] = _centroid
 
-                invalid_subtree.at[node_id, "_centroid"] = _centroid
+                    if invalid_subtree.loc[node_id, "_centroid"] is None:
+                        print("\nNode {} has no centroid!".format(node_id))
 
-                if invalid_subtree.loc[node_id, "_centroid"] is None:
-                    print("\nNode {} has no centroid!".format(node_id))
+                    # Finally, flag as updated
+                    invalid_subtree.at[node_id, "__updated"] = True
 
-                # Finally, flag as updated
-                invalid_subtree.at[node_id, "__updated"] = True
+                    bar.numerator += 1
+                    print(node_id, bar, end="    \r")
+                print()
 
-                bar.numerator += 1
-                print(node_id, bar, end="    \r")
-            print()
+                # Convert _n_objects_deep to int (might be object when containing NULL values in the database)
+                invalid_subtree["_n_objects_deep"] = invalid_subtree["_n_objects_deep"].astype(
+                    int)
 
-            # Convert _n_objects_deep to int (might be object when containing NULL values in the database)
-            invalid_subtree["_n_objects_deep"] = invalid_subtree["_n_objects_deep"].astype(
-                int)
+                # Flag all rows as valid
+                invalid_subtree["cache_valid"] = True
 
-            # Flag all rows as valid
-            invalid_subtree["cache_valid"] = True
+                # Write results back to database
+                update_fields = ["cache_valid", "_centroid", "_type_objects",
+                                "_own_type_objects", "_n_objects_deep",
+                                "_n_objects", "_n_children"]
 
-            # Write results back to database
-            update_fields = ["cache_valid", "_centroid", "_type_objects",
-                             "_own_type_objects", "_n_objects_deep",
-                             "_n_objects", "_n_children"]
+                stmt = (nodes.update()
+                        .where(nodes.c.node_id == bindparam('_node_id'))
+                        .values({k: bindparam(k) for k in update_fields}))
 
-            stmt = (nodes.update()
-                    .where(nodes.c.node_id == bindparam('_node_id'))
-                    .values({k: bindparam(k) for k in update_fields}))
+                # Mask for updated rows
+                updated_selection = invalid_subtree["__updated"] == True
 
-            # Mask for updated rows
-            updated_selection = invalid_subtree["__updated"] == True
+                # Build the result list of dicts with _node_id and only update_fields
+                result = invalid_subtree.loc[updated_selection, update_fields]
+                result.index.rename('_node_id', inplace=True)
+                result.reset_index(inplace=True)
 
-            # Build the result list of dicts with _node_id and only update_fields
-            result = invalid_subtree.loc[updated_selection, update_fields]
-            result.index.rename('_node_id', inplace=True)
-            result.reset_index(inplace=True)
-
-            self.connection.execute(stmt, result.to_dict('records'))
+                self.connection.execute(stmt, result.to_dict('records'))
 
             if return_ == "node":
                 return invalid_subtree.loc[node_id].to_dict()
