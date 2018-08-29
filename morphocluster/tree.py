@@ -281,6 +281,40 @@ class Tree(object):
                 bar.numerator += 1
                 print(bar, end="\r")
 
+    def export_tree(self, root_id, fn_prefix):
+        """
+        Export the whole tree with its objects.
+        """
+        with self.connection.begin():
+            # Acquire exclusive lock on nodes
+            self.connection.execute("LOCK TABLE nodes;")
+
+            # Get complete subtree with up to date cached values
+            print("Consolidating cached values...")
+            subtree = self.consolidate_node(
+                root_id, depth="full", return_="raw")
+
+            keep_columns = ["orig_id", "parent_id", "name", 'starred',
+                            'approved', '_n_children', '_n_objects', '_n_objects_deep']
+
+            print("Writing tree...")
+            subtree[keep_columns].to_csv("{}tree.csv".format(fn_prefix))
+
+            print("Writing objects...")
+            # Get subtree below root
+            subtree = _rquery_subtree(root_id)
+
+            # Get object IDs for all nodes
+            node_objects = (
+                select([nodes_objects.c.node_id, nodes_objects.c.object_id])
+                .select_from(nodes_objects)
+                .where(nodes_objects.c.node_id == subtree.c.node_id)
+            )
+
+            node_objects = pd.read_sql_query(
+                node_objects, self.connection, index_col="node_id")
+            node_objects.to_csv("{}objects.csv".format(fn_prefix))
+
     def get_root_id(self, project_id):
         """
         """
@@ -386,16 +420,20 @@ class Tree(object):
             # Make sure that the retrieved id is non-NULL by coalescing with -1 which will trigger an IntegrityError
             parent_id = coalesce(parent_id, -1)
 
-        stmt = nodes.insert({"project_id": project_id,
-                             "parent_id": parent_id,
-                             "orig_id": orig_node_id,
-                             "name": name,
-                             "starred": starred})
+        row = {"project_id": project_id,
+               "parent_id": parent_id,
+               "orig_id": orig_node_id,
+               "name": name,
+               "starred": starred}
+
+        stmt = nodes.insert(row)
 
         try:
             result = self.connection.execute(stmt)
         except SQLAlchemyError as e:
-            raise TreeError("Node could not be created.") from e
+            row["orig_parent"] = orig_parent
+            raise TreeError(
+                "Node could not be created: {!r}".format(row)) from e
 
         node_id = result.inserted_primary_key[0]
 
@@ -943,109 +981,6 @@ class Tree(object):
 
             self.invalidate_nodes(nodes_to_invalidate, unapprove)
 
-    # ===========================================================================
-    # Methods to simplify the tree
-    # ===========================================================================
-
-    def flatten_tree(self, root_id):
-        """
-        Flatten the tree by merging nodes along the trunk.
-
-        Algorithm:
-            Given a node n.
-            If exactly one child c of n has 2 children (grandchildren of n), merge c into n and recurse with n.
-            Else recurse in all children that have 2 children by themselves (grandchildren of n).
-        """
-
-        print("Flattening tree...")
-
-        n_total = self.node_n_descendants(root_id)
-        n_processed = 0
-        n_merged = 0
-
-        with self.connection.begin():
-            queue = [root_id]
-
-            bar = ProgressBar(n_total, max_width=40)
-
-            while len(queue) > 0:
-                node_id = queue.pop()
-
-                children = self.get_children(node_id, require_valid=False)
-
-                children_2 = [c for c in children if c["n_children"] == 2]
-
-                # Count skipped children
-                n_processed += len(children) - len(children_2)
-
-                # TODO: Skip nodes with name
-
-                if len(children_2) == 0:
-                    # Nothing to do for the current node
-                    # Count current node
-                    n_processed += 1
-                    continue
-
-                if len(children_2) == 1:
-                    child_to_merge = children_2[0]
-
-                    # If the child is not starred
-                    if not child_to_merge["starred"]:
-                        # Merge this child and restart with this current node
-                        self.merge_node_into(
-                            child_to_merge["node_id"], node_id)
-                        n_merged += 1
-
-                        # Current node is not yet done
-                        queue.append(node_id)
-                        continue
-
-                # Else recurse into every child that has 2 children by itself
-                for c in children_2:
-                    queue.append(c["node_id"])
-
-                bar.numerator = n_processed
-                print(bar, end="\r")
-
-        print("Merged {:d} nodes.".format(n_merged))
-
-    def prune_chains(self, root_id):
-        """
-        Prune chains of single nodes.
-
-        Algorithm:
-            Given a node n.
-            If n has exactly one child c, merge this child into n and recurse with n.
-            Else recurse into all children.
-        """
-
-        n_merged = 0
-
-        with self.connection.begin():
-            queue = [root_id]
-
-            while len(queue) > 0:
-                node_id = queue.pop()
-
-                children = self.get_children(node_id)
-
-                if len(children) == 0:
-                    # Do nothing
-                    continue
-
-                if len(children) == 1:
-                    # Merge this child and restart with this node
-                    child_to_merge = children[0]
-                    self.merge_node_into(child_to_merge["node_id"], node_id)
-                    queue.append(node_id)
-                    continue
-
-                # Else recurse into every child
-                for c in children:
-                    queue.append(c["node_id"])
-
-        print("Merged {:d} nodes.".format(n_merged))
-
     def update_node(self, node_id, data):
         if "parent_id" in data:
             warnings.warn("parent_id in data")
@@ -1128,7 +1063,7 @@ class Tree(object):
 
         # First try if there are candidates below this node
         def recurse_cb(_, s):
-            return not s.c.approved
+            return s.c.approved == False
 
         subtree = _rquery_subtree(node_id, recurse_cb)
 
@@ -1140,7 +1075,7 @@ class Tree(object):
                       .label("n_children"))
 
         stmt = (select([subtree.c.node_id])
-                .where(not subtree.c.approved))
+                .where(subtree.c.approved == False))
 
         if leaf:
             stmt = stmt.where(n_children == 0)
@@ -1211,7 +1146,7 @@ class Tree(object):
 
         Parameters:
             node_id: Root of the subtree that gets consolidated.
-            deep: Consolidate all successors? (Default: False)
+            depth: Ensure validity of cached values at least up to a certain depth.
             return_: None | "node" | "children". Return this node or its children.
 
         Returns:
@@ -1221,6 +1156,8 @@ class Tree(object):
         if isinstance(depth, str):
             if depth == "children":
                 depth = 1
+            elif depth == "full":
+                depth = -1
             else:
                 raise NotImplementedError(
                     "Unknown depth string: {}".format(depth))
@@ -1234,6 +1171,9 @@ class Tree(object):
                 # Only recurse into invalid nodes
                 # Ensure validity up to a certain level
                 return (q.c.cache_valid == False) | (q.c.level < depth)
+
+            if depth == -1:
+                recurse_cb_level = None
 
             invalid_subtree = _rquery_subtree(node_id, recurse_cb_level)
 
@@ -1373,6 +1313,9 @@ class Tree(object):
             if return_ == "children":
                 return (invalid_subtree[invalid_subtree["parent_id"] == node_id]
                         .to_dict("records"))
+
+            if return_ == "raw":
+                return invalid_subtree
 
 
 if __name__ in ("__main__", "builtins"):

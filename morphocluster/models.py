@@ -3,6 +3,7 @@ Created on 13.03.2018
 
 @author: mschroeder
 '''
+# pylint: disable=W,C,R
 from sqlalchemy import Table, Column, ForeignKey, Index
 
 import datetime
