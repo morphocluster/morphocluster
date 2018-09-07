@@ -21,7 +21,9 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from morphocluster import models
 from morphocluster.api import api
+from morphocluster.frontend import frontend
 from morphocluster.extensions import database, migrate, redis_store
+from morphocluster.numpy_json_encoder import NumpyJSONEncoder
 from morphocluster.tree import Tree
 
 app = Flask(__name__)
@@ -33,6 +35,8 @@ app.config.from_envvar('MORPHOCLUSTER_SETTINGS')
 database.init_app(app)
 redis_store.init_app(app)
 migrate.init_app(app, database)
+
+app.json_encoder = NumpyJSONEncoder
 
 # Enable batch mode
 with app.app_context():
@@ -193,6 +197,30 @@ def export_tree(root_id, fn_prefix):
 
         tree.export_tree(root_id, fn_prefix)
 
+@app.cli.command()
+@click.argument('root_id', type=int, required=False)
+@click.option('--log/--no-log', "log", default=False)
+def progress(root_id, log):
+    """
+    Report progress on a tree
+    """
+    with database.engine.connect() as conn:
+        tree = Tree(conn)
+
+        if root_id is None:
+            root_ids = [p["node_id"] for p in tree.get_projects()]
+        else:
+            root_ids = [root_id]
+
+        with Timer("Progress") as timer: 
+            for rid in root_ids:
+                print("Root {}:".format(rid))
+                with timer.child(str(rid)):
+                    prog = tree.calculate_progress(rid)
+
+                for k in sorted(prog.keys()):
+                    print("{}: {}".format(k, prog[k]))
+
 
 @app.cli.command()
 @click.argument('root_id', type=int)
@@ -308,21 +336,12 @@ def export_log(filename):
 
 @app.route("/")
 def index():
-    return redirect(url_for("labeling"))
+    return redirect(url_for("frontend"))
 
-
+    
 @app.route("/labeling")
 def labeling():
     return render_template('pages/labeling.html')
-
-
-@app.route("/bisect/<path:path>")
-def vue(path):  # pylint: disable=unused-variable
-    """
-    Handle any routes handled by vue.
-    """
-
-    return app.send_static_file('vue/index.html')
 
 
 @app.route("/get_obj_image/<objid>")
@@ -344,6 +363,8 @@ def get_obj_image(objid):
 
 # Register api
 app.register_blueprint(api, url_prefix='/api')
+
+app.register_blueprint(frontend, url_prefix='/frontend')
 
 
 # ===============================================================================

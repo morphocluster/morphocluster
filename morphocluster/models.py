@@ -47,6 +47,8 @@ nodes = Table('nodes', metadata,
     Column('starred', Boolean, default=False, nullable=False),
     Column('approved', Boolean, default=False,
             nullable=False, server_default="f"),
+    Column('filled', Boolean, default=False,
+            nullable=False, server_default="f"),
 
     # ===========================================================================
     # Super Node support
@@ -70,8 +72,6 @@ nodes = Table('nodes', metadata,
     Column('_n_objects', BigInteger, nullable=True),
     # Number of all objects anywhere below this node
     Column('_n_objects_deep', BigInteger, nullable=True),
-    # Covariance
-    Column('_covariance', PickleType, nullable=True),
 
     # Validity of cached values
     Column('cache_valid', Boolean,
@@ -114,6 +114,7 @@ log = Table("log", metadata,
         'users.username', ondelete="SET NULL"), nullable=True),
     Column('action', Text, nullable=False),
     Column('reverse_action', Text, nullable=True),
+    Column('data', Text, nullable=True),
 )
 
 # ===============================================================================

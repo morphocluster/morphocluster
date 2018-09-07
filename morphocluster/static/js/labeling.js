@@ -147,10 +147,19 @@ function init_tree() {
 	$(document).on("node_loaded.morphocluster", function (event, data) {
 		$("#btn-bisect").attr("href", "/bisect/" + appState.node.node_id);
 	});
-	
+
+	$(document).on("node_loaded.morphocluster", function (event, data) {
+		// TODO: Approved counter
+		$("#nav-info").html(appState.node.name + "<br/>" + "foo");
+	});
+
 	// Change application state when a node is activated
 	$('#tree-pane').on("activate_node.jstree", function(event, data) {
 		console.log("activate_node.jstree", event, data);
+
+		/* if("project_id" in data.node.original) {
+			setTitle(data.node.original.name);
+		} */
 		loadNode(data.node.id, null, "tree");
 	});
 	
@@ -158,7 +167,10 @@ function init_tree() {
 	$('#tree-pane').on("loaded.jstree", function (event) {
 		openHash();
 	});
-	
+
+	function setTitle(title) {
+		$("#nav-title").html('<li class="nav-item active text-light">' + title + '</li>');
+	};
 	
 	/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 	 * Hash

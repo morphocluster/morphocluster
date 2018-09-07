@@ -260,6 +260,49 @@ class Tree(object):
 
         return [dict(r) for r in result]
 
+    def calculate_progress(self, node_id):
+        """
+        Calculate labeling progress.
+
+        - Number of objects below approved nodes
+        """
+
+        with self.connection.begin():
+            subtree = self.consolidate_node(node_id, depth="full", return_="raw", descend_approved=False)
+            """ subtree = _rquery_subtree(node_id)
+            subtree = (select([subtree])
+                    .order_by(subtree.c.level.desc()))
+            subtree = pd.read_sql_query(
+                subtree, self.connection, index_col="node_id") """
+
+        subtree["n_approved_objects"] = subtree["approved"] * subtree["_n_objects_deep"]
+        subtree["n_filled_objects"] = subtree["filled"] * subtree["_n_objects_deep"]
+        subtree["n_named_objects"] = pd.notna(subtree["name"]) * subtree["_n_objects_deep"]
+
+        # Leaves
+        leaves_mask = subtree["_n_children"] == 0
+        leaves_result = subtree.loc[leaves_mask, ["_n_objects", "_n_objects_deep", "n_filled_objects", "n_approved_objects", "n_named_objects"]].sum(axis=0).to_dict()
+        leaves_result = {"leaves_{}".format(k.lstrip('_')): v for k, v in leaves_result.items()}
+
+        # Compute deep values for root
+        # subtree is ordered deep-first
+        for nid in subtree.index:
+            child_selector = (subtree['parent_id'] == nid)
+
+            subtree.at[nid, "n_approved_objects"] = max(
+                subtree.at[nid, "n_approved_objects"],
+                subtree.loc[child_selector, "n_approved_objects"].sum())
+
+            subtree.at[nid, "n_named_objects"] = max(
+                subtree.at[nid, "n_named_objects"],
+                subtree.loc[child_selector, "n_named_objects"].sum())
+
+        deep_result = subtree.loc[node_id, ["_n_objects", "_n_objects_deep", "n_filled_objects", "n_approved_objects", "n_named_objects"]].to_dict()
+        deep_result = {k.lstrip('_'): v for k, v in deep_result.items()}
+
+        return dict(**leaves_result, **deep_result)
+
+
     def export_classifications(self, root_id, classification_fn):
         """
         Export `object_id`s with cluster labels.
@@ -727,13 +770,8 @@ class Tree(object):
         """
 
         with self.connection.begin():
-            # Get project_id of dest node
-            dest_project_id = select([nodes.c.project_id]).where(
-                nodes.c.node_id == dest_node_id).as_scalar()
-
             # Change node for objects
-            stmt = nodes_objects.update().values(node_id=dest_node_id,
-                                                 project_id=dest_project_id).where(nodes_objects.c.node_id == node_id)
+            stmt = nodes_objects.update().values(node_id=dest_node_id).where(nodes_objects.c.node_id == node_id)
             self.connection.execute(stmt)
 
             # Change parent for children
@@ -749,6 +787,8 @@ class Tree(object):
             stmt = nodes.update().values(cache_valid=False).where(
                 nodes.c.node_id == dest_node_id)
             self.connection.execute(stmt)
+
+            # TODO: Unapprove
 
     def get_objects(self, node_id, offset=None, limit=None, order_by=None):
         """
@@ -1048,13 +1088,13 @@ class Tree(object):
 
         return [self._upgrade_node(dict(r), require_valid=require_valid) for r in result]
 
-    def get_next_unapproved(self, node_id, leaf=False):
+    def get_next_node(self, node_id, leaf=False, recurse_cb=None, filter=None):
         """
         Get the id of the next unapproved node.
 
         This is either        
-            a) the deepest unapproved node below, if this current node is not approved, or
-            b) the first unapproved node below a predecessor of the current node.
+            a) the deepest node below, if this current node matches the recurse_cb, or
+            b) the first node below a predecessor of the current node that does not match the recurse_cb.
 
         Parameters:
             node_id
@@ -1062,9 +1102,6 @@ class Tree(object):
         """
 
         # First try if there are candidates below this node
-        def recurse_cb(_, s):
-            return s.c.approved == False
-
         subtree = _rquery_subtree(node_id, recurse_cb)
 
         children = nodes.alias("children")
@@ -1074,8 +1111,10 @@ class Tree(object):
                       .as_scalar()
                       .label("n_children"))
 
-        stmt = (select([subtree.c.node_id])
-                .where(subtree.c.approved == False))
+        stmt = (select([subtree.c.node_id]))
+
+        if filter is not None:
+            stmt = stmt.where(filter(subtree))
 
         if leaf:
             stmt = stmt.where(n_children == 0)
@@ -1083,6 +1122,9 @@ class Tree(object):
         stmt = (stmt
                 .order_by(subtree.c.level.desc())
                 .limit(1))
+
+
+        print(stmt)
 
         result = self.connection.execute(stmt).scalar()
 
@@ -1096,7 +1138,8 @@ class Tree(object):
         if node["parent_id"]:
             print("No unapproved children, trying parent: {}".format(
                 node["parent_id"]))
-            return self.get_next_unapproved(node["parent_id"], leaf)
+            return self.get_next_node(node["parent_id"], leaf, recurse_cb, filter)
+
         return None
 
     def _calc_obj_mean_cov(self, objects_):
@@ -1138,7 +1181,7 @@ class Tree(object):
             "_n_objects_deep": n
         }
 
-    def consolidate_node(self, node_id, depth=0, return_=None):
+    def consolidate_node(self, node_id, depth=0, descend_approved=True, return_=None):
         """
         Ensures that the calculated values of this node are valid.
 
@@ -1164,18 +1207,28 @@ class Tree(object):
 
         # Wrap everything in a transaction
         with self.connection.begin():
+            # TODO: Acquire exclusive lock only per project
+            #self.connection.execute(select(func.pg_advisory_xact_lock(project_id)))
+
             # Acquire exclusive lock on nodes
             self.connection.execute("LOCK TABLE nodes;")
 
-            def recurse_cb_level(q, _):
+            if depth == -1:
+                if descend_approved:
+                    recurse_cb = None
+                else:
+                    # Only recurse into invalid nodes
+                    # Ensure validity up to a certain level
+                    recurse_cb = lambda q, s: (q.c.cache_valid == False) | (q.c.approved == False)
+            else:
+                if not descend_approved:
+                    raise NotImplementedError()
+
                 # Only recurse into invalid nodes
                 # Ensure validity up to a certain level
-                return (q.c.cache_valid == False) | (q.c.level < depth)
+                recurse_cb = lambda q, s: (q.c.cache_valid == False) | (q.c.level < depth)
 
-            if depth == -1:
-                recurse_cb_level = None
-
-            invalid_subtree = _rquery_subtree(node_id, recurse_cb_level)
+            invalid_subtree = _rquery_subtree(node_id, recurse_cb)
 
             # Readily query real n_objects
             n_objects = (select([func.count()])
@@ -1203,7 +1256,7 @@ class Tree(object):
             if len(invalid_subtree) == 0:
                 raise TreeError("Unknown node: {}".format(node_id))
 
-            if not invalid_subtree["cache_valid"].all() or (depth == -1):
+            if not invalid_subtree["cache_valid"].all():
                 # 1. _n_objects, _n_children
                 invalid_subtree["_n_objects"] = invalid_subtree["_n_objects_"]
                 invalid_subtree["_n_children"] = invalid_subtree["_n_children_"]
@@ -1213,7 +1266,7 @@ class Tree(object):
                 # Iterate over DataFrame fixing the values along the way
                 bar = ProgressBar(len(invalid_subtree), max_width=40)
                 for node_id in invalid_subtree.index:
-                    if invalid_subtree.at[node_id, "cache_valid"] and (depth != -1):
+                    if invalid_subtree.at[node_id, "cache_valid"]:
                         # Don't recalculate valid nodes as invalid_subtree (rightly)
                         # doesn't include their children.
                         continue
@@ -1285,24 +1338,31 @@ class Tree(object):
                 # Flag all rows as valid
                 invalid_subtree["cache_valid"] = True
 
-                # Write results back to database
-                update_fields = ["cache_valid", "_centroid", "_type_objects",
-                                "_own_type_objects", "_n_objects_deep",
-                                "_n_objects", "_n_children"]
-
-                stmt = (nodes.update()
-                        .where(nodes.c.node_id == bindparam('_node_id'))
-                        .values({k: bindparam(k) for k in update_fields}))
-
                 # Mask for updated rows
                 updated_selection = invalid_subtree["__updated"] == True
+                n_updated = updated_selection.sum()
 
-                # Build the result list of dicts with _node_id and only update_fields
-                result = invalid_subtree.loc[updated_selection, update_fields]
-                result.index.rename('_node_id', inplace=True)
-                result.reset_index(inplace=True)
+                # Write back to database (if necessary)
+                if n_updated > 0:
+                    # Write results back to database
+                    update_fields = ["cache_valid", "_centroid", "_type_objects",
+                                    "_own_type_objects", "_n_objects_deep",
+                                    "_n_objects", "_n_children"]
 
-                self.connection.execute(stmt, result.to_dict('records'))
+                    stmt = (nodes.update()
+                            .where(nodes.c.node_id == bindparam('_node_id'))
+                            .values({k: bindparam(k) for k in update_fields}))
+
+                    
+
+                    # Build the result list of dicts with _node_id and only update_fields
+                    result = invalid_subtree.loc[updated_selection, update_fields]
+                    result.index.rename('_node_id', inplace=True)
+                    result.reset_index(inplace=True)
+
+                    self.connection.execute(stmt, result.to_dict('records'))
+
+                    print("Updated {:d} nodes.".format(n_updated))
 
             if return_ == "node":
                 return invalid_subtree.loc[node_id].to_dict()

@@ -31,16 +31,47 @@ from timer_cm import Timer
 
 api = Blueprint("api", __name__)
 
+def batch(iterable, n=1):
+    """
+    Taken from https://stackoverflow.com/a/8290508/1116842
+    """
+    l = len(iterable)
+    for ndx in range(0, l, n):
+        yield iterable[ndx:min(ndx + n, l)]
 
-def log(connection, action, node_id = None, reverse_action = None):
+def json_converter(value):
+    if isinstance(value, np.floating):
+        return float(o)
+    if isinstance(value, np.integer):
+        return int(value)
+    raise TypeError("Unknown type: {!r}".format(type(value)))
+
+def json_dumps(o, *args, **kwargs):
+    try:
+        return json.dumps(o, *args, **kwargs, default=json_converter)
+    except TypeError:
+        pprint(o)
+        raise
+
+def jsonify(*args, **kwargs):
+    try:
+        return flask_jsonify(*args, **kwargs)
+    except TypeError:
+        pprint(args)
+        pprint(kwargs)
+        raise
+
+
+def log(connection, action, node_id=None, reverse_action=None, data=None):
     auth = request.authorization
     username = auth.username if auth is not None else None
-    
+
     stmt = models.log.insert({'node_id': node_id,
                               'username': username,
                               'action': action,
-                              'reverse_action': reverse_action})
-    
+                              'reverse_action': reverse_action,
+                              'data': data})
+
     connection.execute(stmt)
 
 
@@ -49,11 +80,12 @@ def record(state):
     api.config = state.app.config
 
 @api.after_request
-def no_cache_header(response):
+def api_headers(response):
     response.headers['Last-Modified'] = datetime.datetime.now()
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '-1'
+    #response.headers['Last-Modified'] = datetime.datetime.now()
     return response
 
 def _node_icon(node):
@@ -114,14 +146,41 @@ def get_subtree(node_id):
 #===============================================================================
 # /projects
 #===============================================================================
-
-
-
 @api.route("/projects", methods=["GET"])
 def get_projects():
+
+    parser = reqparse.RequestParser()
+    parser.add_argument("include_progress", type=strtobool, default=0)
+    arguments = parser.parse_args(strict=True)
+
     with database.engine.connect() as connection:
         tree = Tree(connection)
-        return jsonify(tree.get_projects())
+
+        projects = tree.get_projects()
+
+        if arguments["include_progress"]:
+            for p in projects:
+                progress = tree.calculate_progress(p["node_id"])
+                p["progress"] = progress
+                
+        return jsonify(projects)
+
+@api.route("/projects/<int:project_id>", methods=["GET"])
+def get_project(project_id):
+
+    parser = reqparse.RequestParser()
+    parser.add_argument("include_progress", type=strtobool, default=0)
+    arguments = parser.parse_args(strict=True)
+
+    with database.engine.connect() as connection:
+        tree = Tree(connection)
+        result = tree.get_project(project_id)
+
+        if arguments["include_progress"]:
+            progress = tree.calculate_progress(result["node_id"])
+            result["progress"] = progress
+
+        return jsonify(result)
 
 #===============================================================================
 # /nodes
@@ -131,14 +190,14 @@ def get_projects():
 def create_node():
     """
     Create a new node.
-    
+
     Request parameters:
         project_id
         name
         members
         starred
     """
-    
+
     with database.engine.connect() as connection:
         tree = Tree(connection)
         data = request.get_json()
@@ -194,6 +253,7 @@ def _node(tree, node, include_children=False):
         "approved": node["approved"],
         "own_type_objects": node["_own_type_objects"],
         "n_objects_deep": node["_n_objects_deep"] or 0,
+        "parent_id": node["parent_id"],
     }
     
     if include_children:
@@ -246,30 +306,6 @@ def _arrange_by_nleaves(result):
 
 def _members(tree, members):
     return [_node(tree, m) if "node_id" in m else _object(m) for m in members]
-
-def batch(iterable, n=1):
-    """
-    Taken from https://stackoverflow.com/a/8290508/1116842
-    """
-    l = len(iterable)
-    for ndx in range(0, l, n):
-        yield iterable[ndx:min(ndx + n, l)]
-
-
-def json_dumps(o, *args, **kwargs):
-    try:
-        return json.dumps(o, *args, **kwargs)
-    except TypeError:
-        pprint(o)
-        raise
-    
-def jsonify(*args, **kwargs):
-    try:
-        return flask_jsonify(*args, **kwargs)
-    except TypeError:
-        pprint(args)
-        pprint(kwargs)
-        raise
 
 def _load_or_calc(func, func_kwargs, request_id, page, page_size = 100, compress = True):
     cache_key = '{}:{}:{}'.format(func.__name__,
@@ -549,6 +585,37 @@ def get_node_members(node_id):
         arguments.request_id = uuid.uuid4().hex
     
     return _get_node_members(node_id = node_id, **arguments)
+
+@api.route("/nodes/<int:node_id>/progress", methods=["GET"])
+def get_node_stats(node_id):
+    """
+    Return progress information about this node.
+    
+    URL parameters:
+        node_id (int): ID of a node
+        
+    Request parameters:
+        log (str): Save an entry to the log?
+    
+    Returns:
+        JSON-dict
+    """
+    
+    parser = reqparse.RequestParser()
+    parser.add_argument("log", default = None)
+    arguments = parser.parse_args(strict=True)
+    
+    with database.engine.connect() as connection:
+        tree = Tree(connection)
+
+        with connection.begin():
+            progress = tree.calculate_progress(node_id)
+
+            if arguments["log"] is not None:
+                log(connection, "progress-{}".format(arguments["log"]),
+                node_id=node_id, data=json_dumps(progress))
+
+            return jsonify(progress)
     
 @api.route("/nodes/<int:node_id>/members", methods=["POST"])
 def post_node_members(node_id):
@@ -724,8 +791,31 @@ def node_get_next(node_id):
     
     with database.engine.connect() as connection:
         tree = Tree(connection)
+
+        # Descend if the successor is not approved
+        # Rationale: Approval is for a whole subtree.
+        recurse = lambda _, s: s.c.approved == False
+
+        # Filter descendants that are not approved
+        filter = lambda subtree: subtree.c.approved == False
     
-        return jsonify(tree.get_next_unapproved(node_id, arguments["leaf"]))
+        return jsonify(tree.get_next_node(node_id, leaf=arguments["leaf"], recurse_cb=recurse, filter=filter))
+
+@api.route("/nodes/<int:node_id>/next_unfilled", methods=["GET"])
+def node_get_next_unfilled(node_id):
+    parser = reqparse.RequestParser()
+    parser.add_argument("leaf", type = strtobool, default = False)
+    arguments = parser.parse_args(strict=True)
+    
+    print(arguments)
+    
+    with database.engine.connect() as connection:
+        tree = Tree(connection)
+    
+        # Filter descendants that are approved and unfilled
+        filter = lambda subtree: (subtree.c.approved == True) & (subtree.c.filled == False)
+    
+        return jsonify(tree.get_next_node(node_id, leaf=arguments["leaf"], filter=filter))
     
     
 @api.route("/nodes/<int:node_id>/n_sorted", methods=["GET"])
@@ -748,13 +838,15 @@ def post_node_merge_into(node_id):
     URL parameters:
         node_id: Node that is merged.
         
-    Request parameters:
+    Request parameters (body):
         dest_node_id: Node that absorbs the children and objects.
     """
     with database.engine.connect() as connection:
         tree = Tree(connection)
-        
+
         data = request.get_json()
+
+        print(data)
         
         # TODO: Unapprove
         tree.merge_node_into(node_id, data["dest_node_id"])

@@ -10,7 +10,11 @@ body {
 }
 
 #content {
-	flex-grow: 1;
+    flex-grow: 1;
+}
+
+#nav-info {
+    font-size: 75%;
 }
 
 .container {
