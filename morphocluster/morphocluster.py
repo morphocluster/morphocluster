@@ -336,7 +336,7 @@ def export_log(filename):
 
 @app.route("/")
 def index():
-    return redirect(url_for("frontend"))
+    return redirect(url_for("frontend.index"))
 
     
 @app.route("/labeling")
