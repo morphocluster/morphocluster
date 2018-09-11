@@ -20,6 +20,7 @@ setup(
         'Flask-SQLAlchemy',
         'flask-redis',
         'Flask-Migrate',
-        'timer_cm'
+        'timer_cm',
+        'fire',
     ],
 )

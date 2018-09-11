@@ -149,8 +149,7 @@ function init_tree() {
 	});
 
 	$(document).on("node_loaded.morphocluster", function (event, data) {
-		// TODO: Approved counter
-		$("#nav-info").html(appState.node.name + "<br/>" + "foo");
+		$("#nav-info").html(appState.node.name);
 	});
 
 	// Change application state when a node is activated

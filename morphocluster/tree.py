@@ -24,6 +24,7 @@ from sqlalchemy.sql.expression import literal
 from sqlalchemy.sql.elements import literal_column
 from morphocluster.member import MemberCollection
 from _functools import reduce
+from morphocluster import processing
 
 
 class TreeError(Exception):
@@ -129,10 +130,66 @@ def _rquery_subtree(node_id, recurse_cb=None):
 
 
 class Tree(object):
+    """
+    A tree as represented by the database.
+    """
     def __init__(self, connection):
         self.connection = connection
 
-    def load_project(self, name, path, root_first=True):
+    def load_project(self, name, tree_fn):
+        """
+        Load a project from a saved tree.
+        """
+        tree = processing.Tree.from_saved(tree_fn)
+
+        with self.connection.begin():
+            project_id = self.create_project(name)
+
+            # Lock project
+            self.lock_project(project_id)
+
+            bar = ProgressBar(len(tree.nodes) + len(tree.objects), max_width=40)
+            
+            def progress_cb(nadd):
+                bar.numerator += nadd
+                print(bar, end="\r")
+
+            for node in tree.topological_order():
+                name = node["name"] if "name" in node and pd.notnull(node["name"]) else None
+
+                object_ids = tree.objects_for_node(node["node_id"])["object_id"].tolist()
+                parent_id = int(node["parent_id"]) if pd.notnull(node["parent_id"]) else None
+
+                self.create_node(project_id,
+                                 orig_node_id=int(node["node_id"]),
+                                 orig_parent=parent_id,
+                                 object_ids=object_ids,
+                                 name=name,
+                                 progress_cb=progress_cb)
+                # Update progress bar
+                progress_cb(1)
+            print()
+
+        print("Done after {}s.".format(bar._eta.elapsed))
+
+        return project_id
+
+    def lock_project(self, project_id):
+        """
+        Acquire advisory transaction lock for a project.
+        """
+        return self.connection.execute(select([func.pg_advisory_xact_lock(project_id)]))
+
+    def lock_project_for_node(self, node_id):
+        """
+        Acquire advisory project lock given a node ID.
+        """
+        project_id = (select([nodes.c.project_id])
+            .where(nodes.c.node_id == node_id)
+            .as_scalar())
+        return self.lock_project(project_id)
+
+    def __load_project_old(self, name, path, root_first=True):
         tree_fn = os.path.join(path, "tree.csv")
         objids_fn = os.path.join(path, "objids.csv")
 
@@ -329,8 +386,8 @@ class Tree(object):
         Export the whole tree with its objects.
         """
         with self.connection.begin():
-            # Acquire exclusive lock on nodes
-            self.connection.execute("LOCK TABLE nodes;")
+            # Acquire project lock
+            self.lock_project_for_node(root_id)
 
             # Get complete subtree with up to date cached values
             print("Consolidating cached values...")
@@ -466,8 +523,7 @@ class Tree(object):
         row = {"project_id": project_id,
                "parent_id": parent_id,
                "orig_id": orig_node_id,
-               "name": name,
-               "starred": starred}
+               "name": name}
 
         stmt = nodes.insert(row)
 
@@ -888,6 +944,9 @@ class Tree(object):
 
             objects_.extend(self.get_objects(parent_id, limit=n_left))
 
+        if not objects_:
+            return []
+
         vectors = [o["vector"] for o in objects_]
 
         objects_ = np.array(objects_, dtype=object)
@@ -927,8 +986,8 @@ class Tree(object):
             return
 
         with self.connection.begin():
-            # Acquire exclusive lock
-            self.connection.execute("LOCK TABLE nodes;")
+            # Acquire project lock
+            self.lock_project_for_node(parent_id)
 
             new_parent_path = self.get_path_ids(parent_id)
 
@@ -976,8 +1035,8 @@ class Tree(object):
             return
 
         with self.connection.begin():
-            # Acquire exclusive lock
-            self.connection.execute("LOCK TABLE nodes;")
+            # Acquire project lock
+            self.lock_project_for_node(node_id)
 
             # Poject id of the new node
             project_id = select([nodes.c.project_id]).where(
@@ -1207,11 +1266,8 @@ class Tree(object):
 
         # Wrap everything in a transaction
         with self.connection.begin():
-            # TODO: Acquire exclusive lock only per project
-            #self.connection.execute(select(func.pg_advisory_xact_lock(project_id)))
-
-            # Acquire exclusive lock on nodes
-            self.connection.execute("LOCK TABLE nodes;")
+            # Acquire project lock
+            self.lock_project_for_node(node_id)
 
             if depth == -1:
                 if descend_approved:
