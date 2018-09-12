@@ -44,6 +44,8 @@ def json_converter(value):
         return float(o)
     if isinstance(value, np.integer):
         return int(value)
+    if isinstance(value, np.bool):
+        return bool(value)
     raise TypeError("Unknown type: {!r}".format(type(value)))
 
 def json_dumps(o, *args, **kwargs):

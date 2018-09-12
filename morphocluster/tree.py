@@ -335,10 +335,15 @@ class Tree(object):
         subtree["n_approved_objects"] = subtree["approved"] * subtree["_n_objects_deep"]
         subtree["n_filled_objects"] = subtree["filled"] * subtree["_n_objects_deep"]
         subtree["n_named_objects"] = pd.notna(subtree["name"]) * subtree["_n_objects_deep"]
+        subtree["n_approved_nodes"] = subtree["approved"].astype(int)
+        subtree["n_filled_nodes"] = subtree["filled"].astype(int)
+        subtree["n_nodes"] = 1
+
+        fields = ["_n_objects", "_n_objects_deep", "n_filled_objects", "n_approved_objects", "n_named_objects", "n_approved_nodes", "n_filled_nodes", "n_nodes"]
 
         # Leaves
         leaves_mask = subtree["_n_children"] == 0
-        leaves_result = subtree.loc[leaves_mask, ["_n_objects", "_n_objects_deep", "n_filled_objects", "n_approved_objects", "n_named_objects"]].sum(axis=0).to_dict()
+        leaves_result = subtree.loc[leaves_mask, fields].sum(axis=0).to_dict()
         leaves_result = {"leaves_{}".format(k.lstrip('_')): v for k, v in leaves_result.items()}
 
         # Compute deep values for root
@@ -354,7 +359,19 @@ class Tree(object):
                 subtree.at[nid, "n_named_objects"],
                 subtree.loc[child_selector, "n_named_objects"].sum())
 
-        deep_result = subtree.loc[node_id, ["_n_objects", "_n_objects_deep", "n_filled_objects", "n_approved_objects", "n_named_objects"]].to_dict()
+            subtree.at[nid, "n_approved_nodes"] = (
+                subtree.at[nid, "n_approved_nodes"]
+                + subtree.loc[child_selector, "n_approved_nodes"].sum())
+
+            subtree.at[nid, "n_filled_nodes"] = (
+                subtree.at[nid, "n_filled_nodes"]
+                + subtree.loc[child_selector, "n_filled_nodes"].sum())
+
+            subtree.at[nid, "n_nodes"] = (
+                subtree.at[nid, "n_nodes"]
+                + subtree.loc[child_selector, "n_nodes"].sum())
+
+        deep_result = subtree.loc[node_id, fields].to_dict()
         deep_result = {k.lstrip('_'): v for k, v in deep_result.items()}
 
         return dict(**leaves_result, **deep_result)
@@ -523,7 +540,8 @@ class Tree(object):
         row = {"project_id": project_id,
                "parent_id": parent_id,
                "orig_id": orig_node_id,
-               "name": name}
+               "name": name,
+               "starred": starred}
 
         stmt = nodes.insert(row)
 
