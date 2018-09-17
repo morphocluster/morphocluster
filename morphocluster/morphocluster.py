@@ -187,15 +187,15 @@ def load_project(tree_fn, project_name):
 
 @app.cli.command()
 @click.argument('root_id', type=int)
-@click.argument('fn_prefix')
-def export_tree(root_id, fn_prefix):
+@click.argument('tree_fn')
+def export_tree(root_id, tree_fn):
     """
     Export the whole tree with its objects.
     """
     with database.engine.connect() as conn:
         tree = Tree(conn)
 
-        tree.export_tree(root_id, fn_prefix)
+        tree.export_tree(root_id, tree_fn)
 
 @app.cli.command()
 @click.argument('root_id', type=int, required=False)

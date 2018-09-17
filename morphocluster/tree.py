@@ -398,7 +398,7 @@ class Tree(object):
                 bar.numerator += 1
                 print(bar, end="\r")
 
-    def export_tree(self, root_id, fn_prefix):
+    def export_tree(self, root_id, tree_fn):
         """
         Export the whole tree with its objects.
         """
@@ -413,11 +413,9 @@ class Tree(object):
 
             keep_columns = ["orig_id", "parent_id", "name", 'starred',
                             'approved', '_n_children', '_n_objects', '_n_objects_deep']
+            tree_nodes = subtree[keep_columns].reset_index()
 
-            print("Writing tree...")
-            subtree[keep_columns].to_csv("{}tree.csv".format(fn_prefix))
-
-            print("Writing objects...")
+            print("Getting objects...")
             # Get subtree below root
             subtree = _rquery_subtree(root_id)
 
@@ -429,8 +427,17 @@ class Tree(object):
             )
 
             node_objects = pd.read_sql_query(
-                node_objects, self.connection, index_col="node_id")
-            node_objects.to_csv("{}objects.csv".format(fn_prefix))
+                node_objects, self.connection)
+                
+            try:
+                tree = processing.Tree(tree_nodes, node_objects)
+            except ValueError:
+                print(tree_nodes)
+                print(node_objects)
+                raise
+
+            print("Writing tree...")
+            tree.save(tree_fn)
 
     def get_root_id(self, project_id):
         """
