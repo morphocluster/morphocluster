@@ -69,7 +69,8 @@ class Tree(object):
             # TODO: We blindly assume that collection and unlabeled collection are distinct
             unlabeled_collection["node_id"] = root_id
 
-            objects = pd.concat([objects, unlabeled_collection], ignore_index=True)
+            objects = pd.concat(
+                [objects, unlabeled_collection], ignore_index=True)
 
         return Tree(nodes, objects)
 
@@ -169,10 +170,31 @@ class Tree(object):
         return Tree(nodes, objects)
 
     def __init__(self, nodes=None, objects=None):
+        if nodes is not None:
+            if not isinstance(nodes, pd.DataFrame):
+                nodes = pd.DataFrame(nodes)
+
+            if not "node_id" in nodes.columns:
+                raise ValueError("'nodes' lacks column 'node_id'.")
+            if not "parent_id" in nodes.columns:
+                raise ValueError("'nodes' lacks column 'parent_id'.")
+
+        if objects is not None:
+            if not isinstance(objects, pd.DataFrame):
+                objects = pd.DataFrame(objects)
+
+            if not "object_id" in objects.columns:
+                raise ValueError("'objects' lacks column 'object_id'.")
+            if not "node_id" in objects.columns:
+                raise ValueError("'objects' lacks column 'node_id'.")
+
         self.nodes = nodes
         self.objects = objects
 
     def save(self, tree_fn):
+        """
+        Save nodes and objects to an archive.
+        """
         with ZipFile(tree_fn, "w", ZIP_DEFLATED) as archive:
             buffer_ = StringIO()
             self.nodes.to_csv(buffer_, index=False)
@@ -183,6 +205,9 @@ class Tree(object):
             archive.writestr("objects.csv", buffer_.getvalue())
 
     def get_root_id(self):
+        """
+        Get the ID of the root node.
+        """
         selector = self.nodes["parent_id"].isnull()
         return np.asscalar(self.nodes.loc[selector, "node_id"])
 
@@ -209,14 +234,23 @@ class Tree(object):
             yield self.nodes.loc[node_idx]
 
     def objects_for_node(self, node_id):
+        """
+        Return the objects of a certain node.
+        """
         object_selector = self.objects["node_id"] == node_id
         return self.objects[object_selector]
 
     def print_topological_order(self):
+        """
+        Print nodes in topological order.
+        """
         for node in self.topological_order():
             print(node)
 
     def print_objects_for_node(self, node_id):
+        """
+        Print objects of a certain node.
+        """
         print(self.objects_for_node(node_id)["object_id"].tolist())
 
 
