@@ -1,0 +1,10 @@
+html, body {
+	height: 100%;
+	margin: 0;
+	overflow: hidden;
+}
+
+.tooltip kbd {
+	background-color: #f7f7f9;
+	color: black;
+}
