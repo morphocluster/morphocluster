@@ -145,7 +145,8 @@ function init_tree() {
 	});
 
 	$(document).on("node_loaded.morphocluster", function (event, data) {
-		$("#btn-bisect").attr("href", "/bisect/" + appState.node.node_id);
+		console.log(appState.node);
+		$("#btn-bisect").attr("href", "/frontend/p/" + appState.node.project_id  + "/bisect/" + appState.node.node_id);
 	});
 
 	$(document).on("node_loaded.morphocluster", function (event, data) {
@@ -231,7 +232,9 @@ function init_tree() {
 		var parameters = {
 				objects: displayObjects,
 				nodes: !displayObjects,
-				arrange_by: node.n_children == 0 ? "interleaved" : "starred_sim",
+				//arrange_by: node.n_children == 0 ? "interleaved" : "starred_sim",
+				arrange_by: "interleaved",
+				descending: true,
 				// Always show starred objects first
 				starred_first: true
 		};
