@@ -1,3 +1,7 @@
+"""
+Frontend blueprint
+"""
+
 import datetime
 
 from flask.blueprints import Blueprint

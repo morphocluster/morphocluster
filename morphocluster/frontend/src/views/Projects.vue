@@ -29,6 +29,7 @@
                             Approve
                         </b-button>
                         <b-button size="sm" variant="primary" class="mr-2" :to="{name: 'bisect', params: {project_id: data.item.project_id}}">Bisect</b-button>
+                        <b-button size="sm" variant="primary" class="mr-2" @click.prevent="save_project(data.item.project_id)">Save</b-button>
                     </template>
                     <template slot="visible" slot-scope="data">
                         {{data.visible ? "yes" : "no"}}
@@ -66,7 +67,14 @@ export default {
             projects: []
         };
     },
-    methods: {},
+    methods: {
+        save_project(project_id) {
+            console.log("Saving", project_id, "...");
+            api.saveProject(project_id).then(result => {
+                alert("Project saved: " + result["tree_fn"]);
+            });
+        }
+    },
     mounted() {
         // Load node info
         api
@@ -90,11 +98,11 @@ export default {
 
 <style>
 #projects {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  flex: 1;
-  overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex: 1;
+    overflow: hidden;
 }
 
 #projects_table tr td:nth-child(1) {
@@ -108,7 +116,6 @@ export default {
 }
 
 .scrollable {
-  overflow-y: auto;
+    overflow-y: auto;
 }
-
 </style>

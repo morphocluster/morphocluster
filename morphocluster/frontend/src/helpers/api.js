@@ -71,3 +71,10 @@ export function getProject(project_id, include_progress = false) {
             return response.data;
         });
 }
+
+export function saveProject(project_id) {
+    return axios.post(`/api/projects/${project_id}/save`)
+        .then(response => {
+            return response.data;
+        });
+}
