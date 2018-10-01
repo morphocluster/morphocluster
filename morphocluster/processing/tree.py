@@ -81,9 +81,13 @@ class Tree(object):
         """
         with ZipFile(tree_fn, "r") as archive:
             with archive.open("nodes.csv", "r") as nodes_f:
-                nodes = pd.read_csv(nodes_f, dtype={'node_id': np.uint64, 'parent_id': np.uint64})
+                nodes = pd.read_csv(nodes_f)
+                for col, dtype in {'node_id': np.uint64, 'parent_id': np.uint64}.items():
+                    nodes[col] = nodes[col].astype(dtype, copy=False)
             with archive.open("objects.csv", "r") as objects_f:
-                objects = pd.read_csv(objects_f, dtype={'node_id': np.uint64, 'object_id': str})
+                objects = pd.read_csv(objects_f)
+                for col, dtype in {'node_id': np.uint64, 'object_id': str}.items():
+                    nodes[col] = nodes[col].astype(dtype, copy=False)
 
         return Tree(nodes, objects)
 
@@ -142,8 +146,8 @@ class Tree(object):
         Construct a tree from a label vector and a vector of object_ids.
         """
 
-        labels = pd.Series(labels)
-        object_ids = pd.Series(object_ids)
+        labels = pd.Series(labels).astype(np.uint64)
+        object_ids = pd.Series(object_ids).astype(np.uint64)
 
         unique_labels = labels.unique()
         root_id = unique_labels.max() + 1
