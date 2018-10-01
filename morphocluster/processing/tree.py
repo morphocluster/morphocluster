@@ -81,9 +81,9 @@ class Tree(object):
         """
         with ZipFile(tree_fn, "r") as archive:
             with archive.open("nodes.csv", "r") as nodes_f:
-                nodes = pd.read_csv(nodes_f)
+                nodes = pd.read_csv(nodes_f, dtype={'node_id': np.uint64, 'parent_id': np.uint64})
             with archive.open("objects.csv", "r") as objects_f:
-                objects = pd.read_csv(objects_f)
+                objects = pd.read_csv(objects_f, dtype={'node_id': np.uint64, 'object_id': str})
 
         return Tree(nodes, objects)
 
@@ -137,9 +137,32 @@ class Tree(object):
         return Tree(nodes, objects)
 
     @staticmethod
+    def from_labels(labels, object_ids):
+        """
+        Construct a tree from a label vector and a vector of object_ids.
+        """
+
+        labels = pd.Series(labels)
+        object_ids = pd.Series(object_ids)
+
+        unique_labels = labels.unique()
+        root_id = unique_labels.max() + 1
+
+        nodes = [{"node_id": node_id, "parent_id": root_id}
+                 for node_id in unique_labels]
+        nodes.append({"node_id": root_id})
+        nodes = pd.DataFrame(nodes)
+
+        objects = pd.concat({"node_id": labels, "object_id": object_ids}, axis=1)
+
+        return Tree(nodes, objects)
+
+    @staticmethod
     def from_cluster_labels(cluster_labels_fn, object_ids_fn=None):
         """
-        Construct tree from cluster labels.
+        Construct tree from a cluster_labels file.
+
+        A cluster_labels contains the columns "objid" and "label".
         """
         cluster_labels = pd.read_csv(cluster_labels_fn, index_col=False)
 
@@ -252,6 +275,32 @@ class Tree(object):
         Print objects of a certain node.
         """
         print(self.objects_for_node(node_id)["object_id"].tolist())
+
+    def merge(self, other):
+        """
+        Merge other into self.
+        """
+
+        other_nodes = other.nodes.copy()
+        other_objects = other.objects.copy()
+        other_root = other.get_root_id()
+        self_root = self.get_root_id()
+
+        # Offset `node_id`s of other so they come after the `node_id`s of self
+        offset = self.nodes["node_id"].max() + 1 - other_nodes["node_id"].min()
+        other_nodes["node_id"] += offset
+        other_objects["node_id"] += offset
+        other_root += offset
+
+        # Delete other.root and relocate children to self.root
+        other_nodes = other_nodes[other_nodes["node_id"] != other_root]
+
+        other_nodes.loc[other_nodes["parent_id"] == other_root, "parent_id"] = self_root
+
+        self.nodes = pd.concat((self.nodes, other_nodes), ignore_index=True)
+        self.objects = pd.concat((self.objects, other_objects), ignore_index=True)
+
+
 
 
 if __name__ == "__main__":
