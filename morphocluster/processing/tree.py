@@ -82,12 +82,8 @@ class Tree(object):
         with ZipFile(tree_fn, "r") as archive:
             with archive.open("nodes.csv", "r") as nodes_f:
                 nodes = pd.read_csv(nodes_f)
-                for col, dtype in {'node_id': np.uint64, 'parent_id': np.uint64}.items():
-                    nodes[col] = nodes[col].astype(dtype, copy=False)
             with archive.open("objects.csv", "r") as objects_f:
-                objects = pd.read_csv(objects_f)
-                for col, dtype in {'node_id': np.uint64, 'object_id': str}.items():
-                    nodes[col] = nodes[col].astype(dtype, copy=False)
+                objects = pd.read_csv(objects_f, dtype={'object_id': str})
 
         return Tree(nodes, objects)
 
