@@ -290,10 +290,9 @@ class Tree(object):
         offset = self.nodes["node_id"].max() + 1 - other_nodes["node_id"].min()
         other_nodes["node_id"] += offset
         other_objects["node_id"] += offset
-        other_root += offset
 
         # Delete other.root and relocate children to self.root
-        other_nodes = other_nodes[other_nodes["node_id"] != other_root]
+        other_nodes = other_nodes[other_nodes["node_id"] != other_root + offset]
 
         other_nodes.loc[other_nodes["parent_id"] == other_root, "parent_id"] = self_root
 
