@@ -140,10 +140,12 @@ class Tree(object):
     def from_labels(labels, object_ids):
         """
         Construct a tree from a label vector and a vector of object_ids.
+
+        labels may contain -1. Then an object is assigned to root.
         """
 
-        labels = pd.Series(labels).astype(np.uint64)
-        object_ids = pd.Series(object_ids).astype(np.uint64)
+        labels = pd.Series(labels)
+        object_ids = pd.Series(object_ids)
 
         unique_labels = labels.unique()
         root_id = unique_labels.max() + 1
@@ -154,6 +156,8 @@ class Tree(object):
         nodes = pd.DataFrame(nodes)
 
         objects = pd.concat({"node_id": labels, "object_id": object_ids}, axis=1)
+
+        objects.loc[objects["node_id"] == -1, "node_id"] = root_id
 
         return Tree(nodes, objects)
 
