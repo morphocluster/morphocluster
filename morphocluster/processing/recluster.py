@@ -27,15 +27,18 @@ class Recluster:
 
         print("Loading {}...".format(features_fn))
 
-        with h5py.File(features_fn, "r", libver="latest") as f_features:
-            dataset = {t: f_features[t][:]
-                       for t in ("features", "objids")}
+        with h5py.File(features_fn, "r") as f_features:
+            dataset = {
+                "features": f_features["features"][:],
+                # Sometimes, objids are still ints (which is wrong)
+                "objids": pd.Series(f_features["objids"][:]).astype(str)
+            }
 
         if append and self.dataset is not None:
             self.dataset["features"] = np.concatenate((self.dataset["features"],
                                                        dataset["features"]))
 
-            self.dataset["objids"] = np.concatenate((self.dataset["objids"],
+            self.dataset["objids"] = pd.concat((self.dataset["objids"],
                                                      dataset["objids"]))
         else:
             self.dataset = dataset
@@ -58,6 +61,7 @@ class Recluster:
 
     def _get_unapproved_dataset(self):
         approved_objids = []
+        tree_objids = []
         for i, tree in enumerate(self.trees):
             print("Tree #{}:".format(i))
 
@@ -73,6 +77,8 @@ class Recluster:
             approved_objids.append(
                 tree.objects.loc[approved_objects_selector, "object_id"])
 
+            tree_objids.append(tree.objects["object_id"])
+
             print(" Approved objects: {:,d} / {:,d} ({:.2%})".format(
                 n_approved_objects, n_objects, (n_approved_objects / n_objects)))
             print(" Unapproved objects: {:,d} / {:,d} ({:.2%})".format(
@@ -81,8 +87,19 @@ class Recluster:
         approved_objids = pd.concat(
             approved_objids).drop_duplicates().reset_index(drop=True)
 
+        tree_objids = pd.concat(
+            tree_objids).drop_duplicates().reset_index(drop=True)
+
         # This is faster than np.isin
         dataset_objids = pd.Series(self.dataset["objids"])
+        dataset_available_selector = dataset_objids.isin(tree_objids)
+        n_dataset_available = dataset_available_selector.sum()
+
+        print("Availability (dset/both/tree): {:,d} / {:,d} / {:,d}".format(
+            len(dataset_available_selector) - n_dataset_available,
+            n_dataset_available,
+            len(tree_objids) - n_dataset_available))
+
         dataset_selector = ~dataset_objids.isin(approved_objids)
 
         n_selected = dataset_selector.sum()
@@ -92,7 +109,7 @@ class Recluster:
             n_selected, n_total, (n_selected / n_total)))
 
         return {
-            "features": self.dataset["features"][dataset_selector].reset_index(drop=True),
+            "features": self.dataset["features"][dataset_selector],
             "objids": dataset_objids[dataset_selector].reset_index(drop=True)
         }
 
@@ -108,12 +125,14 @@ class Recluster:
 
         clusterer = hdbscan.HDBSCAN(**kwargs)
 
-        print("Clustering...")
+        print("Clustering {:,d} objects...".format(len(dataset["features"])))
         start = time.perf_counter()
         labels = clusterer.fit_predict(dataset["features"])
         time_fit = time.perf_counter() - start
 
         print("Clustering took {:.0f}s".format(time_fit))
+
+        print("Found {:,d} labels.".format(len(np.unique(labels))))
 
         # Turn cluster_labels to a tree
         self.trees.append(Tree.from_labels(labels, dataset["objids"]))
