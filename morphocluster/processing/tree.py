@@ -283,6 +283,8 @@ class Tree(object):
     def merge(self, other):
         """
         Merge other into self.
+
+        If `other` contains the objects also present in `self`, their position in `other` takes precedence.
         """
 
         other_nodes = other.nodes.copy()
@@ -300,10 +302,28 @@ class Tree(object):
 
         other_nodes.loc[other_nodes["parent_id"] == other_root, "parent_id"] = self_root
 
+        duplicate_objects_mask = self.objects["object_id"].isin(other_objects["object_id"])
+        if duplicate_objects_mask.any():
+            print("Objects present in both trees: {:,d}. Keeping assignments from `other`.".format(duplicate_objects_mask.sum()))
+        self_objects = self.objects[~duplicate_objects_mask]
+
         self.nodes = pd.concat((self.nodes, other_nodes), ignore_index=True)
-        self.objects = pd.concat((self.objects, other_objects), ignore_index=True)
+        self.objects = pd.concat((self_objects, other_objects), ignore_index=True)
 
+    def to_networkx(self):
+        """
+        Return a NetworkX DiGraph object representing the tree.
+        """
+        try:
+            from networkx import DiGraph
+        except ImportError:
+            raise ImportError('You must have networkx installed to export networkx graphs')
 
+        result = DiGraph()
+        for row in self.nodes[["parent_id", "node_id"]].values:
+            result.add_edge(row[0], row[1])
+
+        return result
 
 
 if __name__ == "__main__":
