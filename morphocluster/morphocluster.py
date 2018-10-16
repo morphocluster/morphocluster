@@ -184,6 +184,7 @@ def load_project(tree_fn, project_name):
             root_id = tree.get_root_id(project_id)
 
         print("Root ID: {}".format(root_id))
+        print("Project ID: {}".format(project_id))
 
 @app.cli.command()
 @click.argument('root_id', type=int)
