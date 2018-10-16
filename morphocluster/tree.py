@@ -159,7 +159,7 @@ class Tree(object):
 
                 object_ids = tree.objects_for_node(node["node_id"])["object_id"].tolist()
                 parent_id = int(node["parent_id"]) if pd.notnull(node["parent_id"]) else None
-                approved = bool(node["approved"]) if "approved" in node and pd.notnull(node["approved"]) else None
+                approved = bool(node["approved"]) if "approved" in node and pd.notnull(node["approved"]) else False
 
                 self.create_node(project_id,
                                  orig_node_id=int(node["node_id"]),
