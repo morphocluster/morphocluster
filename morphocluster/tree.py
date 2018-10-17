@@ -453,20 +453,18 @@ class Tree(object):
 
         return root_id
 
-    def get_projects(self):
+    def get_projects(self, visible_only=True):
         """
         Get projects with name
         """
 
-        stmt = text("""
-        SELECT p.*, n.node_id
-        FROM nodes AS n
-        JOIN projects AS p
-        ON p.project_id = n.project_id
-        WHERE n.parent_id IS NULL
-        """)
+        qroots = select([nodes.c.project_id, nodes.c.node_id]).where(nodes.c.parent_id == None).alias("roots")
+        qprojects = select([projects, qroots.c.node_id]).select_from(projects.join(qroots, qroots.c.project_id == projects.c.project_id))
 
-        result = self.connection.execute(stmt).fetchall()
+        if visible_only:
+            qprojects = qprojects.where(projects.c.visible == True)
+
+        result = self.connection.execute(qprojects).fetchall()
 
         return [dict(r) for r in result]
 
