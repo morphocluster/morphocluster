@@ -22,7 +22,7 @@
 
             <div class="row" v-if="node_members">
                 <div v-for="m of node_members" :key="getUniqueId(m)" class="col col-2">
-                    <member-preview v-bind:member="m" />
+                    <member-preview :member="m" :controls="member_controls" v-on:moveup="moveupMember" />
                 </div>
             </div>
             <infinite-loading v-if="node" @infinite="updateMembers" spinner="circles">
@@ -71,7 +71,14 @@ export default {
             node: null,
             node_members: [],
             members_url: null,
-            progress: null
+            progress: null,
+            member_controls: [
+                {
+                    event: "moveup",
+                    icon: "mdi-arrow-up",
+                    title: "Move this member to the parent node."
+                }
+            ]
         };
     },
     created() {
@@ -208,15 +215,13 @@ export default {
         },
         approve() {
             console.log("Approve");
-            api
-                .patchNode(this.node.node_id, { approved: true })
+            api.patchNode(this.node.node_id, { approved: true })
                 .then(() => {
                     const msg = `Approved ${this.node.node_id}.`;
                     console.log(msg);
                     this.messages.unshift(msg);
                     // Update progress
-                    api
-                        .getNodeProgress(this.project.node_id, "approve")
+                    api.getNodeProgress(this.project.node_id, "approve")
                         .then(progress => {
                             this.progress = progress;
                         })
@@ -239,14 +244,12 @@ export default {
         },
         merge() {
             // TODO
-            api
-                .mergeNodeInto(this.node.node_id, this.node.parent_id)
+            api.mergeNodeInto(this.node.node_id, this.node.parent_id)
                 .then(() => {
                     this.messages.unshift(`Merged ${this.node.node_id}.`);
 
                     // Update progress
-                    api
-                        .getNodeProgress(this.project.node_id, "approve")
+                    api.getNodeProgress(this.project.node_id, "approve")
                         .then(progress => {
                             this.progress = progress;
                         })
@@ -282,6 +285,18 @@ export default {
             } else if (event.key == "m") {
                 this.merge();
             }
+        },
+        moveupMember(member) {
+            console.log("Remove", this.getUniqueId(member));
+
+            api.nodeAdoptMembers(this.node.parent_id, [member])
+                .then(() => {
+                    // Remove from current recommendations
+                    var index = this.node_members.indexOf(member);
+                    if (index > -1) {
+                        this.node_members.splice(index, 1);
+                    }
+                });
         }
     }
 };

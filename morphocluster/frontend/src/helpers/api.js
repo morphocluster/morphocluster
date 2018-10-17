@@ -28,7 +28,7 @@ export function getNextUnfilledNode(node_id, leaf = false) {
         });
 }
 
-export function getNodeProgress(node_id, log=null) {
+export function getNodeProgress(node_id, log = null) {
     var params = {}
     if (log !== null) {
         params.log = log;
@@ -39,7 +39,7 @@ export function getNodeProgress(node_id, log=null) {
         });
 }
 
-export function getNodeRecommendedObjects(node_id, max_n=null) {
+export function getNodeRecommendedObjects(node_id, max_n = null) {
     var params = {}
     if (max_n !== null) {
         params.max_n = max_n;
@@ -51,7 +51,7 @@ export function getNodeRecommendedObjects(node_id, max_n=null) {
 }
 
 export function mergeNodeInto(node_id, dest_node_id) {
-    const data = {dest_node_id};
+    const data = { dest_node_id };
     console.log(data)
     return axios.post(`/api/nodes/${node_id}/merge_into`, data);
 }
@@ -77,4 +77,12 @@ export function saveProject(project_id) {
         .then(response => {
             return response.data;
         });
+}
+
+export function nodeAdoptMembers(node_id, members) {
+    if (!Array.isArray(members)) {
+        members = [members];
+    }
+
+    return axios.post(`/api/nodes/${node_id}/adopt_members`, { members: members });
 }
