@@ -150,13 +150,16 @@ class Tree(object):
         unique_labels = labels.unique()
         root_id = unique_labels.max() + 1
 
+        # Compose nodes out of unique_labels (except -1)
         nodes = [{"node_id": node_id, "parent_id": root_id}
-                 for node_id in unique_labels]
+                 for node_id in unique_labels if node_id != -1]
+        # Add root node
         nodes.append({"node_id": root_id})
         nodes = pd.DataFrame(nodes)
 
+        # Compose objects
         objects = pd.concat({"node_id": labels, "object_id": object_ids}, axis=1)
-
+        # Mount unlabeled objects (-1) to root
         objects.loc[objects["node_id"] == -1, "node_id"] = root_id
 
         return Tree(nodes, objects)
@@ -242,6 +245,14 @@ class Tree(object):
         """
         Yield nodes in topological order.
         """
+
+        for node_idx in self.topological_order_idx():
+            yield self.nodes.loc[node_idx]
+
+    def topological_order_idx(self):
+        """
+        Yield node indices in topological order.
+        """
         queue = [self.get_root_id()]
 
         while queue:
@@ -258,7 +269,7 @@ class Tree(object):
 
             node_idx = node_selector.idxmax()
 
-            yield self.nodes.loc[node_idx]
+            yield node_idx
 
     def objects_for_node(self, node_id):
         """
@@ -295,12 +306,14 @@ class Tree(object):
         # Offset `node_id`s of other so they come after the `node_id`s of self
         offset = self.nodes["node_id"].max() + 1 - other_nodes["node_id"].min()
         other_nodes["node_id"] += offset
+        other_nodes["parent_id"] += offset
         other_objects["node_id"] += offset
+        other_root += offset
 
-        # Delete other.root and relocate children to self.root
-        other_nodes = other_nodes[other_nodes["node_id"] != other_root + offset]
-
+        # Delete other.root and relocate children and objects to self.root
+        other_nodes = other_nodes[other_nodes["node_id"] != other_root]
         other_nodes.loc[other_nodes["parent_id"] == other_root, "parent_id"] = self_root
+        other_objects.loc[other_objects["node_id"] == other_root, "node_id"] = self_root
 
         duplicate_objects_mask = self.objects["object_id"].isin(other_objects["object_id"])
         if duplicate_objects_mask.any():
@@ -324,6 +337,32 @@ class Tree(object):
             result.add_edge(row[0], row[1])
 
         return result
+
+    def check_connectivity(self):
+        """
+        Traverse the tree and see if all nodes and objects are visited.
+        """
+
+
+        # Visit objects
+        self.nodes["__visited"] = False
+        for node_idx in self.topological_order_idx():
+            self.nodes.loc[node_idx, "__visited"] = True
+        if any(~self.nodes["__visited"]):
+            raise ValueError("Tree is not a single connected component.")
+        del self.nodes["__visited"]
+
+        # Check objects
+        ons = set(self.objects["node_id"])
+        nns = set(self.nodes["node_id"])
+        if len(ons - nns):
+            raise ValueError("Some objects are not reachable.")
+
+    def copy(self):
+        """
+        Create a copy of this tree.
+        """
+        return Tree(self.nodes.copy(), self.objects.copy())
 
 
 if __name__ == "__main__":
