@@ -133,6 +133,7 @@ class Tree(object):
     """
     A tree as represented by the database.
     """
+
     def __init__(self, connection):
         self.connection = connection
 
@@ -148,20 +149,25 @@ class Tree(object):
             # Lock project
             self.lock_project(project_id)
 
-            bar = ProgressBar(len(tree.nodes) + len(tree.objects), max_width=40)
-            
+            bar = ProgressBar(len(tree.nodes) +
+                              len(tree.objects), max_width=40)
+
             def progress_cb(nadd):
                 bar.numerator += nadd
                 print(bar, end="\r")
 
             for node in tree.topological_order():
-                name = node["name"] if "name" in node and pd.notnull(node["name"]) else None
+                name = node["name"] if "name" in node and pd.notnull(
+                    node["name"]) else None
 
-                object_ids = tree.objects_for_node(node["node_id"])["object_id"].tolist()
-                parent_id = int(node["parent_id"]) if pd.notnull(node["parent_id"]) else None
+                object_ids = tree.objects_for_node(node["node_id"])[
+                    "object_id"].tolist()
+                parent_id = int(node["parent_id"]) if pd.notnull(
+                    node["parent_id"]) else None
 
                 flag_names = ("approved", "starred", "filled")
-                flags = {k: bool(node[k]) for k in flag_names if k in node and pd.notnull(k)}
+                flags = {k: bool(node[k])
+                         for k in flag_names if k in node and pd.notnull(k)}
 
                 self.create_node(project_id,
                                  orig_node_id=int(node["node_id"]),
@@ -190,8 +196,8 @@ class Tree(object):
         Acquire advisory project lock given a node ID.
         """
         project_id = (select([nodes.c.project_id])
-            .where(nodes.c.node_id == node_id)
-            .as_scalar())
+                      .where(nodes.c.node_id == node_id)
+                      .as_scalar())
         return self.lock_project(project_id)
 
     def __load_project_old(self, name, path, root_first=True):
@@ -330,26 +336,32 @@ class Tree(object):
         """
 
         with self.connection.begin():
-            subtree = self.consolidate_node(node_id, depth="full", return_="raw", descend_approved=False)
+            subtree = self.consolidate_node(
+                node_id, depth="full", return_="raw", descend_approved=False)
             """ subtree = _rquery_subtree(node_id)
             subtree = (select([subtree])
                     .order_by(subtree.c.level.desc()))
             subtree = pd.read_sql_query(
                 subtree, self.connection, index_col="node_id") """
 
-        subtree["n_approved_objects"] = subtree["approved"] * subtree["_n_objects_deep"]
-        subtree["n_filled_objects"] = subtree["filled"] * subtree["_n_objects_deep"]
-        subtree["n_named_objects"] = pd.notna(subtree["name"]) * subtree["_n_objects_deep"]
+        subtree["n_approved_objects"] = subtree["approved"] * \
+            subtree["_n_objects_deep"]
+        subtree["n_filled_objects"] = subtree["filled"] * \
+            subtree["_n_objects_deep"]
+        subtree["n_named_objects"] = pd.notna(
+            subtree["name"]) * subtree["_n_objects_deep"]
         subtree["n_approved_nodes"] = subtree["approved"].astype(int)
         subtree["n_filled_nodes"] = subtree["filled"].astype(int)
         subtree["n_nodes"] = 1
 
-        fields = ["_n_objects", "_n_objects_deep", "n_filled_objects", "n_approved_objects", "n_named_objects", "n_approved_nodes", "n_filled_nodes", "n_nodes"]
+        fields = ["_n_objects", "_n_objects_deep", "n_filled_objects", "n_approved_objects",
+                  "n_named_objects", "n_approved_nodes", "n_filled_nodes", "n_nodes"]
 
         # Leaves
         leaves_mask = subtree["_n_children"] == 0
         leaves_result = subtree.loc[leaves_mask, fields].sum(axis=0).to_dict()
-        leaves_result = {"leaves_{}".format(k.lstrip('_')): v for k, v in leaves_result.items()}
+        leaves_result = {"leaves_{}".format(
+            k.lstrip('_')): v for k, v in leaves_result.items()}
 
         # Compute deep values for root
         # subtree is ordered deep-first
@@ -380,7 +392,6 @@ class Tree(object):
         deep_result = {k.lstrip('_'): v for k, v in deep_result.items()}
 
         return dict(**leaves_result, **deep_result)
-
 
     def export_classifications(self, root_id, classification_fn):
         """
@@ -416,7 +427,7 @@ class Tree(object):
             subtree = self.consolidate_node(
                 root_id, depth="full", return_="raw")
 
-            keep_columns = ["orig_id", "parent_id", "name", 'starred',
+            keep_columns = ["orig_id", "parent_id", "name", 'starred', 'filled',
                             'approved', '_n_children', '_n_objects', '_n_objects_deep']
             tree_nodes = subtree[keep_columns].reset_index()
 
@@ -433,7 +444,7 @@ class Tree(object):
 
             node_objects = pd.read_sql_query(
                 node_objects, self.connection)
-                
+
             try:
                 tree = processing.Tree(tree_nodes, node_objects)
             except ValueError:
@@ -461,8 +472,10 @@ class Tree(object):
         Get projects with name
         """
 
-        qroots = select([nodes.c.project_id, nodes.c.node_id]).where(nodes.c.parent_id == None).alias("roots")
-        qprojects = select([projects, qroots.c.node_id]).select_from(projects.join(qroots, qroots.c.project_id == projects.c.project_id))
+        qroots = select([nodes.c.project_id, nodes.c.node_id]).where(
+            nodes.c.parent_id == None).alias("roots")
+        qprojects = select([projects, qroots.c.node_id]).select_from(
+            projects.join(qroots, qroots.c.project_id == projects.c.project_id))
 
         if visible_only:
             qprojects = qprojects.where(projects.c.visible == True)
@@ -855,7 +868,8 @@ class Tree(object):
 
         with self.connection.begin():
             # Change node for objects
-            stmt = nodes_objects.update().values(node_id=dest_node_id).where(nodes_objects.c.node_id == node_id)
+            stmt = nodes_objects.update().values(node_id=dest_node_id).where(
+                nodes_objects.c.node_id == node_id)
             self.connection.execute(stmt)
 
             # Change parent for children
@@ -1210,7 +1224,6 @@ class Tree(object):
                 .order_by(subtree.c.level.desc())
                 .limit(1))
 
-
         print(stmt)
 
         result = self.connection.execute(stmt).scalar()
@@ -1303,14 +1316,16 @@ class Tree(object):
                 else:
                     # Only recurse into invalid nodes
                     # Ensure validity up to a certain level
-                    recurse_cb = lambda q, s: (q.c.cache_valid == False) | (q.c.approved == False)
+                    def recurse_cb(q, s): return (
+                        q.c.cache_valid == False) | (q.c.approved == False)
             else:
                 if not descend_approved:
                     raise NotImplementedError()
 
                 # Only recurse into invalid nodes
                 # Ensure validity up to a certain level
-                recurse_cb = lambda q, s: (q.c.cache_valid == False) | (q.c.level < depth)
+                def recurse_cb(q, s): return (
+                    q.c.cache_valid == False) | (q.c.level < depth)
 
             invalid_subtree = _rquery_subtree(node_id, recurse_cb)
 
@@ -1358,7 +1373,7 @@ class Tree(object):
                     child_selector = (invalid_subtree['parent_id'] == node_id)
                     children = invalid_subtree.loc[child_selector]
                     children_dict = MemberCollection(children.reset_index().to_dict('records'),
-                                                    "zero")
+                                                     "zero")
 
                     # 2. _n_objects_deep
                     _n_objects = invalid_subtree.loc[node_id, "_n_objects"]
@@ -1366,7 +1381,7 @@ class Tree(object):
                         _n_objects
                         + children["_n_objects_deep"].sum())
                     invalid_subtree.at[node_id,
-                                    "_n_objects_deep"] = _n_objects_deep
+                                       "_n_objects_deep"] = _n_objects_deep
 
                     # Sample 1000 objects to speed up the calculation
                     objects_ = MemberCollection(self.get_objects(node_id, order_by=objects.c.rand, limit=1000),
@@ -1394,7 +1409,7 @@ class Tree(object):
                         _centroid.append(_n_objects * obj_mean)
                     if len(children_dict) > 0:
                         children_mean = np.sum(children_dict.cardinalities[:, np.newaxis] * children_dict.vectors,
-                                            axis=0)
+                                               axis=0)
                         _centroid.append(children_mean)
 
                     if len(_centroid) > 0:
@@ -1430,17 +1445,16 @@ class Tree(object):
                 if n_updated > 0:
                     # Write results back to database
                     update_fields = ["cache_valid", "_centroid", "_type_objects",
-                                    "_own_type_objects", "_n_objects_deep",
-                                    "_n_objects", "_n_children"]
+                                     "_own_type_objects", "_n_objects_deep",
+                                     "_n_objects", "_n_children"]
 
                     stmt = (nodes.update()
                             .where(nodes.c.node_id == bindparam('_node_id'))
                             .values({k: bindparam(k) for k in update_fields}))
 
-                    
-
                     # Build the result list of dicts with _node_id and only update_fields
-                    result = invalid_subtree.loc[updated_selection, update_fields]
+                    result = invalid_subtree.loc[updated_selection,
+                                                 update_fields]
                     result.index.rename('_node_id', inplace=True)
                     result.reset_index(inplace=True)
 
