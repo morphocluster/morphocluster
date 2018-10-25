@@ -139,6 +139,16 @@ class Recluster:
 
         return self
 
+    def save_all(self, prefix):
+        """
+        Save all trees individually.
+        """
+        for i, tree in enumerate(self.trees):
+            tree_fn = "{}-{:d}.zip".format(prefix, i)
+            tree.save(tree_fn)
+
+        return self
+
     def save(self, tree_fn):
         """
         Save the result combining all contained trees.
@@ -147,7 +157,7 @@ class Recluster:
         if not self.trees:
             raise ValueError("No trees.")
 
-        tree = self.trees[0]
+        tree = self.trees[0].copy()
 
         for other_tree in self.trees[1:]:
             tree.merge(other_tree)
