@@ -159,15 +159,18 @@ class Tree(object):
 
                 object_ids = tree.objects_for_node(node["node_id"])["object_id"].tolist()
                 parent_id = int(node["parent_id"]) if pd.notnull(node["parent_id"]) else None
-                approved = bool(node["approved"]) if "approved" in node and pd.notnull(node["approved"]) else False
+
+                flag_names = ("approved", "starred", "filled")
+                flags = {k: bool(node[k]) for k in flag_names if k in node and pd.notnull(k)}
 
                 self.create_node(project_id,
                                  orig_node_id=int(node["node_id"]),
                                  orig_parent=parent_id,
                                  object_ids=object_ids,
                                  name=name,
-                                 approved=approved,
-                                 progress_cb=progress_cb)
+                                 progress_cb=progress_cb,
+                                 **flags)
+
                 # Update progress bar
                 progress_cb(1)
             print()
@@ -523,7 +526,7 @@ class Tree(object):
 
         return project_id
 
-    def create_node(self, project_id=None, orig_node_id=None, parent_id=None, orig_parent=None, object_ids=None, name=None, starred=False, approved=None, progress_cb=None):
+    def create_node(self, project_id=None, orig_node_id=None, parent_id=None, orig_parent=None, object_ids=None, name=None, progress_cb=None, **kwargs):
         """
         Create a node.
 
@@ -548,8 +551,7 @@ class Tree(object):
                "parent_id": parent_id,
                "orig_id": orig_node_id,
                "name": name,
-               "starred": starred,
-               "approved": approved}
+               **kwargs}
 
         stmt = nodes.insert(row)
 
