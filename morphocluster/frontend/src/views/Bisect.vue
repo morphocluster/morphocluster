@@ -18,7 +18,8 @@
         </nav>
         <div v-if="loading">Loading...</div>
         <div class="bg-light section-heading border-bottom border-top">Node members
-            <span v-if="node">({{node.n_objects_deep}})</span>
+            <span v-if="node">({{node.n_objects}} objects)</span>
+            <span class="float-right mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html title="All members of this node, randomly ordered."/>
         </div>
         <div id="node-members" class="row scrollable">
             <div v-if="node" class="col col-1">
@@ -30,14 +31,15 @@
             </div>
 
             <infinite-loading ref="infload" v-if="node" @infinite="updateNodeMembers" spinner="circles">
-                <div slot="no-more" />
+                <div slot="no-more">&#8718;</div>
             </infinite-loading>
         </div>
-        <div v-if="recommended_members && !done" class="bg-light section-heading border-bottom border-top">Recommended members
-            <span v-if="typeof(current_page) != 'undefined'">(Page {{current_page + 1}})</span>
+        <div v-if="rec_members && !done" class="bg-light section-heading border-bottom border-top">Recommended members
+            <span v-if="typeof(rec_current_page) != 'undefined'">(Page {{rec_current_page + 1}} / {{rec_n_pages}})</span>
+            <span class="float-right mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html title="Recommendations this node, page by page."/>
         </div>
-        <div id="recommended-members" v-if="recommended_members && !done" class="row scrollable">
-            <div :key="getUniqueId(m)" v-for="m of recommended_members" class="col col-1">
+        <div id="recommended-members" v-if="rec_members && !done" class="row scrollable">
+            <div :key="getUniqueId(m)" v-for="m of rec_members" class="col col-1">
                 <member-preview :member="m" :controls="rec_member_controls" v-on:remove="removeMember" />
             </div>
         </div>
@@ -47,7 +49,7 @@
             <table>
                 <tr>
                     <th>Total number of pages:</th>
-                    <td>{{n_pages}}</td>
+                    <td>{{rec_n_pages}}</td>
                 </tr>
                 <tr>
                     <th>Number of valid pages:</th>
@@ -62,7 +64,7 @@
                     <td>{{rejected_members.length}}</td>
                 </tr>
             </table>
-            <p v-if="n_valid_pages == n_pages">
+            <p v-if="n_valid_pages == rec_n_pages">
                 You accepted all recommendations. You may want to
                 <i>start over</i> to get more.
             </p>
@@ -81,7 +83,7 @@
                 <i class="mdi mdi-restart" /> Start over</b-button>
             <!-- <b-button variant="outline-success" v-b-tooltip.hover title="Assign all safe objects to the current node." @click.prevent="saveResult">Save result</b-button> -->
             <!-- <div>
-        n_valid_pages: {{n_valid_pages}}, n_unsure_pages: {{n_unsure_pages}}, n_invalid_pages: {{n_invalid_pages}}, interval_left: {{interval_left}}, interval_right: {{interval_right}}
+        n_valid_pages: {{n_valid_pages}}, n_unsure_pages: {{n_unsure_pages}}, n_invalid_pages: {{n_invalid_pages}}, rec_interval_left: {{rec_interval_left}}, rec_interval_right: {{rec_interval_right}}
       </div> -->
             <b-button :disabled="!done" variant="secondary" v-b-tooltip.hover.html title="Continue with next node. <kbd>N</kbd>" @click.prevent="next">
                 <i class="mdi mdi-chevron-right" /> Next
@@ -96,6 +98,7 @@ import axios from "axios";
 import shuffle from "lodash/shuffle";
 
 import InfiniteLoading from "vue-infinite-loading";
+import Spinner from "vue-infinite-loading/src/components/Spinner";
 
 import mixins from "@/mixins.js";
 
@@ -103,6 +106,8 @@ import * as api from "@/helpers/api.js";
 
 import MemberPreview from "@/components/MemberPreview.vue";
 import MessageLog from "@/components/MessageLog.vue";
+
+const MAX_N_RECOMMENDATIONS = 100000;
 
 export default {
     name: "bisect",
@@ -112,14 +117,15 @@ export default {
             project: null,
             node: null,
             node_members: [],
-            members_url: null,
-            recommended_members: [],
+            node_members_url: null,
+            node_members_page: null,
+            rec_members: [],
             rejected_members: [],
-            interval_left: 0,
-            interval_right: null,
-            current_page: 0,
-            base_url: null,
-            n_pages: null,
+            rec_interval_left: 0,
+            rec_interval_right: null,
+            rec_current_page: 0,
+            rec_base_url: null,
+            rec_n_pages: null,
             done: false,
             rec_member_controls: [
                 {
@@ -144,7 +150,8 @@ export default {
     components: {
         MemberPreview,
         InfiniteLoading,
-        MessageLog
+        MessageLog,
+        Spinner
     },
     mixins: [mixins],
     watch: {
@@ -161,13 +168,13 @@ export default {
     },
     computed: {
         n_valid_pages() {
-            return this.interval_right - this.n_unsure_pages;
+            return this.rec_interval_right - this.n_unsure_pages;
         },
         n_unsure_pages() {
-            return Math.max(0, this.interval_right - this.interval_left);
+            return Math.max(0, this.rec_interval_right - this.rec_interval_left);
         },
         n_invalid_pages() {
-            return this.n_pages - this.interval_right;
+            return this.rec_n_pages - this.rec_interval_right;
         }
     },
     methods: {
@@ -238,13 +245,13 @@ export default {
                 });
 
             nodeIdPromise.then(node_id => {
-                api.getNodeRecommendedObjects(node_id, 5000).then(data => {
-                    this.recommended_members = shuffle(data.data);
-                    this.base_url = data.links.self;
-                    this.n_pages = this.interval_right =
+                api.getNodeRecommendedObjects(node_id, MAX_N_RECOMMENDATIONS).then(data => {
+                    this.rec_members = shuffle(data.data);
+                    this.rec_base_url = data.links.self;
+                    this.rec_n_pages = this.rec_interval_right =
                         data.meta.last_page + 1;
 
-                    this.current_page = this.interval_left = 0;
+                    this.rec_current_page = this.rec_interval_left = 0;
                 });
             });
         },
@@ -256,33 +263,34 @@ export default {
             }
             console.log("updateNodeMembers");
 
-            // Should members_url be updated (with unique id etc.) on response?
+            // Should node_members_url be updated (with unique id etc.) on response?
             var updateMembersUrl = false;
 
-            if (!this.members_url) {
+            // TODO: arrange_by=random
+            if (!this.node_members_url) {
                 const nodes = !!this.node.children;
-                this.members_url = `/api/nodes/${
+                this.node_members_url = `/api/nodes/${
                     this.node.node_id
-                }/members?objects=${!nodes}&nodes=${nodes}&arrange_by=interleaved&`;
-                this.page = 0;
+                }/members?objects=${!nodes}&nodes=${nodes}&arrange_by=random&`;
+                this.node_members_page = 0;
                 updateMembersUrl = true;
             }
 
             axios
-                .get(`${this.members_url}&page=${this.page}`)
+                .get(`${this.node_members_url}&page=${this.node_members_page}`)
                 .then(response => {
                     this.node_members = this.node_members.concat(
                         response.data.data
                     );
 
                     if (updateMembersUrl) {
-                        this.members_url = response.data.links.self;
+                        this.node_members_url = response.data.links.self;
                     }
 
                     $state.loaded();
 
-                    if (this.page < response.data.meta.n_pages) {
-                        this.page += 1;
+                    if (this.node_members_page < response.data.meta.last_page) {
+                        this.node_members_page += 1;
                     } else {
                         $state.complete();
                     }
@@ -292,10 +300,10 @@ export default {
                 });
         },
         membersOk: function() {
-            this.interval_left = this.current_page + 1;
+            this.rec_interval_left = this.rec_current_page + 1;
 
             if (!this.found_right) {
-                this.current_page += this.jump_pages;
+                this.rec_current_page = Math.min(this.rec_current_page + this.jump_pages, this.rec_n_pages - 1);
                 this.jump_pages *= 2;
             } else {
                 this.updateCurrentPage();
@@ -304,7 +312,7 @@ export default {
             this.showNext();
         },
         membersNotOk: function() {
-            this.interval_right = this.current_page;
+            this.rec_interval_right = this.rec_current_page;
             this.found_right = true;
 
             this.updateCurrentPage(0.25);
@@ -312,18 +320,18 @@ export default {
             this.showNext();
         },
         updateCurrentPage(frac = 0.5) {
-            this.current_page = Math.trunc(
-                (1 - frac) * this.interval_left + frac * this.interval_right
+            this.rec_current_page = Math.trunc(
+                (1 - frac) * this.rec_interval_left + frac * this.rec_interval_right
             );
         },
         showNext: function() {
             console.log(
-                this.current_page,
-                this.interval_left,
-                this.interval_right
+                this.rec_current_page,
+                this.rec_interval_left,
+                this.rec_interval_right
             );
 
-            if (this.n_unsure_pages == 0) {
+            if (this.n_unsure_pages <= 0) {
                 this.done = true;
 
                 this.saveResult();
@@ -331,36 +339,44 @@ export default {
             }
 
             axios
-                .get(`${this.base_url}&page=${this.current_page}`)
+                .get(`${this.rec_base_url}&page=${this.rec_current_page}`)
                 .then(response => {
                     console.log(
                         response.data.data,
                         shuffle(response.data.data)
                     );
-                    this.recommended_members = shuffle(response.data.data);
+                    this.rec_members = shuffle(response.data.data);
                 })
                 .catch(e => {
                     this.axiosErrorHandler(e);
                 });
         },
         saveResult() {
-            // For each page in the valid range (0<=x<this.interval_left):
+            // For each page in the valid range (0<=x<this.rec_interval_left):
             // Fetch members and assign to the current node.
 
-            var promises = Array(this.interval_left)
+            console.log("Saving...");
+
+            // Save all data of the current run.
+            // If the user continues with the next node, all data is lost.
+            var rejected_members = this.rejected_members;
+            var node = this.node;
+            var rec_base_url = this.rec_base_url;
+
+            var promises = Array(this.rec_interval_left)
                 .fill()
                 .map((v, i) => {
                     return axios
-                        .get(`${this.base_url}&page=${i}`)
+                        .get(`${rec_base_url}&page=${i}`)
                         .then(response => {
                             var members = response.data.data.filter(m => {
-                                return !this.rejected_members.includes(
+                                return !rejected_members.includes(
                                     this.getUniqueId(m)
                                 );
                             });
 
                             return axios.post(
-                                `/api/nodes/${this.node.node_id}/adopt_members`,
+                                `/api/nodes/${node.node_id}/adopt_members`,
                                 {
                                     members
                                 }
@@ -368,12 +384,15 @@ export default {
                         });
                 });
 
-            promises.push(api.patchNode(this.node.node_id, { filled: true }));
+            promises.push(api.patchNode(node.node_id, { filled: true }));
 
             Promise.all(promises)
-                .then(() => {})
+                .then(() => {
+                    console.log("Saved.");
+                    this.messages.unshift(`Saved ${node.node_id}.`);
+                })
                 .catch(e => {
-                    this.messages.unshift("Error");
+                    this.messages.unshift(`Error saving ${node.node_id}.`);
                     console.log(e);
                 });
         },
@@ -381,9 +400,9 @@ export default {
             console.log("Remove", this.getUniqueId(member));
 
             // Remove from current recommendations
-            var index = this.recommended_members.indexOf(member);
+            var index = this.rec_members.indexOf(member);
             if (index > -1) {
-                this.recommended_members.splice(index, 1);
+                this.rec_members.splice(index, 1);
             }
 
             // And add to rejected

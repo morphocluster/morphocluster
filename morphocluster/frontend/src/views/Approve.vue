@@ -18,6 +18,7 @@
         </nav>
         <div v-if="loading">Loading...</div>
         <div id="node-info">
+            <div class="info-hint mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html title="All members of this node, most extreme appearance first."/>
             <!--<node-header :node="node" v-if="node" />-->
 
             <div class="row" v-if="node_members">
@@ -314,6 +315,7 @@ export default {
 #node-info {
     flex: 1;
     overflow-y: auto;
+    position: relative;
 }
 
 #node-info .row {

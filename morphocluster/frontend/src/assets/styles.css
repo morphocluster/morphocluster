@@ -8,3 +8,10 @@ html, body {
 	background-color: #f7f7f9;
 	color: black;
 }
+
+.info-hint {
+	position: absolute;
+	top: 0.5em;
+	right: 1em;
+	/*color: gray;*/
+}
