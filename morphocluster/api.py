@@ -296,6 +296,7 @@ def _node(tree, node, include_children=False):
         "approved": node["approved"],
         "own_type_objects": node["_own_type_objects"],
         "n_objects_deep": node["_n_objects_deep"] or 0,
+        "n_objects": node["_n_objects"] or 0,
         "parent_id": node["parent_id"],
         "project_id": node["project_id"],
     }
@@ -583,6 +584,9 @@ def _get_node_members(node_id, nodes=False, objects=False, arrange_by="", starre
                         order0, order1 = np.array_split(order.copy(), 2)
                         order[::2] = order0
                         order[1::2] = order1[::-1]
+            elif arrange_by == "random":
+                with timer.child("random"):
+                    order = np.random.permutation(len(result))
             else:
                 warnings.warn(
                     "arrange_by={} not supported!".format(arrange_by))
