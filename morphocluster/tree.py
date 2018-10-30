@@ -3,28 +3,30 @@ Created on 13.03.2018
 
 @author: mschroeder
 '''
-from morphocluster.models import nodes, projects, nodes_objects, objects
-from sqlalchemy.sql import text
-from sqlalchemy.sql.expression import select, bindparam
+import csv
+import itertools
 import os
+import warnings
+from genericpath import commonprefix
+from numbers import Integral
+
+import numpy as np
 import pandas as pd
 from etaprogress.progress import ProgressBar
-from sqlalchemy.sql.functions import coalesce, func
 from sqlalchemy.exc import SQLAlchemyError
-import itertools
-from numbers import Integral
-import numpy as np
-import warnings
-from morphocluster.classifier import Classifier
-from morphocluster.extensions import database
-import csv
-from genericpath import commonprefix
-from morphocluster.helpers import seq2array, combine_covariances
-from sqlalchemy.sql.expression import literal
+from sqlalchemy.sql import text
 from sqlalchemy.sql.elements import literal_column
-from morphocluster.member import MemberCollection
+from sqlalchemy.sql.expression import bindparam, literal, select
+from sqlalchemy.sql.functions import coalesce, func
+from timer_cm import Timer
+
 from _functools import reduce
 from morphocluster import processing
+from morphocluster.classifier import Classifier
+from morphocluster.extensions import database
+from morphocluster.helpers import combine_covariances, seq2array
+from morphocluster.member import MemberCollection
+from morphocluster.models import nodes, nodes_objects, objects, projects
 
 
 class TreeError(Exception):
@@ -167,7 +169,7 @@ class Tree(object):
 
                 flag_names = ("approved", "starred", "filled")
                 flags = {k: bool(node[k])
-                         for k in flag_names if k in node and pd.notnull(k)}
+                         for k in flag_names if k in node and pd.notnull(node[k])}
 
                 self.create_node(project_id,
                                  orig_node_id=int(node["node_id"]),
@@ -969,38 +971,56 @@ class Tree(object):
         return nodes_[order].tolist()
 
     def recommend_objects(self, node_id, max_n=1000):
-        node = self.get_node(node_id)
+        """
+        Recommend objects for a node.
 
-        # Get the path to the node (without the node itself)
-        path = self.get_path_ids(node_id)[:-1]
+        Note: Most time is spent querying all objects below a node.
+        This can be sped up, if the nodes a relatively small.
 
-        objects_ = []
+        History:
+            18/10/29: Query all objects, then sort and truncate.
+            pre 18/10/29: Queried number of objects per node is limited by max_n.
+                This leads to suboptimal results, as the closest objects may not
+                lie under these max_n quasi-randomly chosen objects.
+        """
+        with Timer("Tree.recommend_objects") as timer:
+            node = self.get_node(node_id)
 
-        # Traverse the parse in reverse
-        for parent_id in path[::-1]:
-            n_left = max_n - len(objects_)
+            # Get the path to the node (without the node itself)
+            path = self.get_path_ids(node_id)[:-1]
 
-            # Break if we already have enough nodes
-            if n_left <= 0:
-                break
+            objects_ = []
 
-            objects_.extend(self.get_objects(parent_id, limit=n_left))
+            with timer.child("Query matching objects"):
+                # Traverse the parse in reverse
+                for parent_id in path[::-1]:
+                    n_left = max_n - len(objects_)
 
-        if not objects_:
-            return []
+                    # Break if we already have enough nodes
+                    if n_left <= 0:
+                        break
 
-        vectors = [o["vector"] for o in objects_]
+                    objects_.extend(self.get_objects(parent_id))
 
-        objects_ = np.array(objects_, dtype=object)
-        vectors = np.array(vectors)
+            if not objects_:
+                return []
 
-        distances = np.linalg.norm(vectors - node["_centroid"], axis=1)
+            with timer.child("Convert to array"):
+                vectors = [o["vector"] for o in objects_]
 
-        assert len(distances) == len(vectors), distances.shape
+                objects_ = np.array(objects_, dtype=object)
+                vectors = np.array(vectors)
 
-        order = np.argsort(distances)[:max_n]
+            with timer.child("Calculate distances"):
+                distances = np.linalg.norm(vectors - node["_centroid"], axis=1)
 
-        return objects_[order].tolist()
+            assert len(distances) == len(vectors), distances.shape
+
+            with timer.child("Sorting"):
+                order = np.argsort(distances)[:max_n]
+
+            with timer.child("Result assembly"):
+                return objects_[order].tolist()
 
     def invalidate_nodes(self, nodes_to_invalidate, unapprove=False):
         """
