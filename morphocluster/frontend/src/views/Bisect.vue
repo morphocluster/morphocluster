@@ -68,6 +68,9 @@
                 You accepted all recommendations. You may want to
                 <i>start over</i> to get more.
             </p>
+            <p v-if="saving">Your input is being saved...</p>
+            <p v-if="saved">Your input has been saved. Go on with the next node.</p>
+            <p v-if="saving_total_ms">Saving took {{saving_total_ms/1000}}s.</p>
         </div>
         <div id="progress">
             <div :style="{flexGrow: n_valid_pages}" class="bg-success" />
@@ -85,7 +88,7 @@
             <!-- <div>
         n_valid_pages: {{n_valid_pages}}, n_unsure_pages: {{n_unsure_pages}}, n_invalid_pages: {{n_invalid_pages}}, rec_interval_left: {{rec_interval_left}}, rec_interval_right: {{rec_interval_right}}
       </div> -->
-            <b-button :disabled="!done" variant="secondary" v-b-tooltip.hover.html title="Continue with next node. <kbd>N</kbd>" @click.prevent="next">
+            <b-button :disabled="!saved" variant="secondary" v-b-tooltip.hover.html title="Continue with next node. <kbd>N</kbd>" @click.prevent="next">
                 <i class="mdi mdi-chevron-right" /> Next
             </b-button>
         </div>
@@ -144,7 +147,11 @@ export default {
             Used to update the current page.
             While the right limit of the interval is not found, doubled for every "good" page
             */
-            jump_pages: 1
+            jump_pages: 1,
+            saving: false,
+            saved: false,
+            saving_start_ms: null,
+            saving_total_ms: null,
         };
     },
     components: {
@@ -356,6 +363,8 @@ export default {
             // Fetch members and assign to the current node.
 
             console.log("Saving...");
+            this.saving = true;
+            this.saving_start_ms = Date.now();
 
             // Save all data of the current run.
             // If the user continues with the next node, all data is lost.
@@ -389,6 +398,9 @@ export default {
             Promise.all(promises)
                 .then(() => {
                     console.log("Saved.");
+                    this.saving = false;
+                    this.saved = true;
+                    this.saving_total_ms = Date.now() - this.saving_start_ms;
                     this.messages.unshift(`Saved ${node.node_id}.`);
                 })
                 .catch(e => {
