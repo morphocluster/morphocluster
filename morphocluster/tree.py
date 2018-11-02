@@ -920,24 +920,27 @@ class Tree(object):
         Invalidate the cached values in the node and its parents.
         """
 
-        stmt = text("""
-        WITH RECURSIVE q AS
-        (
-            SELECT  n.*, 1 AS level
-            FROM    nodes AS n
-            WHERE   n.node_id = :node_id
-            UNION ALL
-            SELECT  p.*, level + 1
-            FROM    q
-            JOIN    nodes AS p
-            ON      p.node_id = q.parent_id
-        )
-        UPDATE nodes
-        SET cache_valid = FALSE
-        WHERE node_id IN (SELECT node_id from q);
-        """)
+        with self.connection.begin():
+            self.lock_project_for_node(node_id)
 
-        self.connection.execute(stmt, node_id=node_id)
+            stmt = text("""
+            WITH RECURSIVE q AS
+            (
+                SELECT  n.*, 1 AS level
+                FROM    nodes AS n
+                WHERE   n.node_id = :node_id
+                UNION ALL
+                SELECT  p.*, level + 1
+                FROM    q
+                JOIN    nodes AS p
+                ON      p.node_id = q.parent_id
+            )
+            UPDATE nodes
+            SET cache_valid = FALSE
+            WHERE node_id IN (SELECT node_id from q);
+            """)
+
+            self.connection.execute(stmt, node_id=node_id)
 
     def recommend_children(self, node_id, max_n=1000):
         node = self.get_node(node_id)
@@ -1029,6 +1032,9 @@ class Tree(object):
         Parameters:
             nodes_to_invalidate: Collection of `node_id`s
         """
+
+        # TODO: Get project ids for requested node ids and lock the projects
+        # Otherwise a deadlock might occur.
 
         values = {nodes.c.cache_valid: False}
 
