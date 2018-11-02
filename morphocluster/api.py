@@ -299,6 +299,7 @@ def _node(tree, node, include_children=False):
         "n_objects": node["_n_objects"] or 0,
         "parent_id": node["parent_id"],
         "project_id": node["project_id"],
+        "filled": node["filled"],
     }
 
     if include_children:
