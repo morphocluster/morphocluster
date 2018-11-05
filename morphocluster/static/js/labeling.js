@@ -699,17 +699,18 @@ function init_tree() {
 		var $title = $('<div class="member-title" />').appendTo($headline);
 		var $images = $('<div class="images img-9"/>').appendTo($member);
 		
+		console.log("render_obj_child_spaceholder");
 		console.log(appState);
-		
+
 		if(appState.display == "children") {
 			$member.data("display", "objects").addClass("member-object");
-			$title.html('<i class="mdi mdi-dark mdi-blur"></i>Objects');
+			$title.html('<i class="mdi mdi-dark mdi-blur"></i>' + appState.node.n_objects + ' Objects');
 			$.each(appState.node.own_type_objects, function (k, v) {
 				$images.append('<img src="/get_obj_image/' + v + '" class="show-tt-fullsize" />');
 			});
 		} else {
 			$member.data("display", "children").addClass("member-node");
-			$title.html('<i class="mdi mdi-dark mdi-hexagon-multiple"></i>Children');
+			$title.html('<i class="mdi mdi-dark mdi-hexagon-multiple"></i>' + appState.node.n_children + ' Children');
 			$.each(appState.node.type_objects, function (k, v) {
 				$images.append('<img src="/get_obj_image/' + v + '" class="show-tt-fullsize" />');
 			});
