@@ -1113,36 +1113,41 @@ class Tree(object):
 
             new_node_path = self.get_path_ids(node_id)
 
-            # ===================================================================
-            # stmt = nodes_objects.update().values({"node_id": node_id})\
-            #     .where((nodes_objects.c.object_id.in_(object_ids)) & (nodes_objects.c.project_id == project_id))
-            # ===================================================================
+            # Find current node_ids of the objects
+            stmt = select([nodes_objects.c.node_id], for_update=True).where(nodes_objects.c.object_id.in_(object_ids) & (nodes_objects.c.project_id == project_id))
+            old_node_ids = [r["node_id"] for r in self.connection.execute(stmt).fetchall()]
 
-            # Return distinct old `parent_id`s
-            stmt = text("""
-            WITH updater AS (
-                UPDATE nodes_objects x
-                SET node_id = :node_id
-                FROM  (SELECT object_id, node_id FROM nodes_objects
-                    WHERE project_id = :project_id AND object_id IN :object_ids FOR UPDATE) y
-                WHERE  project_id = :project_id AND x.object_id = y.object_id
-                RETURNING y.node_id AS old_node_id
-            )
-            SELECT DISTINCT old_node_id FROM updater;
-            """)
+            # Update assignments
+            stmt = nodes_objects.update().values({"node_id": node_id})\
+                .where(nodes_objects.c.object_id.in_(object_ids) & (nodes_objects.c.project_id == project_id))
+            self.connection.execute(stmt)
+            
+            # # Return distinct old `parent_id`s
+            # stmt = text("""
+            # WITH updater AS (
+            #     UPDATE nodes_objects x
+            #     SET node_id = :node_id
+            #     FROM  (SELECT object_id, node_id FROM nodes_objects
+            #         WHERE project_id = :project_id AND object_id IN :object_ids FOR UPDATE) y
+            #     WHERE  project_id = :project_id AND x.object_id = y.object_id
+            #     RETURNING y.node_id AS old_node_id
+            # )
+            # SELECT DISTINCT old_node_id FROM updater;
+            # """)
 
-            # Fetch old_parent_ids
-            result = self.connection.execute(stmt,
-                                             node_id=node_id,
-                                             project_id=project_id,
-                                             object_ids=tuple(object_ids)
-                                             ).fetchall()
+            # # Fetch old_parent_ids
+            # result = self.connection.execute(stmt,
+            #                                  node_id=node_id,
+            #                                  project_id=project_id,
+            #                                  object_ids=tuple(object_ids)
+            #                                  ).fetchall()
 
             # Invalidate subtree rooted at first common ancestor
-            paths = [new_node_path] + \
-                [self.get_path_ids(r["old_node_id"]) for r in result]
+            paths = [new_node_path] + [old_node_ids]
             paths_to_update = _paths_from_common_ancestor(paths)
             nodes_to_invalidate = set(sum(paths_to_update, []))
+
+            print("Invalidating {!r}...".format(nodes_to_invalidate))
 
             assert node_id in nodes_to_invalidate
 
