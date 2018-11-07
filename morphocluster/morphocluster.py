@@ -165,7 +165,8 @@ def load_features(features_fns):
 @app.cli.command()
 @click.argument('tree_fn')
 @click.argument('project_name', default=None)
-def load_project(tree_fn, project_name):
+@click.option('--consolidate/--no-consolidate', default=True)
+def load_project(tree_fn, project_name, consolidate):
     """
     Load a project from a saved tree.
     """
@@ -182,6 +183,10 @@ def load_project(tree_fn, project_name):
             project_id = tree.load_project(
                 project_name, tree_fn)
             root_id = tree.get_root_id(project_id)
+
+            if consolidate:
+                print("Consolidating ...")
+                tree.consolidate_node(root_id)
 
         print("Root ID: {}".format(root_id))
         print("Project ID: {}".format(project_id))
