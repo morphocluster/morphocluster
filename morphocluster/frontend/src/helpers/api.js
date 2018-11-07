@@ -86,3 +86,8 @@ export function nodeAdoptMembers(node_id, members) {
 
     return axios.post(`/api/nodes/${node_id}/adopt_members`, { members: members });
 }
+
+export function nodeAcceptRecommendations(node_id, request_id, rejected_members, last_page) {
+    return axios.post(`/api/nodes/${node_id}/accept_recommended_objects`,
+        { request_id, rejected_members, last_page });
+}

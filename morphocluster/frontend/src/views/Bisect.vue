@@ -16,10 +16,10 @@
                 </ul>
             </div>
         </nav>
-        <div v-if="loading">Loading...</div>
+        <div v-if="node_status == 'loading'">Loading node...</div>
         <div class="bg-light section-heading border-bottom border-top">Node members
             <span v-if="node">({{node.n_objects}} objects)</span>
-            <span class="float-right mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html title="All members of this node, randomly ordered."/>
+            <span class="float-right mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html title="All members of this node, randomly ordered." />
         </div>
         <div id="node-members" class="row scrollable">
             <div v-if="node" class="col col-1">
@@ -34,11 +34,15 @@
                 <div slot="no-more">&#8718;</div>
             </infinite-loading>
         </div>
-        <div v-if="rec_members && !done" class="bg-light section-heading border-bottom border-top">Recommended members
+        <div v-if="rec_status == 'loading'">Loading recommendations...</div>
+        <div v-if="rec_members.length && !done" class="bg-light section-heading border-bottom border-top">Recommended members
             <span v-if="typeof(rec_current_page) != 'undefined'">(Page {{rec_current_page + 1}} / {{rec_n_pages}})</span>
-            <span class="float-right mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html title="Recommendations this node, page by page."/>
+            <span class="float-right mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html title="Recommendations for this node, page by page." />
         </div>
         <div id="recommended-members" v-if="rec_members && !done" class="row scrollable">
+            <div class="col col-12 spinner-container" v-if="rec_status == 'loading'">
+                <spinner spinner="circles" />
+            </div>
             <div :key="getUniqueId(m)" v-for="m of rec_members" class="col col-1">
                 <member-preview :member="m" :controls="rec_member_controls" v-on:remove="removeMember" />
             </div>
@@ -77,7 +81,7 @@
             <div :style="{flexGrow: n_unsure_pages}" class="bg-warning" />
             <div :style="{flexGrow: n_invalid_pages}" class="bg-danger" />
         </div>
-        <div id="decision" v-if="node">
+        <div id="decision" v-if="(rec_status == 'loaded') && (node_status == 'loaded')">
             <b-button variant="success" v-b-tooltip.hover.html title="All recommended members match without exception. Increase left limit. <kbd>F</kbd>" @click.prevent="membersOk">
                 <i class="mdi mdi-check" /> OK</b-button>
             <b-button variant="danger" v-b-tooltip.hover.html title="Some recommended members do not match. Decrease right limit. <kbd>J</kbd>" @click.prevent="membersNotOk">
@@ -93,6 +97,14 @@
             </b-button>
         </div>
         <message-log class="bg-light" :messages="messages" />
+        <b-modal ref="doneModal" centered no-fade header-bg-variant="success" title="Bisection done">
+            <div class="d-block text-center">
+                Bisection is done for this project.
+            </div>
+            <footer slot="modal-footer">
+                <b-button variant="primary" :to="{name: 'projects'}">Back to projects</b-button>
+            </footer>
+        </b-modal>
     </div>
 </template>
 
@@ -116,7 +128,7 @@ export default {
     name: "bisect",
     data() {
         return {
-            loading: null,
+            node_status: "",
             project: null,
             node: null,
             node_members: [],
@@ -129,6 +141,8 @@ export default {
             rec_current_page: 0,
             rec_base_url: null,
             rec_n_pages: null,
+            rec_request_id: null,
+            rec_status: "",
             done: false,
             rec_member_controls: [
                 {
@@ -151,7 +165,7 @@ export default {
             saving: false,
             saved: false,
             saving_start_ms: null,
-            saving_total_ms: null,
+            saving_total_ms: null
         };
     },
     components: {
@@ -178,7 +192,10 @@ export default {
             return this.rec_interval_right - this.n_unsure_pages;
         },
         n_unsure_pages() {
-            return Math.max(0, this.rec_interval_right - this.rec_interval_left);
+            return Math.max(
+                0,
+                this.rec_interval_right - this.rec_interval_left
+            );
         },
         n_invalid_pages() {
             return this.rec_n_pages - this.rec_interval_right;
@@ -192,6 +209,8 @@ export default {
             });
 
             const project_id = parseInt(this.$route.params.project_id);
+
+            this.node_status = "loading";
 
             var projectPromise = new Promise(resolve => {
                 if (this.project && this.project.project_id == project_id) {
@@ -223,6 +242,7 @@ export default {
                     .then(node_id => {
                         if (node_id === null) {
                             // Done
+                            this.$refs.doneModal.show();
                             return Promise.reject(new Error("No next node"));
                         }
                         const to = {
@@ -245,20 +265,28 @@ export default {
                     });
                 })
                 .then(() => {
-                    this.loading = false;
+                    this.node_status = "loaded";
                 })
                 .catch(e => {
                     this.axiosErrorHandler(e);
                 });
 
             nodeIdPromise.then(node_id => {
-                api.getNodeRecommendedObjects(node_id, MAX_N_RECOMMENDATIONS).then(data => {
+                //TODO: This happens twice (??)
+                console.log("getNodeRecommendedObjects...");
+                this.rec_status = "loading";
+                api.getNodeRecommendedObjects(
+                    node_id,
+                    MAX_N_RECOMMENDATIONS
+                ).then(data => {
                     this.rec_members = shuffle(data.data);
                     this.rec_base_url = data.links.self;
                     this.rec_n_pages = this.rec_interval_right =
                         data.meta.last_page + 1;
 
                     this.rec_current_page = this.rec_interval_left = 0;
+                    this.rec_status = "loaded";
+                    this.rec_request_id = data.meta.request_id;
                 });
             });
         },
@@ -310,7 +338,10 @@ export default {
             this.rec_interval_left = this.rec_current_page + 1;
 
             if (!this.found_right) {
-                this.rec_current_page = Math.min(this.rec_current_page + this.jump_pages, this.rec_n_pages - 1);
+                this.rec_current_page = Math.min(
+                    this.rec_current_page + this.jump_pages,
+                    this.rec_n_pages - 1
+                );
                 this.jump_pages *= 2;
             } else {
                 this.updateCurrentPage();
@@ -328,7 +359,8 @@ export default {
         },
         updateCurrentPage(frac = 0.5) {
             this.rec_current_page = Math.trunc(
-                (1 - frac) * this.rec_interval_left + frac * this.rec_interval_right
+                (1 - frac) * this.rec_interval_left +
+                    frac * this.rec_interval_right
             );
         },
         showNext: function() {
@@ -368,34 +400,20 @@ export default {
 
             // Save all data of the current run.
             // If the user continues with the next node, all data is lost.
-            var rejected_members = this.rejected_members;
             var node = this.node;
-            var rec_base_url = this.rec_base_url;
 
-            var promises = Array(this.rec_interval_left)
-                .fill()
-                .map((v, i) => {
-                    return axios
-                        .get(`${rec_base_url}&page=${i}`)
-                        .then(response => {
-                            var members = response.data.data.filter(m => {
-                                return !rejected_members.includes(
-                                    this.getUniqueId(m)
-                                );
-                            });
-
-                            return axios.post(
-                                `/api/nodes/${node.node_id}/adopt_members`,
-                                {
-                                    members
-                                }
-                            );
-                        });
-                });
-
-            promises.push(api.patchNode(node.node_id, { filled: true }));
-
-            Promise.all(promises)
+            api.nodeAcceptRecommendations(
+                node.node_id,
+                this.rec_request_id,
+                this.rejected_members,
+                this.rec_interval_left
+            )
+                .then(() => {
+                    console.log("Saved all recommendations.");
+                })
+                .then(() => {
+                    return api.patchNode(node.node_id, { filled: true });
+                })
                 .then(() => {
                     console.log("Saved.");
                     this.saving = false;
@@ -428,7 +446,8 @@ export default {
         },
         keypress(event) {
             if (
-                this.loading ||
+                this.node_status != "loaded" ||
+                this.rec_status != "loaded" ||
                 event.altKey ||
                 event.ctrlKey ||
                 event.metaKey ||
@@ -508,5 +527,10 @@ export default {
 
 .section-heading {
     margin: 0.2em 0;
+}
+
+.spinner-container {
+    text-align: center;
+    margin: 28px 0;
 }
 </style>

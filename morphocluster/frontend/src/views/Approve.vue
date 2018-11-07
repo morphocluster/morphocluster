@@ -297,6 +297,8 @@ export default {
                     if (index > -1) {
                         this.node_members.splice(index, 1);
                     }
+                }).catch(e => {
+                    this.axiosErrorHandler(e);
                 });
         }
     }
