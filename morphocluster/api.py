@@ -20,6 +20,7 @@ from flask import request
 from flask.blueprints import Blueprint
 from flask.helpers import url_for
 from flask_restful import reqparse
+from marshmallow import ValidationError
 from redis.exceptions import RedisError
 from sklearn.manifold.isomap import Isomap
 from timer_cm import Timer
@@ -28,6 +29,7 @@ from morphocluster import models
 from morphocluster.classifier import Classifier
 from morphocluster.extensions import database, redis_store
 from morphocluster.helpers import keydefaultdict, seq2array
+from morphocluster.schemas import JobSchema
 from morphocluster.tree import Tree
 
 api = Blueprint("api", __name__)
@@ -213,8 +215,8 @@ def save_project(project_id):
 
         tree_fn = os.path.join(api.config["PROJECT_EXPORT_DIR"],
                                "{:%Y-%m-%d-%H-%M-%S}--{}--{}.zip".format(datetime.now(),
-                                                                       project["project_id"],
-                                                                       project["name"]))
+                                                                         project["project_id"],
+                                                                         project["name"]))
 
         tree.export_tree(root_id, tree_fn)
 
@@ -359,17 +361,21 @@ def _members(tree, members):
 
 
 def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=True):
-    cache_key = '{}:{}:{}'.format(func.__name__,
-                                  json_dumps(
-                                      func_kwargs, sort_keys=True, separators=(',', ':')),
-                                  request_id)
+    print("Load or calc {}({!r})...".format(func.__name__, locals()))
 
-    print("Load or calc {}...".format(cache_key))
+    print("request_id", request_id)
 
-    try:
-        page_result = redis_store.lindex(cache_key, page)
+    # If a request_id is given, load the result from the cache
+    if request_id is not None:
+        try:
+            cache_key = '{}:{}'.format(func.__name__,
+                                       request_id)
+            print("Loading cache key {}...".format(cache_key))
+            page_result = redis_store.lindex(cache_key, page)
 
-        if page_result is not None:
+            if page_result is None:
+                raise ValueError("Unknown cache_key: {}".format(cache_key))
+
             n_pages = redis_store.llen(cache_key)
 
             if compress:
@@ -377,10 +383,15 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
 
             #print("Returning page {} from cached result".format(page))
 
-            return page_result, n_pages
+            return page_result, n_pages, request_id
 
-    except RedisError as e:
-        warnings.warn("RedisError: {}".format(e))
+        except RedisError as exc:
+            raise ValueError(
+                "Could not retrieve cache_key: {}".format(cache_key)) from exc
+
+    # Otherwise calculate a result
+    request_id = uuid.uuid4().hex
+    cache_key = '{}:{}'.format(func.__name__, request_id)
 
     # Calculate result
     result = func(**func_kwargs)
@@ -409,9 +420,9 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
             warnings.warn("RedisError: {}".format(e))
 
     if 0 <= page < n_pages:
-        return pages[page], n_pages
+        return pages[page], n_pages, request_id
 
-    return "[]", n_pages
+    return "[]", n_pages, request_id
 
 
 def cache_serialize_page(endpoint, **kwargs):
@@ -441,7 +452,7 @@ def cache_serialize_page(endpoint, **kwargs):
             if page is None:
                 raise ValueError("page may not be None!")
 
-            raw_result, n_pages = _load_or_calc(
+            raw_result, n_pages, request_id = _load_or_calc(
                 func, func_kwargs, request_id, page, **kwargs)
 
             meta = {
@@ -642,13 +653,10 @@ def get_node_members(node_id):
     parser.add_argument("objects", type=strtobool, default=0)
     parser.add_argument("arrange_by", default="")
     parser.add_argument("page", type=int, default=0)
-    parser.add_argument("request_id")
+    parser.add_argument("request_id", default=None)
     parser.add_argument("starred_first", type=strtobool, default=1)
     parser.add_argument("descending", type=strtobool, default=0)
     arguments = parser.parse_args(strict=True)
-
-    if arguments.request_id is None:
-        arguments.request_id = uuid.uuid4().hex
 
     return _get_node_members(node_id=node_id, **arguments)
 
@@ -782,6 +790,47 @@ def node_adopt_members(parent_id):
         return jsonify({})
 
 
+@api.route("/nodes/<int:node_id>/accept_recommended_objects", methods=["POST"])
+def accept_recommended_objects(node_id):
+    """
+    Accept recommended objects.
+
+    URL parameters:
+        node_id (int): ID of the node that accepts recommendations
+
+    Request parameters:
+        request_id: URL of the recommendations.
+        rejected_members: Rejected members.
+        last_page: Last page of accepted recommendations.
+
+    Returns:
+        Nothing.
+    """
+
+    parameters = request.get_json()
+
+    print(parameters)
+
+    object_ids = []
+    for page in range(parameters["last_page"] + 1):
+        response = _node_get_recommended_objects(
+            node_id=node_id, request_id=parameters["request_id"], page=0)
+        object_ids.extend([v["object_id"]
+                           for v in json.loads(response.data.decode())["data"]])
+
+    #print(object_ids)
+
+    with database.engine.connect() as connection:
+        tree = Tree(connection)
+        with connection.begin():
+            tree.relocate_objects(object_ids, node_id)
+
+    print("Node {} adopted {} objects."
+          .format(node_id, len(object_ids)))
+
+    return jsonify({})
+
+
 @cache_serialize_page(".node_get_recommended_children", page_size=20)
 def _node_get_recommended_children(node_id, max_n):
     with database.engine.connect() as connection:
@@ -806,7 +855,7 @@ def node_get_recommended_children(node_id):
     parser = reqparse.RequestParser()
     parser.add_argument("page", type=int, default=0)
     parser.add_argument("max_n", type=int, default=100)
-    parser.add_argument("request_id", default=lambda: uuid.uuid4().hex)
+    parser.add_argument("request_id", default=None)
     arguments = parser.parse_args(strict=True)
 
     # Limit max_n
@@ -816,7 +865,7 @@ def node_get_recommended_children(node_id):
 
 
 @cache_serialize_page(".node_get_recommended_objects", page_size=50)
-def _node_get_recommended_objects(node_id, max_n):
+def _node_get_recommended_objects(node_id=None, max_n=None):
     with database.engine.connect() as connection:
         tree = Tree(connection)
 
@@ -841,7 +890,7 @@ def node_get_recommended_objects(node_id):
     parser = reqparse.RequestParser()
     parser.add_argument("page", type=int, default=0)
     parser.add_argument("max_n", type=int, default=100)
-    parser.add_argument("request_id", default=lambda: uuid.uuid4().hex)
+    parser.add_argument("request_id", default=None)
     arguments = parser.parse_args(strict=True)
 
     # Limit max_n
@@ -1040,3 +1089,10 @@ def post_node_classify(node_id):
 
             return jsonify({"n_predicted_children": int(n_predicted_children),
                             "n_predicted_objects": int(n_predicted_objects)})
+
+
+@api.route("/jobs", methods=["POST"])
+def create_job():
+    data = JobSchema().load(request.get_json())
+    print(data)
+    return ""
