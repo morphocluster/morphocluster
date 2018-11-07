@@ -22,5 +22,6 @@ setup(
         'Flask-Migrate',
         'timer_cm',
         'fire',
+        'marshmallow>=3.0.0'
     ],
 )
