@@ -822,12 +822,16 @@ def accept_recommended_objects(node_id):
 
     print(parameters)
 
+    rejected_members = set(parameters["rejected_members"])
+
     object_ids = []
     for page in range(parameters["last_page"] + 1):
         response = _node_get_recommended_objects(
             node_id=node_id, request_id=parameters["request_id"], page=page)
-        object_ids.extend([v["object_id"]
-                           for v in json.loads(response.data.decode())["data"]])
+        page_object_ids = (v["object_id"] for v in json.loads(response.data.decode())["data"])
+        page_object_ids = [o for o in page_object_ids if o is not in rejected_members]
+        
+        object_ids.extend(page_object_ids)
 
     #print(object_ids)
 
