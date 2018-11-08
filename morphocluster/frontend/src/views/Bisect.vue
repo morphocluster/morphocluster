@@ -406,7 +406,7 @@ export default {
                 node.node_id,
                 this.rec_request_id,
                 this.rejected_members,
-                this.rec_interval_left
+                this.rec_interval_left - 1
             )
                 .then(() => {
                     console.log("Saved all recommendations.");
