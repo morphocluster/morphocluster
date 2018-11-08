@@ -1,6 +1,7 @@
 """
 Morphocluster: Main file.
 """
+import faulthandler
 import itertools
 import os
 from getpass import getpass
@@ -21,10 +22,13 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from morphocluster import models
 from morphocluster.api import api
-from morphocluster.frontend import frontend
 from morphocluster.extensions import database, migrate, redis_store
+from morphocluster.frontend import frontend
 from morphocluster.numpy_json_encoder import NumpyJSONEncoder
 from morphocluster.tree import Tree
+
+# Enable fault handler for meaningful stack traces when a worker is killed
+faulthandler.enable()
 
 app = Flask(__name__)
 
