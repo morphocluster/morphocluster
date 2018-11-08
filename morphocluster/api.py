@@ -200,6 +200,19 @@ def get_project(project_id):
 
         return jsonify(result)
 
+@api.route("/projects/<int:project_id>/unfilled_nodes", methods=["GET"])
+def get_unfilled_nodes(project_id):
+    # with database.engine.connect() as connection:
+    #     tree = Tree(connection)
+    #     result = tree.get_project(project_id)
+
+    #     if arguments["include_progress"]:
+    #         progress = tree.calculate_progress(result["node_id"])
+    #         result["progress"] = progress
+
+    #     return jsonify(result)
+    return jsonify([10622])
+
 
 @api.route("/projects/<int:project_id>/save", methods=["POST"])
 def save_project(project_id):
@@ -361,9 +374,7 @@ def _members(tree, members):
 
 
 def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=True):
-    print("Load or calc {}({!r})...".format(func.__name__, locals()))
-
-    print("request_id", request_id)
+    print("Load or calc {}...".format(func.__name__))
 
     # If a request_id is given, load the result from the cache
     if request_id is not None:
@@ -814,7 +825,7 @@ def accept_recommended_objects(node_id):
     object_ids = []
     for page in range(parameters["last_page"] + 1):
         response = _node_get_recommended_objects(
-            node_id=node_id, request_id=parameters["request_id"], page=0)
+            node_id=node_id, request_id=parameters["request_id"], page=page)
         object_ids.extend([v["object_id"]
                            for v in json.loads(response.data.decode())["data"]])
 
