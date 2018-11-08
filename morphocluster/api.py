@@ -829,7 +829,7 @@ def accept_recommended_objects(node_id):
         response = _node_get_recommended_objects(
             node_id=node_id, request_id=parameters["request_id"], page=page)
         page_object_ids = (v["object_id"] for v in json.loads(response.data.decode())["data"])
-        page_object_ids = [o for o in page_object_ids if o is not in rejected_members]
+        page_object_ids = [o for o in page_object_ids if "o{:d}".format(o) not in rejected_members]
         
         object_ids.extend(page_object_ids)
 
