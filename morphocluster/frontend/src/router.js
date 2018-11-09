@@ -18,7 +18,6 @@ var router = new Router({
       name: 'bisect',
       path: '/p/:project_id/bisect/:node_id?',
       component: () => import(/* webpackChunkName: "bisect" */ './views/Bisect.vue'),
-      props: (route) => ({ project_id: parseInt(route.params.project_id), node_id: parseInt(route.params.node_id) }),
     },
     {
       name: 'labeling2',

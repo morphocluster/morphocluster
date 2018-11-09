@@ -254,7 +254,7 @@ export default {
                         };
 
                         this.$router.replace(to);
-                        return node_id;
+                        throw null;
                     });
             });
 

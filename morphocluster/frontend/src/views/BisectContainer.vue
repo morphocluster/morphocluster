@@ -117,29 +117,25 @@ export default {
                     return parseInt(this.$route.params.node_id);
                 }
 
-                // If there is already a promise for a working package, use the corresponding node_id.
-
-                // Otherwise,
-                if (
-                    this.project_loading_queue &&
-                    this.project_loading_queue.length
-                ) {
-                    var node_id = this.project_loading_queue.pop();
-
-                    const to = {
-                        name: "bisect",
-                        params: {
-                            project_id: this.project.project_id,
-                            node_id: node_id
-                        }
-                    };
-
-                    this.$router.replace(to);
-
-                    // Throw to prevent double execution of the following
-                    throw new Error("New route");
+                // Otherwise use the id that is currently loading
+                if (!Object.keys(this.project_wp_promises).length) {
+                    throw new Error("No working package promises.");
                 }
-                throw new Error("No more nodes.");
+
+                var node_id = Object.keys(this.project_wp_promises).pop();
+
+                const to = {
+                    name: "bisect",
+                    params: {
+                        project_id: this.project.project_id,
+                        node_id: node_id
+                    }
+                };
+
+                this.$router.replace(to);
+
+                // Throw to prevent double execution of the following
+                throw null;
             });
 
             p = p.then(node_id => {
@@ -147,39 +143,8 @@ export default {
                 return node_id;
             });
 
-            // Now load the working package (node, members, recommendations)
-            p = p.then(() => {});
-
-            p = p
-                .then(node_id => {
-                    return api.getNode(node_id).then(node => {
-                        this.node = node;
-                    });
-                })
-                .then(() => {
-                    this.node_status = "loaded";
-                })
-                .catch(e => {
-                    this.axiosErrorHandler(e);
-                });
-
-            p = p.then(node_id => {
-                console.log("getNodeRecommendedObjects...");
-                this.rec_status = "loading";
-                api.getNodeRecommendedObjects(
-                    node_id,
-                    MAX_N_RECOMMENDATIONS
-                ).then(data => {
-                    this.rec_members = shuffle(data.data);
-                    this.rec_base_url = data.links.self;
-                    this.rec_n_pages = this.rec_interval_right =
-                        data.meta.last_page + 1;
-
-                    this.rec_current_page = this.rec_interval_left = 0;
-                    this.rec_status = "loaded";
-                    this.rec_request_id = data.meta.request_id;
-                });
-            });
+            //TODO: Go on.
+            // Now we need to get the working package promise with the node_id from the queue and provide the component with the correct data after resolution.
 
             p.catch(err => {
                 if (err === null) {
@@ -211,6 +176,8 @@ export default {
         loadWorkingPackage(node_id = null) {
             if (node_id === null) {
                 node_id = this.project_loading_queue.pop();
+            } else {
+                // TODO: Remove node_id from project_loading_queue
             }
             console.log(`Loading working package for ${node_id}...`);
 
@@ -230,15 +197,20 @@ export default {
                     return data.links.self;
                 });
 
-            var allPromise = Promise.all([nodePromise, membersUrlPromise, recommendationsUrlPromise]);
+            var allPromise = Promise.all([
+                nodePromise,
+                membersUrlPromise,
+                recommendationsUrlPromise
+            ]);
 
-            this.project_wp_promises.unshift([node_id, allPromise]);
+            // Put promise into collection
+            this.project_wp_promises[node_id] = allPromise;
 
             allPromise.then((node, membersUrl, recommendationsUrl) => {
                 console.log(`Working package for ${node_id} is now loaded.`);
                 console.log(node, membersUrl, recommendationsUrl);
             });
-            
+
             return allPromise;
         },
 
