@@ -26,7 +26,7 @@ from morphocluster.classifier import Classifier
 from morphocluster.extensions import database
 from morphocluster.helpers import combine_covariances, seq2array
 from morphocluster.member import MemberCollection
-from morphocluster.models import nodes, nodes_objects, objects, projects
+from morphocluster.models import nodes, nodes_objects, objects, projects, nodes_rejected_objects
 
 
 class TreeError(Exception):
@@ -994,6 +994,10 @@ class Tree(object):
 
             objects_ = []
 
+            rejected_object_ids = (select([nodes_rejected_objects.c.object_id])
+                                   .where(nodes_rejected_objects.c.node_id == node_id)
+                                   .alias("rejected_object_ids"))
+
             with timer.child("Query matching objects"):
                 # Traverse the parse in reverse
                 for parent_id in path[::-1]:
@@ -1003,7 +1007,14 @@ class Tree(object):
                     if n_left <= 0:
                         break
 
-                    objects_.extend(self.get_objects(parent_id))
+                    # Get objects below parent_id that are not rejected by node_id
+                    stmt = (select([objects])
+                            .select_from(objects.join(nodes_objects))
+                            .where((nodes_objects.c.node_id == parent_id) & (~objects.c.object_id.in_(rejected_object_ids))))
+
+                    result = self.connection.execute(stmt).fetchall()
+
+                    objects_.extend(dict(r) for r in result)
 
             if not objects_:
                 return []
@@ -1114,14 +1125,16 @@ class Tree(object):
             new_node_path = self.get_path_ids(node_id)
 
             # Find current node_ids of the objects
-            stmt = select([nodes_objects.c.node_id], for_update=True).where(nodes_objects.c.object_id.in_(object_ids) & (nodes_objects.c.project_id == project_id))
-            old_node_ids = [r["node_id"] for r in self.connection.execute(stmt).fetchall()]
+            stmt = select([nodes_objects.c.node_id], for_update=True).where(
+                nodes_objects.c.object_id.in_(object_ids) & (nodes_objects.c.project_id == project_id))
+            old_node_ids = [r["node_id"]
+                            for r in self.connection.execute(stmt).fetchall()]
 
             # Update assignments
             stmt = nodes_objects.update().values({"node_id": node_id})\
                 .where(nodes_objects.c.object_id.in_(object_ids) & (nodes_objects.c.project_id == project_id))
             self.connection.execute(stmt)
-            
+
             # # Return distinct old `parent_id`s
             # stmt = text("""
             # WITH updater AS (
@@ -1152,6 +1165,30 @@ class Tree(object):
             assert node_id in nodes_to_invalidate
 
             self.invalidate_nodes(nodes_to_invalidate, unapprove)
+
+    def reject_objects(self, node_id, object_ids):
+        """
+        Save objects as rejected for a certain node_id to prevent further recommendation.
+        """
+
+        if not object_ids:
+            return
+
+        with self.connection.begin():
+            # Acquire project lock
+            self.lock_project_for_node(node_id)
+
+            # Poject id of the node
+            project_id = select([nodes.c.project_id]).where(
+                nodes.c.node_id == node_id)
+            project_id = self.connection.execute(project_id).scalar()
+
+            new_node_path = self.get_path_ids(node_id)
+
+            # Update assignments
+            stmt = nodes_rejected_objects.insert()
+            self.connection.execute(stmt, [
+                                    {'node_id': node_id, 'project_id': project_id, 'object_id': oid} for oid in object_ids])
 
     def update_node(self, node_id, data):
         if "parent_id" in data:

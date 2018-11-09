@@ -211,6 +211,8 @@ def get_unfilled_nodes(project_id):
     #         result["progress"] = progress
 
     #     return jsonify(result)
+    
+    # TODO
     return jsonify([10622])
 
 
@@ -822,14 +824,14 @@ def accept_recommended_objects(node_id):
 
     print(parameters)
 
-    rejected_members = set(parameters["rejected_members"])
+    rejected_object_ids = set(m[1:] for m in parameters["rejected_members"] if m.startswith("o"))
 
     object_ids = []
     for page in range(parameters["last_page"] + 1):
         response = _node_get_recommended_objects(
             node_id=node_id, request_id=parameters["request_id"], page=page)
         page_object_ids = (v["object_id"] for v in json.loads(response.data.decode())["data"])
-        page_object_ids = [o for o in page_object_ids if "o{:d}".format(o) not in rejected_members]
+        page_object_ids = [o for o in page_object_ids if o not in rejected_object_ids]
         
         object_ids.extend(page_object_ids)
 
@@ -839,9 +841,10 @@ def accept_recommended_objects(node_id):
         tree = Tree(connection)
         with connection.begin():
             tree.relocate_objects(object_ids, node_id)
+            tree.reject_objects(node_id, rejected_object_ids)
 
-    print("Node {} adopted {} objects."
-          .format(node_id, len(object_ids)))
+    print("Node {} adopted {} objects and rejected {} objects."
+          .format(node_id, len(object_ids), len(rejected_object_ids)))
 
     return jsonify({})
 

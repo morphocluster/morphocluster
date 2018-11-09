@@ -99,6 +99,16 @@ nodes_objects = Table('nodes_objects', metadata,
     UniqueConstraint('project_id', 'object_id')
 )
 
+nodes_rejected_objects = Table('nodes_rejected_objects', metadata,
+    Column('node_id', None,
+            ForeignKey('nodes.node_id', ondelete="CASCADE"),
+            index=True, nullable=False),
+    Column('object_id', None,
+            ForeignKey('objects.object_id',
+                    ondelete="CASCADE"),
+            index=True, nullable=False)
+)
+
 users = Table('users', metadata,
     Column('username', String, primary_key=True),
     Column('pwhash', String)
