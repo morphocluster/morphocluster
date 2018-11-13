@@ -29,7 +29,7 @@
                             Approve
                         </b-button>
                         <b-button size="sm" variant="primary" class="mr-2" :to="{name: 'bisect', params: {project_id: data.item.project_id}}">Bisect</b-button>
-                        <b-button size="sm" variant="primary" class="mr-2" @click.prevent="showSaveModal(data.item)">Save</b-button>
+                        <b-button size="sm" variant="primary" class="mr-2" @click.prevent="save_project(data.item.project_id)">Save</b-button>
                     </template>
                     <template slot="visible" slot-scope="data">
                         {{data.visible ? "yes" : "no"}}
@@ -46,13 +46,6 @@
                 </div>
             </div>
         </div>
-        <b-modal ref="saveModal" lazy centered :title="save_title" @ok="HandleSaveOk">
-            <div class="d-block text-center">
-                <form @submit.stop.prevent="handleSubmit">
-                    <b-form-input type="text" placeholder="Enter your name" v-model="save_slug"></b-form-input>
-                </form>
-            </div>
-        </b-modal>
     </div>
 </template>
 
@@ -71,31 +64,21 @@ export default {
                 "progress",
                 "action"
             ],
-            projects: [],
-            save_slug: "",
-            save_title: ""
+            projects: []
         };
     },
     methods: {
-        showSaveModal(project) {
-            console.log(project);
-            this.save_slug = project.name;
-            this.save_title = `Save ${project.name}`;
-            this.$refs.saveModal.show();
-        },
-        HandleSaveOk() {
-            // TODO
-        },
         save_project(project_id) {
             console.log("Saving", project_id, "...");
             api.saveProject(project_id).then(result => {
                 alert("Project saved: " + result["tree_fn"]);
             });
-        },
+        }
     },
     mounted() {
         // Load node info
-        api.getProjects()
+        api
+            .getProjects()
             .then(projects => {
                 this.projects = projects;
 
