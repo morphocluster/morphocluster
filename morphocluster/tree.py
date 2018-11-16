@@ -447,8 +447,18 @@ class Tree(object):
             node_objects = pd.read_sql_query(
                 node_objects, self.connection)
 
+
+            node_rejected_objects = (
+                select([nodes_rejected_objects.c.node_id, nodes_rejected_objects.c.object_id])
+                .select_from(nodes_rejected_objects)
+                .where(nodes_rejected_objects.c.node_id == subtree.c.node_id)
+            )
+
+            node_rejected_objects = pd.read_sql_query(
+                node_rejected_objects, self.connection)
+
             try:
-                tree = processing.Tree(tree_nodes, node_objects)
+                tree = processing.Tree(tree_nodes, node_objects, node_rejected_objects)
             except ValueError:
                 print(tree_nodes)
                 print(node_objects)

@@ -25,6 +25,9 @@ class Tree(object):
         objects: pandas.DataFrame
             object_id (str): Object identifier
             node_id (int): ID of the corresponding node
+        rejected_objects: pandas.DataFrame (optional)
+            object_id (str): Object identifier
+            node_id (int): ID of the corresponding node
     """
 
     @staticmethod
@@ -85,7 +88,14 @@ class Tree(object):
             with archive.open("objects.csv", "r") as objects_f:
                 objects = pd.read_csv(objects_f, dtype={'object_id': str})
 
-        return Tree(nodes, objects)
+            try:
+                with archive.open("rejected_objects.csv", "r") as objects_f:
+                    rejected_objects = pd.read_csv(objects_f, dtype={'object_id': str})
+            except KeyError:
+                # No such member
+                rejected_objects = None
+
+        return Tree(nodes, objects, rejected_objects)
 
     @staticmethod
     def from_HDBSCAN(path, root_first=True):
@@ -199,7 +209,7 @@ class Tree(object):
 
         return Tree(nodes, objects)
 
-    def __init__(self, nodes=None, objects=None):
+    def __init__(self, nodes=None, objects=None, rejected_objects=None):
         if nodes is not None:
             if not isinstance(nodes, pd.DataFrame):
                 nodes = pd.DataFrame(nodes)
@@ -218,8 +228,18 @@ class Tree(object):
             if not "node_id" in objects.columns:
                 raise ValueError("'objects' lacks column 'node_id'.")
 
+        if rejected_objects is not None:
+            if not isinstance(rejected_objects, pd.DataFrame):
+                rejected_objects = pd.DataFrame(rejected_objects)
+
+            if not "object_id" in rejected_objects.columns:
+                raise ValueError("'rejected_objects' lacks column 'object_id'.")
+            if not "node_id" in rejected_objects.columns:
+                raise ValueError("'rejected_objects' lacks column 'node_id'.")
+
         self.nodes = nodes
         self.objects = objects
+        self.rejected_objects = rejected_objects
 
     def save(self, tree_fn):
         """
@@ -233,6 +253,11 @@ class Tree(object):
             buffer_ = StringIO()
             self.objects.to_csv(buffer_, index=False)
             archive.writestr("objects.csv", buffer_.getvalue())
+
+            if self.rejected_objects is not None:
+                buffer_ = StringIO()
+                self.rejected_objects.to_csv(buffer_, index=False)
+                archive.writestr("rejected_objects.csv", buffer_.getvalue())
 
     def get_root_id(self):
         """
