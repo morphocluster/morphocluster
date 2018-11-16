@@ -290,6 +290,7 @@ export default {
         moveupMember(member) {
             console.log("Remove", this.getUniqueId(member));
 
+            // TODO: Also reject members.
             api.nodeAdoptMembers(this.node.parent_id, [member])
                 .then(() => {
                     // Remove from current recommendations

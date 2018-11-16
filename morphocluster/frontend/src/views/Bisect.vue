@@ -82,6 +82,7 @@
             <div :style="{flexGrow: n_invalid_pages}" class="bg-danger" />
         </div>
         <div id="decision" v-if="(rec_status == 'loaded') && (node_status == 'loaded')">
+            <b-form-checkbox v-model="turtle_mode">Turtle mode</b-form-checkbox>
             <b-button variant="success" v-b-tooltip.hover.html title="All recommended members match without exception. Increase left limit. <kbd>F</kbd>" @click.prevent="membersOk">
                 <i class="mdi mdi-check" /> OK</b-button>
             <b-button variant="danger" v-b-tooltip.hover.html title="Some recommended members do not match. Decrease right limit. <kbd>J</kbd>" @click.prevent="membersNotOk">
@@ -165,7 +166,9 @@ export default {
             saving: false,
             saved: false,
             saving_start_ms: null,
-            saving_total_ms: null
+            saving_total_ms: null,
+            turtle_mode: false,
+            turtle_mode_auto_changed: false
         };
     },
     components: {
@@ -337,15 +340,7 @@ export default {
         membersOk: function() {
             this.rec_interval_left = this.rec_current_page + 1;
 
-            if (!this.found_right) {
-                this.rec_current_page = Math.min(
-                    this.rec_current_page + this.jump_pages,
-                    this.rec_n_pages - 1
-                );
-                this.jump_pages *= 2;
-            } else {
-                this.updateCurrentPage();
-            }
+            this.updateCurrentPage();
 
             this.showNext();
         },
@@ -353,15 +348,33 @@ export default {
             this.rec_interval_right = this.rec_current_page;
             this.found_right = true;
 
+            // Update page, but go to first quarter instead of half of the interval.
             this.updateCurrentPage(0.25);
 
             this.showNext();
         },
         updateCurrentPage(frac = 0.5) {
-            this.rec_current_page = Math.trunc(
-                (1 - frac) * this.rec_interval_left +
-                    frac * this.rec_interval_right
-            );
+            if (this.turtle_mode) {
+                // In turtle mode, only go one page forward.
+                this.rec_current_page = Math.min(
+                    this.rec_interval_left,
+                    this.rec_n_pages - 1
+                );
+            } else if (!this.found_right) {
+                // If the right side of the interval was not found yet, jump forward
+                // and increase leap.
+                this.rec_current_page = Math.min(
+                    this.rec_current_page + this.jump_pages,
+                    this.rec_n_pages - 1
+                );
+                this.jump_pages *= 2;
+            } else {
+                // Otherwise perform regular bisection
+                this.rec_current_page = Math.trunc(
+                    (1 - frac) * this.rec_interval_left +
+                        frac * this.rec_interval_right
+                );
+            }
         },
         showNext: function() {
             console.log(
@@ -433,6 +446,11 @@ export default {
             var index = this.rec_members.indexOf(member);
             if (index > -1) {
                 this.rec_members.splice(index, 1);
+            }
+
+            if (!this.turtle_mode_auto_changed) {
+                this.turtle_mode = true;
+                this.turtle_mode_auto_changed = true;
             }
 
             // And add to rejected
