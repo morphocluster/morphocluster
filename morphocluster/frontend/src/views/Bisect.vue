@@ -31,7 +31,7 @@
             </div>
 
             <infinite-loading ref="infload" v-if="node" @infinite="updateNodeMembers" spinner="circles">
-                <div slot="no-more">&#8718;</div>
+                <div slot="no-more"><span v-b-tooltip.hover.html title="End of list.">&#8718;</span></div>
             </infinite-loading>
         </div>
         <div v-if="rec_status == 'loading'">Loading recommendations...</div>
