@@ -94,5 +94,6 @@ export default {
 
 .member-controls i {
   cursor: pointer;
+  margin-left: 0.25em;
 }
 </style>

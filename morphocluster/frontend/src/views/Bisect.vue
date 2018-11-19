@@ -44,7 +44,7 @@
                 <spinner spinner="circles" />
             </div>
             <div :key="getUniqueId(m)" v-for="m of rec_members" class="col col-1">
-                <member-preview :member="m" :controls="rec_member_controls" v-on:remove="removeMember" />
+                <member-preview :member="m" :controls="rec_member_controls" v-on:remove="removeMember" v-on:accept="acceptMember" />
             </div>
         </div>
         <div v-if="done" class="bg-light section-heading">Report</div>
@@ -83,9 +83,9 @@
         </div>
         <div id="decision" v-if="(rec_status == 'loaded') && (node_status == 'loaded')">
             <b-form-checkbox v-model="turtle_mode">Turtle mode</b-form-checkbox>
-            <b-button variant="success" v-b-tooltip.hover.html title="All recommended members match without exception. Increase left limit. <kbd>F</kbd>" @click.prevent="membersOk">
-                <i class="mdi mdi-check" /> OK</b-button>
-            <b-button variant="danger" v-b-tooltip.hover.html title="Some recommended members do not match. Decrease right limit. <kbd>J</kbd>" @click.prevent="membersNotOk">
+            <b-button variant="success" v-b-tooltip.hover.html title="All visible recommendations match without exception. Increase left limit. <kbd>F</kbd>" @click.prevent="membersOk">
+                <i class="mdi mdi-check-all" /> OK</b-button>
+            <b-button id="button-not-ok" variant="danger" v-b-tooltip.hover.html :title="not_ok_tooltip" @click.prevent="membersNotOk">
                 <i class="mdi mdi-close" /> Not OK</b-button>
             <b-button variant="secondary" v-b-tooltip.hover.html title="Discard progress and start over. <kbd>R</kbd>" @click.prevent="initialize">
                 <i class="mdi mdi-restart" /> Start over</b-button>
@@ -123,6 +123,8 @@ import * as api from "@/helpers/api.js";
 import MemberPreview from "@/components/MemberPreview.vue";
 import MessageLog from "@/components/MessageLog.vue";
 
+import Vue from 'vue';
+
 const MAX_N_RECOMMENDATIONS = 100000;
 
 export default {
@@ -149,7 +151,12 @@ export default {
                 {
                     event: "remove",
                     icon: "mdi-close",
-                    title: "Remove this member from the suggestions."
+                    title: "Remove this object from the suggestions."
+                },
+                {
+                    event: "accept",
+                    icon: "mdi-check",
+                    title: "Accept this object."
                 }
             ],
 
@@ -168,7 +175,10 @@ export default {
             saving_start_ms: null,
             saving_total_ms: null,
             turtle_mode: false,
-            turtle_mode_auto_changed: false
+            turtle_mode_auto_changed: false,
+
+            /* Accepted members */
+            accepted_members: []
         };
     },
     components: {
@@ -202,6 +212,12 @@ export default {
         },
         n_invalid_pages() {
             return this.rec_n_pages - this.rec_interval_right;
+        },
+        not_ok_tooltip() {
+            if (this.accepted_members.length) {
+                return "<strong>All</strong> visible recommendations <strong>do not match</strong> without exception. Save all as rejected and proceed. <kbd>J</kbd>";
+            }
+            return "<strong>Some</strong> visible recommendations do not match. Decrease right limit. <kbd>J</kbd>";
         }
     },
     methods: {
@@ -340,13 +356,26 @@ export default {
         membersOk: function() {
             this.rec_interval_left = this.rec_current_page + 1;
 
+            this.accepted_members = [];
+
             this.updateCurrentPage();
 
             this.showNext();
         },
         membersNotOk: function() {
-            this.rec_interval_right = this.rec_current_page;
-            this.found_right = true;
+            if(this.accepted_members.length) {
+                // If there are accepted members, reject all remaining and proceed like in membersOk
+                var remaining_members = this.rec_members.map(this.getUniqueId);
+
+                console.log("Rejecting", remaining_members);
+                this.rejected_members.push(...remaining_members);
+
+                this.rec_interval_left = this.rec_current_page + 1;
+                this.accepted_members = [];
+            } else {
+                this.rec_interval_right = this.rec_current_page;
+                this.found_right = true;
+            }
 
             // Update page, but go to first quarter instead of half of the interval.
             this.updateCurrentPage(0.25);
@@ -439,22 +468,50 @@ export default {
                     console.log(e);
                 });
         },
-        removeMember(member) {
-            console.log("Remove", this.getUniqueId(member));
-
-            // Remove from current recommendations
+        hideMember(member) {
             var index = this.rec_members.indexOf(member);
             if (index > -1) {
                 this.rec_members.splice(index, 1);
             }
-
+        },
+        autoEnableTurtleMode() {
             if (!this.turtle_mode_auto_changed) {
                 this.turtle_mode = true;
                 this.turtle_mode_auto_changed = true;
             }
+        },
+        removeMember(member) {
+            console.log("Reject", this.getUniqueId(member));
+
+            // Remove from current recommendations
+            this.hideMember(member);
+
+            // Enable turtle mode
+            this.autoEnableTurtleMode();
 
             // And add to rejected
             this.rejected_members.push(this.getUniqueId(member));
+        },
+        acceptMember(member) {
+            console.log("Accept", this.getUniqueId(member));
+
+            // Remove from current recommendations
+            this.hideMember(member);
+
+            // Enable turtle mode
+            this.autoEnableTurtleMode();
+
+            if (this.accepted_members.length == 0) {
+                // If this is the first accepted element, show the changed tooltip.
+                Vue.nextTick(() => {
+                    this.$root.$emit("bv::show::tooltip", "button-not-ok");
+                });
+            }
+
+            this.accepted_members.push(this.getUniqueId(member));
+            this.messages.unshift(
+                `Accepted ${this.accepted_members.length} objects.`
+            );
         },
         next() {
             this.$router.push({
