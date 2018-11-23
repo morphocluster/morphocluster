@@ -49,6 +49,8 @@ nodes = Table('nodes', metadata,
             nullable=False, server_default="f"),
     Column('filled', Boolean, default=False,
             nullable=False, server_default="f"),
+    Column('preferred', Boolean, default=False,
+            nullable=False, server_default="f"),
 
     # ===========================================================================
     # Super Node support

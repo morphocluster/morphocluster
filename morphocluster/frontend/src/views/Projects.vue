@@ -20,8 +20,9 @@
                     </template>
                     <div slot="progress" slot-scope="data">
                         <b-progress v-if="'progress' in data.item" :max="data.item.progress.leaves_n_nodes">
-                            <b-progress-bar variant="success" :value="data.item.progress.leaves_n_filled_nodes" v-b-tooltip.hover :title="`${data.item.progress.leaves_n_filled_nodes} filled up`" />
-                            <b-progress-bar variant="warning" :value="data.item.progress.leaves_n_approved_nodes - data.item.progress.leaves_n_filled_nodes" v-b-tooltip.hover :title="`${data.item.progress.leaves_n_approved_nodes} approved`" />
+                            <b-progress-bar variant="success" :value="data.item.progress.leaves_n_filled_nodes" v-b-tooltip.hover :title="`${data.item.progress.leaves_n_filled_nodes} / ${data.item.progress.leaves_n_nodes} filled up`" />
+                            <b-progress-bar variant="warning" :value="data.item.progress.leaves_n_approved_nodes - data.item.progress.leaves_n_filled_nodes" v-b-tooltip.hover :title="`${data.item.progress.leaves_n_approved_nodes} / ${data.item.progress.leaves_n_nodes} approved`" />
+                            <!-- <b-progress-bar variant="secondary" :value="data.item.progress.leaves_n_nodes - data.item.progress.leaves_n_approved_nodes" v-b-tooltip.hover :title="`${data.item.progress.leaves_n_nodes - data.item.progress.leaves_n_approved_nodes} / ${data.item.progress.leaves_n_nodes} untreated`" /> -->
                         </b-progress>
                     </div>
                     <template slot="action" slot-scope="data">

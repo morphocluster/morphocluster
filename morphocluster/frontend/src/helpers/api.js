@@ -21,8 +21,8 @@ export function getNextUnapprovedNode(node_id, leaf = false) {
         });
 }
 
-export function getNextUnfilledNode(node_id, leaf = false) {
-    return axios.get(`/api/nodes/${node_id}/next_unfilled`, { params: { leaf } })
+export function getNextUnfilledNode(node_id, leaf = false, preferred_first = false) {
+    return axios.get(`/api/nodes/${node_id}/next_unfilled`, { params: { leaf, preferred_first } })
         .then(response => {
             return response.data;
         });

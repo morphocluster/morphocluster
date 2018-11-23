@@ -35,8 +35,15 @@
             <div :style="{flexGrow: progress.leaves_n_objects - progress.leaves_n_approved_objects}" class="bg-danger" />
         </div>
         <div id="decision">
-            <b-button id="btn-approve" variant="success" @click.prevent="approve" v-b-tooltip.hover.html title="All members look alike. Approve. <kbd>A</kbd>">Approve</b-button>
-            <b-button id="btn-merge" variant="danger" @click.prevent="merge" v-b-tooltip.hover.html title="Members are too dissimilar. Merge into parent. <kbd>M</kbd>">Merge into parent</b-button>
+            <b-button id="btn-approve" variant="success" @click.prevent="approve(true)" v-b-tooltip.hover.html title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>">
+                <i class="mdi mdi-check-all" /><i class="mdi mdi-flag" /> Approve + Flag
+            </b-button>
+            <b-button id="btn-approve" variant="success" @click.prevent="approve(false)" v-b-tooltip.hover.html title="All members look alike. Approve. <kbd>A</kbd>">
+                <i class="mdi mdi-check-all" /> Approve
+            </b-button>
+            <b-button id="btn-merge" variant="danger" @click.prevent="merge" v-b-tooltip.hover.html title="Members are too dissimilar. Merge into parent. <kbd>M</kbd>">
+                <i class="mdi mdi-call-merge" /> Merge into parent
+            </b-button>
         </div>
         <message-log class="bg-light" :messages="messages" />
         <b-modal ref="doneModal" centered no-fade header-bg-variant="success" title="Approval done">
@@ -214,9 +221,9 @@ export default {
                     this.axiosErrorHandler(e);
                 });
         },
-        approve() {
+        approve(preferred=false) {
             console.log("Approve");
-            api.patchNode(this.node.node_id, { approved: true })
+            api.patchNode(this.node.node_id, { approved: true, preferred: preferred })
                 .then(() => {
                     const msg = `Approved ${this.node.node_id}.`;
                     console.log(msg);
@@ -283,6 +290,8 @@ export default {
             }
             if (event.key == "a") {
                 this.approve();
+            } else if (event.key == "f") {
+                this.approve(true);
             } else if (event.key == "m") {
                 this.merge();
             }
@@ -319,6 +328,7 @@ export default {
     flex: 1;
     overflow-y: auto;
     position: relative;
+    padding-top: 0.5em;
 }
 
 #node-info .row {

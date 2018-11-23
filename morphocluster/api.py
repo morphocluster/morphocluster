@@ -950,6 +950,7 @@ def node_get_next(node_id):
 def node_get_next_unfilled(node_id):
     parser = reqparse.RequestParser()
     parser.add_argument("leaf", type=strtobool, default=False)
+    parser.add_argument("preferred_first", type=strtobool, default=False)
     arguments = parser.parse_args(strict=True)
 
     print(arguments)
@@ -961,7 +962,7 @@ def node_get_next_unfilled(node_id):
         def filter(subtree): return (subtree.c.approved ==
                                      True) & (subtree.c.filled == False)
 
-        return jsonify(tree.get_next_node(node_id, leaf=arguments["leaf"], filter=filter))
+        return jsonify(tree.get_next_node(node_id, leaf=arguments["leaf"], preferred_first=arguments["preferred_first"], filter=filter))
 
 
 @api.route("/nodes/<int:node_id>/n_sorted", methods=["GET"])

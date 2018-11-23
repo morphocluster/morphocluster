@@ -257,7 +257,7 @@ export default {
                 }
                 // ... otherwise get the next unfilled node
                 return api
-                    .getNextUnfilledNode(this.project.node_id, true)
+                    .getNextUnfilledNode(this.project.node_id, true, true)
                     .then(node_id => {
                         if (node_id === null) {
                             // Done

@@ -1267,7 +1267,7 @@ class Tree(object):
 
         return [self._upgrade_node(dict(r), require_valid=require_valid) for r in result]
 
-    def get_next_node(self, node_id, leaf=False, recurse_cb=None, filter=None):
+    def get_next_node(self, node_id, leaf=False, recurse_cb=None, filter=None, preferred_first=False):
         """
         Get the id of the next unapproved node.
 
@@ -1297,6 +1297,9 @@ class Tree(object):
 
         if leaf:
             stmt = stmt.where(n_children == 0)
+
+        if preferred_first:
+            stmt = stmt.order_by(subtree.c.preferred.desc())
 
         stmt = (stmt
                 .order_by(subtree.c.level.desc())
