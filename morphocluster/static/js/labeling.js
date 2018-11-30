@@ -253,7 +253,8 @@ function init_tree() {
 			var data = response.data;
 			$loading.detach();
 			$.each(data, function (k, member) {
-				$row.append($('<div class="col col-2" />').append(render_member(member, ["moveup", "expand"])));
+				var class_ = ("object_id" in member) ? "col-2" : "col-4";
+				$row.append($('<div class="col" />').addClass(class_).append(render_member(member, ["moveup", "expand"])));
 			});
 			
 			// See if there is more data
@@ -398,7 +399,8 @@ function init_tree() {
 			var data = response.data;
 			$loading.detach();
 			$.each(data, function (k, member) {
-				$row.append($('<div class="col col-6" />').append(render_member(member, ["uptohere"])));
+				var class_ = ("object_id" in member) ? "col-6" : "col-12";
+				$row.append($('<div class="col" />').addClass(class_).append(render_member(member, ["uptohere"])));
 			});
 			
 			// See if there is more data
