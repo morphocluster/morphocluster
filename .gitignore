@@ -12,3 +12,6 @@ activate
 *.pid
 .settings/*
 .vscode/**
+.coverage
+htmlcov/**
+.eggs/**
