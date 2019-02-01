@@ -22,6 +22,10 @@ setup(
         'Flask-Migrate',
         'timer_cm',
         'fire',
-        'marshmallow>=3.0.0'
+        'marshmallow',
+        'match_arrays',
+        'Flask-RQ2',
     ],
+    setup_requires=["pytest-runner"],
+    tests_require=["pytest"],
 )
