@@ -14,6 +14,8 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.sql import func
 from morphocluster.extensions import database
 
+db = database
+
 metadata = database.metadata
 
 #: :type objects: sqlalchemy.sql.schema.Table
@@ -135,3 +137,13 @@ log = Table("log", metadata,
 #     Column('ecotaxa_id', String)
 # )
 # ===============================================================================
+
+import enum
+
+class JobState(enum.Enum):
+        pass
+
+class Job(db.Model):
+    id = db.Column(db.String(36), primary_key=True)
+    user_id = db.Column(None, db.ForeignKey('users.username'))
+    status = db.Column(db.Enum(JobState))

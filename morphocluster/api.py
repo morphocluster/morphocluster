@@ -14,6 +14,8 @@ from functools import wraps
 from pprint import pprint
 
 import numpy as np
+from sklearn.manifold.isomap import Isomap
+
 from flask import Response
 from flask import jsonify as flask_jsonify
 from flask import request
@@ -21,16 +23,14 @@ from flask.blueprints import Blueprint
 from flask.helpers import url_for
 from flask_restful import reqparse
 from marshmallow import ValidationError
-from redis.exceptions import RedisError
-from sklearn.manifold.isomap import Isomap
-from timer_cm import Timer
-
 from morphocluster import models
 from morphocluster.classifier import Classifier
 from morphocluster.extensions import database, redis_store
 from morphocluster.helpers import keydefaultdict, seq2array
 from morphocluster.schemas import JobSchema
 from morphocluster.tree import Tree
+from redis.exceptions import RedisError
+from timer_cm import Timer
 
 api = Blueprint("api", __name__)
 
@@ -1109,9 +1109,23 @@ def post_node_classify(node_id):
             return jsonify({"n_predicted_children": int(n_predicted_children),
                             "n_predicted_objects": int(n_predicted_objects)})
 
-
 @api.route("/jobs", methods=["POST"])
 def create_job():
     data = JobSchema().load(request.get_json())
     print(data)
-    return ""
+
+    job_id = ...
+
+    job_url = url_for(".get_job", job_id=job_id)
+
+    return Response(
+        status=httplib.ACCEPTED,
+        headers={'Location': job_url}
+    )
+
+@api.route("/jobs/<job_id>", methods=["GET"])
+def get_job(job_id):
+    job = database.session.query(models.Job).get(job_id)
+
+    print(job)
+    return JobSchema().dumps(job)
