@@ -22,7 +22,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from morphocluster import models
 from morphocluster.api import api
-from morphocluster.extensions import database, migrate, redis_store
+from morphocluster.extensions import database, migrate, redis_lru, rq
 from morphocluster.frontend import frontend
 from morphocluster.numpy_json_encoder import NumpyJSONEncoder
 from morphocluster.tree import Tree
@@ -37,8 +37,9 @@ app.config.from_envvar('MORPHOCLUSTER_SETTINGS')
 
 # Initialize extensions
 database.init_app(app)
-redis_store.init_app(app)
+redis_lru.init_app(app)
 migrate.init_app(app, database)
+rq.init_app(app)
 
 app.json_encoder = NumpyJSONEncoder
 
@@ -195,6 +196,7 @@ def load_project(tree_fn, project_name, consolidate):
         print("Root ID: {}".format(root_id))
         print("Project ID: {}".format(project_id))
 
+
 @app.cli.command()
 @click.argument('root_id', type=int)
 @click.argument('tree_fn')
@@ -206,6 +208,7 @@ def export_tree(root_id, tree_fn):
         tree = Tree(conn)
 
         tree.export_tree(root_id, tree_fn)
+
 
 @app.cli.command()
 @click.argument('root_id', type=int, required=False)
@@ -222,7 +225,7 @@ def progress(root_id, log):
         else:
             root_ids = [root_id]
 
-        with Timer("Progress") as timer: 
+        with Timer("Progress") as timer:
             for rid in root_ids:
                 print("Root {}:".format(rid))
                 with timer.child(str(rid)):
@@ -237,33 +240,23 @@ def progress(root_id, log):
 def connect_supertree(root_id):
     with database.engine.connect() as conn:
         tree = Tree(conn)
-
         tree.connect_supertree(root_id)
 
 
 @app.cli.command()
-@click.argument('root_id', type=int)
-def upgrade_nodes(root_id):
-    with database.engine.connect() as conn:
-        tree = Tree(conn)
-
-        tree.upgrade_nodes(root_id)
-
-
-@app.cli.command()
-@click.argument('root_id', type=int)
-def flatten_tree(root_id):
-    with database.engine.connect() as conn:
-        tree = Tree(conn)
-        tree.flatten_tree(root_id)
-
-
-@app.cli.command()
-@click.argument('root_id', type=int)
+@click.argument('root_id', type=int, required=False)
 def consolidate(root_id):
-    with database.engine.connect() as conn, Timer("Consolidate"):
+    with database.engine.connect() as conn, Timer("Consolidate") as timer:
         tree = Tree(conn)
-        tree.consolidate_node(root_id)
+
+        if root_id is None:
+            root_ids = [p["node_id"] for p in tree.get_projects()]
+        else:
+            root_ids = [root_id]
+
+        for rid in root_ids:
+            with timer.child(str(rid)):
+                tree.consolidate_node(rid)
 
 
 @app.cli.command()
@@ -348,7 +341,7 @@ def export_log(filename):
 def index():
     return redirect(url_for("frontend.index"))
 
-    
+
 @app.route("/labeling")
 def labeling():
     return render_template('pages/labeling.html')
