@@ -13,7 +13,7 @@ setup(
         'h5py>=2.8.0',
         'scikit-learn',
         'scipy',
-        'redis',
+        'redis >= 3.0, < 3.1',
         'hiredis',
         'flask-restful',
         'alembic',
