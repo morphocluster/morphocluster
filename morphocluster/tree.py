@@ -26,7 +26,12 @@ from morphocluster.classifier import Classifier
 from morphocluster.extensions import database
 from morphocluster.helpers import combine_covariances, seq2array
 from morphocluster.member import MemberCollection
-from morphocluster.models import nodes, nodes_objects, objects, projects, nodes_rejected_objects
+from morphocluster.models import (nodes, nodes_objects, nodes_rejected_objects,
+                                  objects, projects)
+from morphocluster.processing.prototypes import Prototypes, merge_prototypes
+
+# TODO: Make N_PROTOTYPES configurable
+N_PROTOTYPES = 16
 
 
 class TreeError(Exception):
@@ -139,11 +144,13 @@ class Tree(object):
     def __init__(self, connection):
         self.connection = connection
 
-    def load_project(self, name, tree_fn):
+    def load_project(self, name, tree):
         """
         Load a project from a saved tree.
         """
-        tree = processing.Tree.from_saved(tree_fn)
+
+        if not isinstance(tree, processing.Tree):
+            tree = processing.Tree.from_saved(tree_fn)
 
         with self.connection.begin():
             project_id = self.create_project(name)
@@ -416,9 +423,9 @@ class Tree(object):
                 bar.numerator += 1
                 print(bar, end="\r")
 
-    def export_tree(self, root_id, tree_fn):
+    def dump_tree(self, root_id):
         """
-        Export the whole tree with its objects.
+        Generate a processing.Tree from the tree below root_id.
         """
         with self.connection.begin():
             # Acquire project lock
@@ -447,9 +454,9 @@ class Tree(object):
             node_objects = pd.read_sql_query(
                 node_objects, self.connection)
 
-
             node_rejected_objects = (
-                select([nodes_rejected_objects.c.node_id, nodes_rejected_objects.c.object_id])
+                select([nodes_rejected_objects.c.node_id,
+                        nodes_rejected_objects.c.object_id])
                 .select_from(nodes_rejected_objects)
                 .where(nodes_rejected_objects.c.node_id == subtree.c.node_id)
             )
@@ -458,14 +465,22 @@ class Tree(object):
                 node_rejected_objects, self.connection)
 
             try:
-                tree = processing.Tree(tree_nodes, node_objects, node_rejected_objects)
+                tree = processing.Tree(
+                    tree_nodes, node_objects, node_rejected_objects)
             except ValueError:
                 print(tree_nodes)
                 print(node_objects)
                 raise
+        return tree
 
-            print("Writing tree...")
-            tree.save(tree_fn)
+    def export_tree(self, root_id, tree_fn):
+        """
+        Export the whole tree with its objects.
+        """
+
+        tree = self.dump_tree(root_id)
+        print("Writing tree...")
+        tree.save(tree_fn)
 
     def get_root_id(self, project_id):
         """
@@ -606,47 +621,6 @@ class Tree(object):
                     progress_cb(len(data))
         return node_id
 
-    # ===========================================================================
-    # def _calc_centroid(self, node, children, objects_):
-    #     """
-    #     Calculate the centroid of a node as the weighted mean of
-    #         a) the centroids of its children, and
-    #         b) the centroid of its own objects_
-    #     """
-    #     # ToDo: Account for number of objects_
-    #
-    #     if not node["_n_objects_deep"]:
-    #         return None
-    #
-    #     # Weight each child centroid with the number of objects_ it stands for
-    #     centroids = [c["_n_objects_deep"] * c["_centroid"] for c in children if c["_centroid"] is not None]
-    #
-    #     # Calculate centroid for own objects_
-    #     object_vectors = [ o["vector"] for o in objects_ if o["vector"] is not None ]
-    #
-    #     if len(object_vectors) > 0:
-    #         object_centroid = np.mean(object_vectors, axis=0)
-    #
-    #         # Weight object_centroid with the number of objects_ it stands for
-    #         object_centroid *= node["_n_objects"]
-    #
-    #         centroids.append(object_centroid)
-    #
-    #     if len(centroids) > 0:
-    #         centroid = np.mean(centroids, axis=0)
-    #
-    #         try:
-    #             # Divide by the number of objects_ it stands for
-    #             centroid /= node["_n_objects_deep"]
-    #         except TypeError:
-    #             print("_n_objects_deep:", repr(node["_n_objects_deep"]))
-    #             raise
-    #
-    #         return centroid
-    #     else:
-    #         return None
-    # ===========================================================================
-
     def _calc_type_objects(self, children, objects_):
         """
         Calculate nine type objects for a node as
@@ -747,67 +721,6 @@ class Tree(object):
         result = self.connection.scalar(stmt) or 0
 
         return result
-
-# ===============================================================================
-#     def _upgrade_node(self, node, require_valid = True, _rec_depth=0):
-#         """
-#         Parameters:
-#             node (dict): Fields of the node.
-#             require_valid: Are valid cache values required?
-#         """
-#
-#         # If no valid cache values are required or the node is already valid,
-#         # return unchanged.
-#         if not require_valid or node["cache_valid"]:
-#             return node
-#
-#         print("{}Upgrading node {}...".format(" " * _rec_depth, node["node_id"]))
-#
-#         if node["n_children"] > 0:
-#             # The recursive calculation happens here
-#             children = self.get_children(node["node_id"], require_valid, _rec_depth = _rec_depth + 1)
-#         else:
-#             children = []
-#
-#         # Limit to 1000 objects to speed up the calculation
-#         # TODO: Select objects randomly
-#         objects = self.get_objects(node["node_id"], limit = 1000)
-#
-#         node["_n_objects"] = self.get_n_objects(node["node_id"])
-#
-#         # Hint: Uses vectors
-#         node["_own_type_objects"] = self._calc_own_type_objects(children, objects)
-#
-#         node["_type_objects"] = self._calc_type_objects(children, objects)
-#
-#         node["_n_objects_deep"] = self._calc_n_objects_deep(node, children)
-#
-#         # TODO: Remove assertion if we're sure enough that this works
-#         query_n_objects_deep = self._query_n_objects_deep(node)
-#
-#         if node["_n_objects_deep"] is None:
-#             node["_n_objects_deep"] = query_n_objects_deep
-#
-#         else:
-#             if node["_n_objects_deep"] != query_n_objects_deep:
-#                 warnings.warn("_n_objects_deep do not match! {}!={}".format(node["_n_objects_deep"], query_n_objects_deep))
-#                 node["_n_objects_deep"] = query_n_objects_deep
-#
-#         # Hint: Uses vectors
-#         node["_centroid"] = self._calc_centroid(node, children, objects)
-#         if node["_centroid"] is None:
-#             print("Node {} has no centroid!".format(node["node_id"]))
-#
-#
-#         node["cache_valid"] = True
-#
-#         # Store these values
-#         update_fields = ("cache_valid", "_centroid", "_type_objects", "_own_type_objects", "_n_objects_deep", "_n_objects")
-#         stmt = nodes.update().values({k: node[k] for k in update_fields}).where(nodes.c.node_id == node["node_id"])
-#         self.connection.execute(stmt)
-#
-#         return node
-# ===============================================================================
 
     def get_node(self, node_id, require_valid=True):
         assert isinstance(
@@ -970,6 +883,7 @@ class Tree(object):
             if len(nodes_) > max_n:
                 break
 
+        # TODO: Prototypes
         vectors = [n["_centroid"] for n in nodes_]
 
         nodes_ = np.array(nodes_, dtype=object)
@@ -1031,14 +945,12 @@ class Tree(object):
 
             with timer.child("Convert to array"):
                 vectors = [o["vector"] for o in objects_]
-
                 objects_ = np.array(objects_, dtype=object)
                 vectors = np.array(vectors)
 
             with timer.child("Calculate distances"):
-                distances = np.linalg.norm(vectors - node["_centroid"], axis=1)
-
-            assert len(distances) == len(vectors), distances.shape
+                prots = node["_prototypes"]
+                distances = prots.transform(vectors)
 
             with timer.child("Sorting"):
                 order = np.argsort(distances)[:max_n]
@@ -1323,45 +1235,6 @@ class Tree(object):
 
         return None
 
-    def _calc_obj_mean_cov(self, objects_):
-        '''
-        Calculate mean and covariance of the features of the objects.
-
-        :param objects_: MemberCollection of objects
-        '''
-        mean = np.mean(objects_.vectors, axis=0)
-        cov = np.cov(objects_.vectors.T, bias=True)
-
-        return mean, cov
-
-    def _combine_mean_cov_n(self, a, b):
-        """
-        a and b are node dicts.
-        """
-
-        if a["_n_objects_deep"] == 0:
-            return b
-        if b["_n_objects_deep"] == 0:
-            return a
-
-        n = a["_n_objects_deep"] + b["_n_objects_deep"]
-
-        mean = (a["_n_objects_deep"] * a["_centroid"]
-                + b["_n_objects_deep"] * b["_centroid"]) / n
-
-        # FIXME: Normalize mean
-        ...
-
-        cov = combine_covariances(a["_centroid"], b["_centroid"],
-                                  a["_covariance"], b["_covariance"],
-                                  a["_n_objects_deep"], b["_n_objects_deep"])
-
-        return {
-            "_centroid": mean,
-            "_covariance": cov,
-            "_n_objects_deep": n
-        }
-
     def consolidate_node(self, node_id, depth=0, descend_approved=True, return_=None):
         """
         Ensures that the calculated values of this node are valid.
@@ -1469,8 +1342,10 @@ class Tree(object):
                                                 "raise")
 
                     # 3. _own_type_objects, _type_objects
+                    # TODO: Replace _own_type_objects with "_atypical_objects"
                     invalid_subtree.at[node_id, "_own_type_objects"] = (
                         self._calc_own_type_objects(children_dict, objects_))
+                    # self._calc_own_type_objects(children_dict, objects_)
 
                     invalid_subtree.at[node_id, "_type_objects"] = (
                         self._calc_type_objects(children_dict, objects_))
@@ -1480,7 +1355,6 @@ class Tree(object):
                             "\nNode {} has no type objects although it has children!".format(node_id))
 
                     # 4. _centroid
-
                     _centroid = []
 
                     if len(objects_) > 0:
@@ -1504,6 +1378,32 @@ class Tree(object):
                     if invalid_subtree.loc[node_id, "_centroid"] is None:
                         print("\nNode {} has no centroid!".format(node_id))
 
+                    # 5. _prototypes
+
+                    _prototypes = []
+
+                    if len(objects_) > 0:
+                        prots = Prototypes(N_PROTOTYPES)
+                        prots.fit(objects_.vectors)
+                        _prototypes.append(prots)
+                    if len(children_dict) > 0:
+                        _prototypes.extend(
+                            c["_prototypes"] for c in children_dict if c["_prototypes"] is not None)
+
+                    if len(_prototypes) > 0:
+                        try:
+                            _prototypes = merge_prototypes(
+                                _prototypes, N_PROTOTYPES)
+                        except:
+                            for prots in _prototypes:
+                                print(prots.prototypes_)
+                            raise
+                    else:
+                        _prototypes = None
+                        print("\nNode {} has no prototypes!".format(node_id))
+
+                    invalid_subtree.at[node_id, "_prototypes"] = _prototypes
+
                     # Finally, flag as updated
                     invalid_subtree.at[node_id, "__updated"] = True
 
@@ -1525,7 +1425,7 @@ class Tree(object):
                 # Write back to database (if necessary)
                 if n_updated > 0:
                     # Write results back to database
-                    update_fields = ["cache_valid", "_centroid", "_type_objects",
+                    update_fields = ["cache_valid", "_centroid", "_prototypes", "_type_objects",
                                      "_own_type_objects", "_n_objects_deep",
                                      "_n_objects", "_n_children"]
 
