@@ -90,7 +90,8 @@ class Tree(object):
 
             try:
                 with archive.open("rejected_objects.csv", "r") as objects_f:
-                    rejected_objects = pd.read_csv(objects_f, dtype={'object_id': str})
+                    rejected_objects = pd.read_csv(
+                        objects_f, dtype={'object_id': str})
             except KeyError:
                 # No such member
                 rejected_objects = None
@@ -168,7 +169,8 @@ class Tree(object):
         nodes = pd.DataFrame(nodes)
 
         # Compose objects
-        objects = pd.concat({"node_id": labels, "object_id": object_ids}, axis=1)
+        objects = pd.concat(
+            {"node_id": labels, "object_id": object_ids}, axis=1)
         # Mount unlabeled objects (-1) to root
         objects.loc[objects["node_id"] == -1, "node_id"] = root_id
 
@@ -233,7 +235,8 @@ class Tree(object):
                 rejected_objects = pd.DataFrame(rejected_objects)
 
             if not "object_id" in rejected_objects.columns:
-                raise ValueError("'rejected_objects' lacks column 'object_id'.")
+                raise ValueError(
+                    "'rejected_objects' lacks column 'object_id'.")
             if not "node_id" in rejected_objects.columns:
                 raise ValueError("'rejected_objects' lacks column 'node_id'.")
 
@@ -296,6 +299,48 @@ class Tree(object):
 
             yield node_idx
 
+    def walk(self, path=None):
+        """
+        Generate node_ids of the tree by walking the tree either top-down.
+        For each node in the tree rooted at `root` (including `root` itself), it yields a 2-tuple (path_ids, node_ids).
+        """
+
+        if path is None:
+            path = [self.get_root_id()]
+
+        yield (path[:-1], [path[-1]])
+
+        queue = [path]
+        while queue:
+            path = queue.pop()
+
+            child_selector = self.nodes["parent_id"] == path[-1]
+
+            if child_selector.any():
+                child_node_ids = list(
+                    self.nodes.loc[child_selector, "node_id"])
+
+                yield (path, child_node_ids)
+
+                queue.extend([path + [c] for c in child_node_ids])
+
+    def get_path(self, node_id):
+        path = []
+
+        while True:
+            node_selector = self.nodes["node_id"] == node_id
+
+            if not node_selector.any():
+                break
+
+            node = self.nodes[node_selector.idxmax()]
+            parent_id = node["parent_id"]
+            path.append(parent_id)
+
+            node_id = parent_id
+
+        return path[::-1]
+
     def objects_for_node(self, node_id):
         """
         Return the objects of a certain node.
@@ -337,16 +382,21 @@ class Tree(object):
 
         # Delete other.root and relocate children and objects to self.root
         other_nodes = other_nodes[other_nodes["node_id"] != other_root]
-        other_nodes.loc[other_nodes["parent_id"] == other_root, "parent_id"] = self_root
-        other_objects.loc[other_objects["node_id"] == other_root, "node_id"] = self_root
+        other_nodes.loc[other_nodes["parent_id"]
+                        == other_root, "parent_id"] = self_root
+        other_objects.loc[other_objects["node_id"]
+                          == other_root, "node_id"] = self_root
 
-        duplicate_objects_mask = self.objects["object_id"].isin(other_objects["object_id"])
+        duplicate_objects_mask = self.objects["object_id"].isin(
+            other_objects["object_id"])
         if duplicate_objects_mask.any():
-            print("Objects present in both trees: {:,d}. Keeping assignments from `other`.".format(duplicate_objects_mask.sum()))
+            print("Objects present in both trees: {:,d}. Keeping assignments from `other`.".format(
+                duplicate_objects_mask.sum()))
         self_objects = self.objects[~duplicate_objects_mask]
 
         self.nodes = pd.concat((self.nodes, other_nodes), ignore_index=True)
-        self.objects = pd.concat((self_objects, other_objects), ignore_index=True)
+        self.objects = pd.concat(
+            (self_objects, other_objects), ignore_index=True)
 
     def to_networkx(self):
         """
@@ -355,7 +405,8 @@ class Tree(object):
         try:
             from networkx import DiGraph
         except ImportError:
-            raise ImportError('You must have networkx installed to export networkx graphs')
+            raise ImportError(
+                'You must have networkx installed to export networkx graphs')
 
         result = DiGraph()
         for row in self.nodes[["parent_id", "node_id"]].values:
@@ -367,7 +418,6 @@ class Tree(object):
         """
         Traverse the tree and see if all nodes and objects are visited.
         """
-
 
         # Visit objects
         self.nodes["__visited"] = False
