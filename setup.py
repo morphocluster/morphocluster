@@ -5,7 +5,7 @@ setup(
     packages=['morphocluster'],
     include_package_data=True,
     install_requires=[
-        'flask',
+        'flask>=1.0.2',
         'psycopg2-binary',
         'pandas',
         'sqlalchemy',
