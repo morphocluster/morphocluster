@@ -9,6 +9,12 @@ from sklearn.utils.extmath import softmax
 from sklearn.utils.validation import check_is_fitted
 
 
+def _check_is_clusterer(clusterer):
+    attributes = ('fit_predict', 'n_clusters')
+    if not all(hasattr(clusterer, attr) for attr in attributes):
+        raise TypeError("%s is not a proper clusterer instance." % (clusterer))
+
+
 class Prototypes:
     """
     Represent a number of vectors by a lower number of prototypes.
@@ -36,6 +42,8 @@ class Prototypes:
         Parameters:
             X: array of shape = [n_samples, n_features]
         """
+
+        _check_is_clusterer(self.clusterer)
 
         if X.shape[0] == 0:
             raise ValueError("X contains no samples.")
