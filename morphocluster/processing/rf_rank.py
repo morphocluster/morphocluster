@@ -5,7 +5,7 @@ RF rank.
 from sklearn.ensemble import RandomForestClassifier
 import numpy as np
 
-def rf_rank(candidates, valid, rejected, rf_options={}):
+def rf_rank(candidates, valid, rejected, **kwargs):
     """
     Rank recommendations using random forests.
 
@@ -17,14 +17,14 @@ def rf_rank(candidates, valid, rejected, rf_options={}):
         valid: (:,D) np.array of feature vectors that are valid members.
         rejected: (:,D) np.array of feature vectors that where already rejected.
 
-        rf_options: Passed as keywords to RandomForestClassifier.
+        kwargs: Passed to RandomForestClassifier.
     """
 
     assert candidates.shape[0] > 0
     assert valid.shape[0] > 0
     assert rejected.shape[0] > 0
 
-    classifier = RandomForestClassifier(**rf_options)
+    classifier = RandomForestClassifier(**kwargs)
 
     X = np.concatenate((rejected, valid))
     y = np.ones(X.shape[0])

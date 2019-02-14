@@ -11,6 +11,29 @@ import hdbscan
 from morphocluster.processing import Tree
 
 
+def _subsample_dataset(sample_size, dataset):
+    """
+    dataset["features"] is a numpy.ndarray
+    dataset["objids"] is a pandas.Series
+    """
+
+    features = dataset["features"]
+    objids = dataset["objids"]
+
+    if features.shape[0] <= sample_size:
+        return dataset
+
+    idx = np.random.permutation(features.shape[0])[:sample_size]
+
+    features = features[idx]
+    objids = objids.iloc[idx].reset_index(drop=True)
+
+    return {
+        "features": features,
+        "objids": objids
+    }
+
+
 class Recluster:
     def __init__(self):
         self.dataset = None
@@ -39,7 +62,7 @@ class Recluster:
                                                        dataset["features"]))
 
             self.dataset["objids"] = pd.concat((self.dataset["objids"],
-                                                     dataset["objids"]))
+                                                dataset["objids"]))
         else:
             self.dataset = dataset
 
@@ -50,12 +73,15 @@ class Recluster:
 
         return self
 
-    def load_tree(self, in_tree_fn):
+    def load_tree(self, tree):
         """
         Load an existing cluster tree.
         """
 
-        self.trees.append(Tree.from_saved(in_tree_fn))
+        if not isinstance(tree, Tree):
+            tree = Tree.from_saved(tree)
+
+        self.trees.append(tree)
 
         return self
 
@@ -113,7 +139,7 @@ class Recluster:
             "objids": dataset_objids[dataset_selector].reset_index(drop=True)
         }
 
-    def cluster(self, ignore_approved=True, **kwargs):
+    def cluster(self, ignore_approved=True, sample_size=None, **kwargs):
         """
         Cluster the data.
         """
@@ -122,6 +148,10 @@ class Recluster:
             dataset = self._get_unapproved_dataset()
         else:
             dataset = self.dataset
+
+        if sample_size is not None:
+            print("Subsampling dataset ({:,d})...".format(sample_size))
+            dataset = _subsample_dataset(sample_size, dataset)
 
         clusterer = hdbscan.HDBSCAN(**kwargs)
 
@@ -149,11 +179,7 @@ class Recluster:
 
         return self
 
-    def save(self, tree_fn):
-        """
-        Save the result combining all contained trees.
-        """
-
+    def merge_trees(self):
         if not self.trees:
             raise ValueError("No trees.")
 
@@ -162,6 +188,14 @@ class Recluster:
         for other_tree in self.trees[1:]:
             tree.merge(other_tree)
 
+        return tree
+
+    def save(self, tree_fn):
+        """
+        Save the result combining all contained trees.
+        """
+
+        tree = self.merge_trees()
         tree.save(tree_fn)
 
         return self
