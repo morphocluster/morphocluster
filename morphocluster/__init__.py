@@ -18,8 +18,6 @@ def create_app(test_config=None):
 
     app = Flask(__name__, instance_relative_config=True)
 
-    print("root_path", app.root_path)
-
     # Load config
     app.config.from_object('morphocluster.config_default')
 
