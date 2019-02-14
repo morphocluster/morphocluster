@@ -13,6 +13,7 @@ from numbers import Integral
 import numpy as np
 import pandas as pd
 from etaprogress.progress import ProgressBar
+from sklearn.cluster import KMeans
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import text
 from sqlalchemy.sql.elements import literal_column
@@ -950,6 +951,9 @@ class Tree(object):
 
             with timer.child("Calculate distances"):
                 prots = node["_prototypes"]
+                if prots is None:
+                    raise TreeError("Node has no prototypes!")
+
                 distances = prots.transform(vectors)
 
             with timer.child("Sorting"):
@@ -1316,6 +1320,9 @@ class Tree(object):
 
                 invalid_subtree["__updated"] = False
 
+                # Initialize clusterer
+                clusterer = KMeans(N_PROTOTYPES, n_init=2)
+
                 # Iterate over DataFrame fixing the values along the way
                 bar = ProgressBar(len(invalid_subtree), max_width=40)
                 for node_id in invalid_subtree.index:
@@ -1379,11 +1386,10 @@ class Tree(object):
                         print("\nNode {} has no centroid!".format(node_id))
 
                     # 5. _prototypes
-
                     _prototypes = []
 
                     if len(objects_) > 0:
-                        prots = Prototypes(N_PROTOTYPES)
+                        prots = Prototypes(clusterer)
                         prots.fit(objects_.vectors)
                         _prototypes.append(prots)
                     if len(children_dict) > 0:
