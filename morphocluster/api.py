@@ -14,7 +14,10 @@ from functools import wraps
 from pprint import pprint
 
 import numpy as np
+import pandas as pd
+import werkzeug.exceptions
 from flask import Response
+from flask import current_app as app
 from flask import jsonify as flask_jsonify
 from flask import request
 from flask.blueprints import Blueprint
@@ -26,7 +29,6 @@ from redis.exceptions import RedisError
 from rq.queue import Queue
 from sklearn.manifold.isomap import Isomap
 from timer_cm import Timer
-import werkzeug.exceptions
 
 from morphocluster import background, models
 from morphocluster.classifier import Classifier
@@ -839,10 +841,20 @@ def accept_recommended_objects(node_id):
             node_id=node_id, request_id=parameters["request_id"], page=page)
         page_object_ids = (v["object_id"]
                            for v in json.loads(response.data.decode())["data"])
-        page_object_ids = [
-            o for o in page_object_ids if o not in rejected_object_ids]
-
         object_ids.extend(page_object_ids)
+
+    if app.config.get("SAVE_RECOMMENDATION_STATS", False):
+        print("Saving accept-reject stats...")
+        rejected = [o in rejected_object_ids for o in object_ids]
+        data = pd.DataFrame({"object_id": object_ids, "rejected": rejected})
+        data_fn = os.path.join(
+            app.config["PROJECT_EXPORT_DIR"],
+            "{:%Y-%m-%d-%H-%M-%S}--accept-reject--{}.csv".format(datetime.now(),
+                                                                 node_id))
+        data.to_csv(data_fn, index=False)
+
+    # Filter object_ids
+    object_ids = [o for o in object_ids if o not in rejected_object_ids]
 
     # print(object_ids)
 
