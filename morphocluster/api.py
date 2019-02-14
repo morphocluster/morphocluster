@@ -14,23 +14,26 @@ from functools import wraps
 from pprint import pprint
 
 import numpy as np
-from sklearn.manifold.isomap import Isomap
-
 from flask import Response
 from flask import jsonify as flask_jsonify
 from flask import request
 from flask.blueprints import Blueprint
 from flask.helpers import url_for
 from flask_restful import reqparse
+from flask_rq2.job import FlaskJob
 from marshmallow import ValidationError
-from morphocluster import models
+from redis.exceptions import RedisError
+from rq.queue import Queue
+from sklearn.manifold.isomap import Isomap
+from timer_cm import Timer
+import werkzeug.exceptions
+
+from morphocluster import background, models
 from morphocluster.classifier import Classifier
-from morphocluster.extensions import database, redis_store
+from morphocluster.extensions import database, redis_lru, rq
 from morphocluster.helpers import keydefaultdict, seq2array
 from morphocluster.schemas import JobSchema
 from morphocluster.tree import Tree
-from redis.exceptions import RedisError
-from timer_cm import Timer
 
 api = Blueprint("api", __name__)
 
@@ -200,6 +203,7 @@ def get_project(project_id):
 
         return jsonify(result)
 
+
 @api.route("/projects/<int:project_id>/unfilled_nodes", methods=["GET"])
 def get_unfilled_nodes(project_id):
     # with database.engine.connect() as connection:
@@ -211,7 +215,7 @@ def get_unfilled_nodes(project_id):
     #         result["progress"] = progress
 
     #     return jsonify(result)
-    
+
     # TODO
     return jsonify([10622])
 
@@ -384,12 +388,12 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
             cache_key = '{}:{}'.format(func.__name__,
                                        request_id)
             print("Loading cache key {}...".format(cache_key))
-            page_result = redis_store.lindex(cache_key, page)
+            page_result = redis_lru.lindex(cache_key, page)
 
             if page_result is None:
                 raise ValueError("Unknown cache_key: {}".format(cache_key))
 
-            n_pages = redis_store.llen(cache_key)
+            n_pages = redis_lru.llen(cache_key)
 
             if compress:
                 page_result = zlib.decompress(page_result).decode()
@@ -428,7 +432,7 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
             cache_pages = pages
 
         try:
-            redis_store.rpush(cache_key, *cache_pages)
+            redis_lru.rpush(cache_key, *cache_pages)
         except RedisError as e:
             warnings.warn("RedisError: {}".format(e))
 
@@ -820,22 +824,27 @@ def accept_recommended_objects(node_id):
         Nothing.
     """
 
+    # TODO: Save list of objects to enable calculation of Average Precision and the like
+
     parameters = request.get_json()
 
     print(parameters)
 
-    rejected_object_ids = set(m[1:] for m in parameters["rejected_members"] if m.startswith("o"))
+    rejected_object_ids = set(
+        m[1:] for m in parameters["rejected_members"] if m.startswith("o"))
 
     object_ids = []
     for page in range(parameters["last_page"] + 1):
         response = _node_get_recommended_objects(
             node_id=node_id, request_id=parameters["request_id"], page=page)
-        page_object_ids = (v["object_id"] for v in json.loads(response.data.decode())["data"])
-        page_object_ids = [o for o in page_object_ids if o not in rejected_object_ids]
-        
+        page_object_ids = (v["object_id"]
+                           for v in json.loads(response.data.decode())["data"])
+        page_object_ids = [
+            o for o in page_object_ids if o not in rejected_object_ids]
+
         object_ids.extend(page_object_ids)
 
-    #print(object_ids)
+    # print(object_ids)
 
     with database.engine.connect() as connection:
         tree = Tree(connection)
@@ -1109,23 +1118,42 @@ def post_node_classify(node_id):
             return jsonify({"n_predicted_children": int(n_predicted_children),
                             "n_predicted_objects": int(n_predicted_objects)})
 
+
 @api.route("/jobs", methods=["POST"])
 def create_job():
     data = JobSchema().load(request.get_json())
-    print(data)
 
-    job_id = ...
+    fun = getattr(background, data["name"])
 
-    job_url = url_for(".get_job", job_id=job_id)
+    if not background.validate_background_job(fun):
+        raise werkzeug.exceptions.NotImplemented()
+
+    job = fun.queue(**data["kwargs"])
+
+    print(job)
+
+    job_url = url_for(".get_job", job_id=job.id)
+
+    data["job"] = job
 
     return Response(
-        status=httplib.ACCEPTED,
+        JobSchema().dumps(data),
+        status=202,
         headers={'Location': job_url}
     )
 
+
 @api.route("/jobs/<job_id>", methods=["GET"])
 def get_job(job_id):
-    job = database.session.query(models.Job).get(job_id)
+    job = rq.get_queue().fetch_job(job_id)
 
-    print(job)
-    return JobSchema().dumps(job)
+    if job is None:
+        raise werkzeug.exceptions.NotFound()
+
+    # job = database.session.query(models.Job).get(job_id)
+
+    data = {"job": job}
+
+    result = JobSchema().dump(data)
+
+    return jsonify(result)
