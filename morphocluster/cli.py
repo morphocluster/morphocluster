@@ -215,14 +215,30 @@ def init_app(app):
             tree = Tree(conn)
             tree.connect_supertree(root_id)
 
+    def validate_consolidate_root_id(ctx, param, value):
+        # We don't need these
+        del ctx
+        del param
+
+        if value in ("all", "visible"):
+            return value
+
+        try:
+            return int(value)
+        except ValueError:
+            raise click.BadParameter(
+                'root_id can be "all", "visible" or an actual id.')
+
     @app.cli.command()
-    @click.argument('root_id', type=int, required=False)
+    @click.argument('root_id', default="visible", callback=validate_consolidate_root_id)
     def consolidate(root_id):
         with database.engine.connect() as conn, Timer("Consolidate") as timer:
             tree = Tree(conn)
 
-            if root_id is None:
+            if root_id == "all":
                 root_ids = [p["node_id"] for p in tree.get_projects()]
+            elif root_id == "visible":
+                root_ids = [p["node_id"] for p in tree.get_projects(True)]
             else:
                 root_ids = [root_id]
 
