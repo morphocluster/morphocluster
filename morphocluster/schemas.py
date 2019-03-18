@@ -30,3 +30,11 @@ class JobSchema(Schema):
     id = fields.Str(dump_only=True)
     job = fields.Nested(RQJobSchema, dump_only=True)
     description = fields.Str(default="", dump_only=True)
+
+
+class LogSchema(Schema):
+    action = fields.Str(required=True)
+
+    node_id = fields.Int(missing=None)
+    reverse_action = fields.Str(missing=None)
+    data = fields.Raw(missing=None)

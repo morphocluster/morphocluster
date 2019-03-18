@@ -151,7 +151,7 @@ class Tree(object):
         """
 
         if not isinstance(tree, processing.Tree):
-            tree = processing.Tree.from_saved(tree_fn)
+            tree = processing.Tree.from_saved(tree)
 
         with self.connection.begin():
             project_id = self.create_project(name)

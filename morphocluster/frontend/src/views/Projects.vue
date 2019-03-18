@@ -13,6 +13,20 @@
     </nav>
     <div class="scrollable">
       <div class="container">
+        <div
+          class="alerts"
+          v-if="alerts.length"
+        >
+          <b-alert
+            :key="a"
+            v-for="a of alerts"
+            dismissible
+            show
+            :variant="a.variant"
+          >
+            {{a.message}}
+          </b-alert>
+        </div>
         <b-table
           id="projects_table"
           striped
@@ -64,14 +78,14 @@
               class="mr-2"
               :to="{name: 'approve', params: {project_id: data.item.project_id}}"
             >
-              Approve
+              Validate
             </b-button>
             <b-button
               size="sm"
               variant="primary"
               class="mr-2"
               :to="{name: 'bisect', params: {project_id: data.item.project_id}}"
-            >Bisect</b-button>
+            >Grow</b-button>
             <b-button
               size="sm"
               variant="primary"
@@ -142,12 +156,11 @@
 
 <script>
 import * as api from "@/helpers/api.js";
-import Spinner from "vue-infinite-loading/src/components/Spinner";
 
 export default {
     name: "projects",
     props: {},
-    components: { Spinner },
+    components: {},
     data() {
         return {
             fields: [
@@ -160,7 +173,8 @@ export default {
             save_slug: "",
             save_title: "",
             save_project_id: null,
-            save_saving: false
+            save_saving: false,
+            alerts: [],
         };
     },
     methods: {
@@ -193,15 +207,21 @@ export default {
             .then(projects => {
                 this.projects = projects;
 
-                this.projects.forEach(p => {
-                    api.getNodeProgress(p.node_id).then(progress => {
-                        console.log(`Got progress for ${p.node_id}.`);
-                        this.$set(p, "progress", progress);
-                    });
-                });
+                return Promise.all(
+                    this.projects.map(p => {
+                        return api.getNodeProgress(p.node_id).then(progress => {
+                            console.log(`Got progress for ${p.node_id}.`);
+                            this.$set(p, "progress", progress);
+                        });
+                    })
+                );
             })
             .catch(e => {
                 console.log(e);
+                this.alerts.unshift({
+                    message: e.message,
+                    variant: "danger"
+                });
             });
     }
 };
@@ -228,5 +248,9 @@ export default {
 
 .scrollable {
     overflow-y: auto;
+}
+
+.alerts {
+    padding-top: 1em;
 }
 </style>
