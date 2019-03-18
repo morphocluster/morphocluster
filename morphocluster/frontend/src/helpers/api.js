@@ -87,13 +87,18 @@ export function nodeAdoptMembers(node_id, members) {
     return axios.post(`/api/nodes/${node_id}/adopt_members`, { members: members });
 }
 
-export function nodeAcceptRecommendations(node_id, request_id, rejected_members, last_page) {
+export function nodeAcceptRecommendations(node_id, request_id, rejected_members, last_page, log_data = null) {
     return axios.post(`/api/nodes/${node_id}/accept_recommended_objects`,
-        { request_id, rejected_members, last_page });
+        { request_id, rejected_members, last_page, log_data });
 }
 
 export function getUnfilledNodes(project_id) {
     return axios.get(`/api/projects/${project_id}/unfilled_nodes`).then(response => {
         return response.data;
     });
+}
+
+export function log(action, node_id = null, reverse_action = null, data = null) {
+    return axios.post(`/api/log`,
+        { action, node_id, reverse_action, data });
 }
