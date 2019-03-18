@@ -34,7 +34,7 @@ from morphocluster import background, models
 from morphocluster.classifier import Classifier
 from morphocluster.extensions import database, redis_lru, rq
 from morphocluster.helpers import keydefaultdict, seq2array
-from morphocluster.schemas import JobSchema
+from morphocluster.schemas import JobSchema, LogSchema
 from morphocluster.tree import Tree
 
 api = Blueprint("api", __name__)
@@ -821,12 +821,11 @@ def accept_recommended_objects(node_id):
         request_id: URL of the recommendations.
         rejected_members: Rejected members.
         last_page: Last page of accepted recommendations.
+        log_data (optional): Additional data to be stored in the log (only if SAVE_RECOMMENDATION_STATS!)
 
     Returns:
         Nothing.
     """
-
-    # TODO: Save list of objects to enable calculation of Average Precision and the like
 
     parameters = request.get_json()
 
@@ -843,26 +842,51 @@ def accept_recommended_objects(node_id):
                            for v in json.loads(response.data.decode())["data"])
         object_ids.extend(page_object_ids)
 
+    # Save list of objects to enable calculation of Average Precision and the like
     if app.config.get("SAVE_RECOMMENDATION_STATS", False):
         print("Saving accept-reject stats...")
-        rejected = [o in rejected_object_ids for o in object_ids]
-        data = pd.DataFrame({"object_id": object_ids, "rejected": rejected})
-        data_fn = os.path.join(
-            app.config["PROJECT_EXPORT_DIR"],
-            "{:%Y-%m-%d-%H-%M-%S}--accept-reject--{}.csv".format(datetime.now(),
-                                                                 node_id))
-        data.to_csv(data_fn, index=False)
+        with Timer("Save accept-reject stats") as t:
+            with t.child("calc rejected"):
+                rejected = [o in rejected_object_ids for o in object_ids]
+            with t.child("assemble DataFrame"):
+                data = pd.DataFrame(
+                    {"object_id": object_ids, "rejected": rejected})
+
+            data_fn = os.path.join(
+                app.config["PROJECT_EXPORT_DIR"],
+                "{:%Y-%m-%d-%H-%M-%S}--accept-reject--{}.csv".format(datetime.now(),
+                                                                     node_id))
+            with t.child("write data"):
+                data.to_csv(data_fn, index=False)
 
     # Filter object_ids
     object_ids = [o for o in object_ids if o not in rejected_object_ids]
 
     # print(object_ids)
 
+    # Assemble log
+    log_data = {
+        "n_accepted": len(object_ids),
+        "n_rejected": len(rejected_object_ids),
+    }
+
+    # Store additional log data
+    addlog_data = parameters.get("log_data")
+    if isinstance(addlog_data, dict):
+        log_data.update(addlog_data)
+    elif addlog_data is not None:
+        raise ValueError(
+            "Parameter log_data should be a dict, got a {}!".format(type(addlog_data)))
+
     with database.engine.connect() as connection:
         tree = Tree(connection)
         with connection.begin():
             tree.relocate_objects(object_ids, node_id)
             tree.reject_objects(node_id, rejected_object_ids)
+
+        log(connection, "accept_recommended_objects",
+            node_id=node_id,
+            data=json_dumps(log_data))
 
     print("Node {} adopted {} objects and rejected {} objects."
           .format(node_id, len(object_ids), len(rejected_object_ids)))
@@ -1129,6 +1153,22 @@ def post_node_classify(node_id):
 
             return jsonify({"n_predicted_children": int(n_predicted_children),
                             "n_predicted_objects": int(n_predicted_objects)})
+
+
+@api.route("/log", methods=["POST"])
+def create_log_entry():
+    log_data = LogSchema().load(request.get_json())
+
+    print("Log:", log_data)
+
+    with database.engine.connect() as connection:
+        log(connection,
+            log_data["action"],
+            node_id=log_data["node_id"],
+            reverse_action=log_data["reverse_action"],
+            data=json_dumps(log_data))
+
+    return jsonify({})
 
 
 @api.route("/jobs", methods=["POST"])
