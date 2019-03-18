@@ -15,3 +15,5 @@ activate
 .coverage
 htmlcov/**
 .eggs/**
+.coverage.*
+dump.rdb
