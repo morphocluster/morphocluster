@@ -236,15 +236,19 @@ def init_app(app):
             tree = Tree(conn)
 
             if root_id == "all":
+                print("Consolidating all projects...")
                 root_ids = [p["node_id"] for p in tree.get_projects()]
             elif root_id == "visible":
+                print("Consolidating visible projects...")
                 root_ids = [p["node_id"] for p in tree.get_projects(True)]
             else:
+                print("Consolidating {}...".format(root_id))
                 root_ids = [root_id]
 
             for rid in root_ids:
                 with timer.child(str(rid)):
                     tree.consolidate_node(rid)
+            print("Done.")
 
     @app.cli.command()
     @click.argument('username')
