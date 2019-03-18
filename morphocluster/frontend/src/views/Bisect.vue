@@ -398,32 +398,43 @@ export default {
                 }
             });
 
-            var nodeIdPromise = projectPromise.then(() => {
-                // If we already have a node_id, return it
-                if (this.$route.params.node_id) {
-                    return parseInt(this.$route.params.node_id);
-                }
-                // ... otherwise get the next unfilled node
-                return api
-                    .getNextUnfilledNode(this.project.node_id, true, true)
-                    .then(node_id => {
-                        if (node_id === null) {
-                            // Done
-                            this.$refs.doneModal.show();
-                            return Promise.reject(new Error("No next node"));
-                        }
-                        const to = {
-                            name: "bisect",
-                            params: {
-                                project_id: project_id,
-                                node_id: node_id
+            var nodeIdPromise = projectPromise
+                .then(() => {
+                    // If we already have a node_id, return it
+                    if (this.$route.params.node_id) {
+                        return parseInt(this.$route.params.node_id);
+                    }
+                    // ... otherwise get the next unfilled node
+                    return api
+                        .getNextUnfilledNode(this.project.node_id, true, true)
+                        .then(node_id => {
+                            if (node_id === null) {
+                                // Done
+                                this.$refs.doneModal.show();
+                                return Promise.reject(
+                                    new Error("No next node")
+                                );
                             }
-                        };
+                            const to = {
+                                name: "bisect",
+                                params: {
+                                    project_id: project_id,
+                                    node_id: node_id
+                                }
+                            };
 
-                        this.$router.replace(to);
-                        throw null;
-                    });
-            });
+                            this.$router.replace(to);
+                            // Don't process this chain further as there is now a new one
+                            throw null;
+                        });
+                })
+                // Get rid of "Unhandled promise rejection null"
+                .catch(e => {
+                    if (e == null) {
+                        return;
+                    }
+                    throw e;
+                });
 
             nodeIdPromise
                 .then(node_id => {

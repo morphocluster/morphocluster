@@ -163,12 +163,14 @@ export default {
             .then(projects => {
                 this.projects = projects;
 
-                this.projects.forEach(p => {
-                    api.getNodeProgress(p.node_id).then(progress => {
-                        console.log(`Got progress for ${p.node_id}.`);
-                        this.$set(p, "progress", progress);
-                    });
-                });
+                return Promise.all(
+                    this.projects.map(p => {
+                        return api.getNodeProgress(p.node_id).then(progress => {
+                            console.log(`Got progress for ${p.node_id}.`);
+                            this.$set(p, "progress", progress);
+                        });
+                    })
+                );
             })
             .catch(e => {
                 console.log(e);
