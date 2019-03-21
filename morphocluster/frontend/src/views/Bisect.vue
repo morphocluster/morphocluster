@@ -367,6 +367,8 @@ export default {
     },
     methods: {
         initialize() {
+            console.log("Initializing...");
+
             // Reset data (but keep project)
             Object.assign(this.$data, this.$options.data(), {
                 project: this.project
@@ -398,15 +400,16 @@ export default {
                 }
             });
 
-            var nodeIdPromise = projectPromise
-                .then(() => {
-                    // If we already have a node_id, return it
-                    if (this.$route.params.node_id) {
-                        return parseInt(this.$route.params.node_id);
-                    }
-                    // ... otherwise get the next unfilled node
-                    return api
+            var nodeIdPromise = projectPromise.then(() => {
+                // If we already have a node_id, return it
+                if (this.$route.params.node_id) {
+                    return parseInt(this.$route.params.node_id);
+                }
+                // ... otherwise get the next unfilled node
+                return (
+                    api
                         .getNextUnfilledNode(this.project.node_id, true, true)
+                        // (This really needs to be nested!)
                         .then(node_id => {
                             if (node_id === null) {
                                 // Done
@@ -423,18 +426,15 @@ export default {
                                 }
                             };
 
+                            // Navigate to the new adress. This starts a new processing of the whole chain.
+                            console.log("Navigating to", to);
                             this.$router.replace(to);
+
                             // Don't process this chain further as there is now a new one
                             throw null;
-                        });
-                })
-                // Get rid of "Unhandled promise rejection null"
-                .catch(e => {
-                    if (e == null) {
-                        return;
-                    }
-                    throw e;
-                });
+                        })
+                );
+            });
 
             nodeIdPromise
                 .then(node_id => {
@@ -449,28 +449,33 @@ export default {
                     this.axiosErrorHandler(e);
                 });
 
-            nodeIdPromise.then(node_id => {
-                //TODO: This happens twice (??)
-                console.log("getNodeRecommendedObjects...");
-                this.rec_status = "loading";
-                api.getNodeRecommendedObjects(node_id, MAX_N_RECOMMENDATIONS)
-                    .then(data => {
-                        this.rec_members = shuffle(data.data);
-                        this.rec_base_url = data.links.self;
-                        this.rec_n_pages = this.rec_interval_right =
-                            data.meta.last_page + 1;
+            nodeIdPromise
+                .then(node_id => {
+                    //TODO: This happens twice (??)
+                    console.log("getNodeRecommendedObjects...");
+                    this.rec_status = "loading";
 
-                        this.rec_current_page = this.rec_interval_left = 0;
-                        this.rec_status = "loaded";
-                        this.rec_request_id = data.meta.request_id;
+                    return api.getNodeRecommendedObjects(
+                        node_id,
+                        MAX_N_RECOMMENDATIONS
+                    );
+                })
+                .then(data => {
+                    this.rec_members = shuffle(data.data);
+                    this.rec_base_url = data.links.self;
+                    this.rec_n_pages = this.rec_interval_right =
+                        data.meta.last_page + 1;
 
-                        // Time when the view is fully initialized
-                        this.log_data.time_initialized = Date.now();
-                    })
-                    .catch(e => {
-                        this.axiosErrorHandler(e);
-                    });
-            });
+                    this.rec_current_page = this.rec_interval_left = 0;
+                    this.rec_status = "loaded";
+                    this.rec_request_id = data.meta.request_id;
+
+                    // Time when the view is fully initialized
+                    this.log_data.time_initialized = Date.now();
+                })
+                .catch(e => {
+                    this.axiosErrorHandler(e);
+                });
         },
         // updateNodeMembers gets called as an infinite loading handler.
         updateNodeMembers($state) {

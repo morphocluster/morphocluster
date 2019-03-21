@@ -5,15 +5,19 @@ export default {
         };
     },
     methods: {
-        getUniqueId (member) {
+        getUniqueId(member) {
             return 'object_id' in member ? 'o' + member.object_id : 'm' + member.node_id;
         },
         axiosErrorHandler(error) {
+            if (error === null) {
+                return;
+            }
+
             var msg;
             if (error.response) {
                 msg = `${error.response.status} ${error.response.statusText}: ${
                     error.config.url
-                }`;
+                    }`;
             } else if (error.request) {
                 console.log(error.request);
                 msg = "Error in request.";
