@@ -22,7 +22,7 @@ setup(
         'Flask-Migrate',
         'timer_cm',
         'fire',
-        'marshmallow',
+        'marshmallow>=3.0.0b20',
         'match_arrays',
         'Flask-RQ2',
     ],
