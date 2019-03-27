@@ -831,67 +831,72 @@ def accept_recommended_objects(node_id):
 
     print(parameters)
 
-    rejected_object_ids = set(
-        m[1:] for m in parameters["rejected_members"] if m.startswith("o"))
+    with Timer("accept_recommended_objects") as t:
 
-    object_ids = []
-    for page in range(parameters["last_page"] + 1):
-        response = _node_get_recommended_objects(
-            node_id=node_id, request_id=parameters["request_id"], page=page)
-        page_object_ids = (v["object_id"]
-                           for v in json.loads(response.data.decode())["data"])
-        object_ids.extend(page_object_ids)
+        with t.child("assemble set of rejected objects"):
+            rejected_object_ids = set(
+                m[1:] for m in parameters["rejected_members"] if m.startswith("o"))
 
-    # Save list of objects to enable calculation of Average Precision and the like
-    if app.config.get("SAVE_RECOMMENDATION_STATS", False):
-        print("Saving accept-reject stats...")
-        with Timer("Save accept-reject stats") as t:
-            with t.child("calc rejected"):
-                rejected = [o in rejected_object_ids for o in object_ids]
-            with t.child("assemble DataFrame"):
-                data = pd.DataFrame(
-                    {"object_id": object_ids, "rejected": rejected})
+        with t.child("assemble list of accepted objects"):
+            object_ids = []
+            for page in range(parameters["last_page"] + 1):
+                response = _node_get_recommended_objects(
+                    node_id=node_id, request_id=parameters["request_id"], page=page)
+                page_object_ids = (v["object_id"]
+                                   for v in json.loads(response.data.decode())["data"])
+                object_ids.extend(page_object_ids)
 
-            data_fn = os.path.join(
-                app.config["PROJECT_EXPORT_DIR"],
-                "{:%Y-%m-%d-%H-%M-%S}--accept-reject--{}.csv".format(datetime.now(),
-                                                                     node_id))
-            with t.child("write data"):
-                data.to_csv(data_fn, index=False)
+        # Save list of objects to enable calculation of Average Precision and the like
+        if app.config.get("SAVE_RECOMMENDATION_STATS", False):
+            print("Saving accept-reject stats...")
+            with t.child("Save accept-reject stats") as t2:
+                with t2.child("calc rejected"):
+                    rejected = [o in rejected_object_ids for o in object_ids]
+                with t2.child("assemble DataFrame"):
+                    data = pd.DataFrame(
+                        {"object_id": object_ids, "rejected": rejected})
 
-    # Filter object_ids
-    object_ids = [o for o in object_ids if o not in rejected_object_ids]
+                data_fn = os.path.join(
+                    app.config["PROJECT_EXPORT_DIR"],
+                    "{:%Y-%m-%d-%H-%M-%S}--accept-reject--{}.csv".format(datetime.now(),
+                                                                         node_id))
+                with t2.child("write data"):
+                    data.to_csv(data_fn, index=False)
 
-    # print(object_ids)
+        with t.child("filter accepted objects"):
+            # Filter object_ids
+            object_ids = [o for o in object_ids if o not in rejected_object_ids]
 
-    # Assemble log
-    log_data = {
-        "n_accepted": len(object_ids),
-        "n_rejected": len(rejected_object_ids),
-    }
+        # print(object_ids)
 
-    # Store additional log data
-    addlog_data = parameters.get("log_data")
-    if isinstance(addlog_data, dict):
-        log_data.update(addlog_data)
-    elif addlog_data is not None:
-        raise ValueError(
-            "Parameter log_data should be a dict, got a {}!".format(type(addlog_data)))
+        # Assemble log
+        log_data = {
+            "n_accepted": len(object_ids),
+            "n_rejected": len(rejected_object_ids),
+        }
 
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
-        with connection.begin():
-            tree.relocate_objects(object_ids, node_id)
-            tree.reject_objects(node_id, rejected_object_ids)
+        # Store additional log data
+        addlog_data = parameters.get("log_data")
+        if isinstance(addlog_data, dict):
+            log_data.update(addlog_data)
+        elif addlog_data is not None:
+            raise ValueError(
+                "Parameter log_data should be a dict, got a {}!".format(type(addlog_data)))
 
-        log(connection, "accept_recommended_objects",
-            node_id=node_id,
-            data=json_dumps(log_data))
+        with database.engine.connect() as connection:
+            tree = Tree(connection)
+            with t.child("save accepted/rejected to database"), connection.begin():
+                tree.relocate_objects(object_ids, node_id)
+                tree.reject_objects(node_id, rejected_object_ids)
 
-    print("Node {} adopted {} objects and rejected {} objects."
-          .format(node_id, len(object_ids), len(rejected_object_ids)))
+            log(connection, "accept_recommended_objects",
+                node_id=node_id,
+                data=json_dumps(log_data))
 
-    return jsonify({})
+        print("Node {} adopted {} objects and rejected {} objects."
+              .format(node_id, len(object_ids), len(rejected_object_ids)))
+
+        return jsonify({})
 
 
 @cache_serialize_page(".node_get_recommended_children", page_size=20)
