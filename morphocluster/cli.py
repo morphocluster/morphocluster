@@ -317,3 +317,19 @@ def init_app(app):
             log = pd.read_sql_query(
                 models.log.select(), conn, index_col="log_id")
             log.to_csv(filename)
+
+    @app.cli.command()
+    def truncate_log():
+        """
+        Truncate the log.
+        """
+        print("Truncate log")
+        print("WARNING: This is a destructive operation and all data will be lost.")
+
+        if input("Continue? (y/n) ") != "y":
+            print("Canceled.")
+            return
+
+        with database.engine.connect() as conn:
+            stmt = models.log.delete()
+            conn.execute(stmt)

@@ -1166,7 +1166,7 @@ def create_log_entry():
             log_data["action"],
             node_id=log_data["node_id"],
             reverse_action=log_data["reverse_action"],
-            data=json_dumps(log_data))
+            data=json_dumps(log_data["data"]))
 
     return jsonify({})
 
