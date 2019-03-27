@@ -157,6 +157,7 @@
     >
       <b-form-checkbox v-model="turtle_mode">Turtle mode</b-form-checkbox>
       <b-button
+        :disabled="saving"
         variant="success"
         v-b-tooltip.hover.html
         title="All visible recommendations match without exception. Increase left limit. <kbd>F</kbd>"
@@ -165,6 +166,7 @@
         <i class="mdi mdi-check-all" /> OK</b-button>
       <b-button
         id="button-not-ok"
+        :disabled="saving"
         variant="danger"
         v-b-tooltip.hover.html
         :title="not_ok_tooltip"
@@ -609,6 +611,11 @@ export default {
         saveResult() {
             // For each page in the valid range (0<=x<this.rec_interval_left):
             // Fetch members and assign to the current node.
+
+            if (this.saving) {
+                console.log("Saving already in progress!");
+                return;
+            }
 
             console.log("Saving...");
             this.saving = true;
