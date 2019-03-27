@@ -247,6 +247,7 @@ def init_app(app):
 
             for rid in root_ids:
                 with timer.child(str(rid)):
+                    print("Consolidating {}...".format(rid))
                     tree.consolidate_node(rid)
             print("Done.")
 
