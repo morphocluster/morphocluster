@@ -100,7 +100,7 @@ nodes_objects = Table('nodes_objects', metadata,
                       Column('object_id', None,
                              ForeignKey('objects.object_id',
                                         ondelete="CASCADE"),
-                             nullable=False),
+                             index=True, nullable=False),
                       UniqueConstraint('project_id', 'object_id')
                       )
 
