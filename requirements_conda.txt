@@ -1,3 +1,4 @@
 hdbscan
 h5py
 pandas
+python=3.6
