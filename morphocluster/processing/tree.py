@@ -414,6 +414,38 @@ class Tree(object):
 
         return result
 
+    def to_ete(self):
+        """
+        Return an ETE tree.
+        """
+        try:
+            from ete3 import Tree as ETETree
+        except ImportError as exc:
+            raise ImportError(
+                'You must have ete3 installed to export ETE trees') from exc
+
+        tree = ETETree()
+
+        nodes = {}
+
+        for row in self.topological_order():
+            try:
+                parent = nodes[row["parent_id"]]
+            except KeyError:
+                parent = tree
+
+            try:
+                name = row["name"]
+            except KeyError:
+                name = row["node_id"]
+
+            if pd.isnull(name):
+                name = ""
+
+            node = nodes[row["node_id"]] = parent.add_child(name=name)
+
+        return tree.children[0]
+
     def check_connectivity(self):
         """
         Traverse the tree and see if all nodes and objects are visited.
@@ -438,6 +470,86 @@ class Tree(object):
         Create a copy of this tree.
         """
         return Tree(self.nodes.copy(), self.objects.copy())
+
+    def to_flat(self, clean_name=True):
+        """
+        Returns a DataFrame with object_id and label.
+
+        Ignores objects without named ancestors.
+        """
+
+        node_idx = pd.Index(self.nodes["node_id"])
+
+        def _get_nodes(node_ids):
+            return [
+                self.nodes.loc[node_idx.get_loc(node_id)]
+                for node_id in node_ids]
+
+        def _clean_path_name(path):
+            result = ""
+
+            for name in path:
+                if not result:
+                    result = name
+                    continue
+
+                components = name.split("/")
+
+                # Filter out components that are already in the result
+                components = [c for c in components if c not in result]
+
+                result = "/".join([result] + components)
+
+            return result
+
+        objects = self.objects.copy()
+        objects["label"] = None
+
+        root_id = self.get_root_id()
+
+        for path, node_ids in self.walk():
+            path_nodes = _get_nodes(path[1:])
+
+            if clean_name:
+                path_name = _clean_path_name(
+                    str(node["name"]) for node in path_nodes)
+            else:
+                path_name = '/'.join(str(node["name"]) for node in path_nodes)
+
+            nodes = _get_nodes(node_ids)
+
+            # Do not descend into unnamed nodes
+            node_ids[:] = [n["node_id"]
+                           for n in nodes if not pd.isnull(n["name"])]
+
+            for node in nodes:
+                if node["node_id"] == root_id:
+                    continue
+
+                if pd.isnull(node["name"]):
+                    # This node has no name, append all objects below to the parent node
+                    subtree = sum(
+                        (node_ids for _, node_ids in self.walk([node["node_id"]])), [])
+
+                    object_selector = objects["node_id"].isin(subtree)
+                    objects.loc[object_selector, "label"] = path_name
+                else:
+                    node_name = str(node["name"])
+
+                    if clean_name:
+                        canonical_name = _clean_path_name(
+                            (path_name, node_name))
+                    else:
+                        canonical_name = '/'.join((path_name, node_name))
+
+                    print(" {}".format(canonical_name))
+
+                    # This node has a name, append objects to this node
+                    object_selector = objects["node_id"] == node["node_id"]
+                    objects.loc[object_selector, "label"] = canonical_name
+
+        result_mask = ~objects["label"].isna()
+        return objects.loc[result_mask, ["object_id", "label"]].reset_index(drop=True)
 
 
 if __name__ == "__main__":
