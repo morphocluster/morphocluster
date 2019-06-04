@@ -453,7 +453,6 @@ export default {
 
             nodeIdPromise
                 .then(node_id => {
-                    //TODO: This happens twice (??)
                     console.log("getNodeRecommendedObjects...");
                     this.rec_status = "loading";
 
@@ -463,6 +462,7 @@ export default {
                     );
                 })
                 .then(data => {
+                    // TODO: Do something when there are no recommendations!
                     this.rec_members = shuffle(data.data);
                     this.rec_base_url = data.links.self;
                     this.rec_n_pages = this.rec_interval_right =

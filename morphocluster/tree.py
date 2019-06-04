@@ -1034,6 +1034,8 @@ class Tree(object):
     def relocate_objects(self, object_ids, node_id, unapprove=False):
         """
         Relocate an object to another node.
+
+        TODO: This is slow!
         """
 
         if len(object_ids) == 0:
@@ -1051,6 +1053,9 @@ class Tree(object):
             new_node_path = self.get_path_ids(node_id)
 
             # Find current node_ids of the objects
+            # This is slow!
+            # old_node_ids is required for invalidation
+            # TODO: Distinct!
             stmt = select([nodes_objects.c.node_id], for_update=True).where(
                 nodes_objects.c.object_id.in_(object_ids) & (nodes_objects.c.project_id == project_id))
             old_node_ids = [r["node_id"]
