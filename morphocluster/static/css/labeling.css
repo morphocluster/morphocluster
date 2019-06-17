@@ -134,6 +134,15 @@
 	background-color: #1f78b4;
 }
 
+.member.ui-selecting, .member.ui-selected {
+	border-color: rgba(190, 235, 255, 0.75);
+}
+
+.member.highlight .member-title {
+	font-weight: bold;
+}
+
+
 .card .member-title {
 	flex-grow: 1;
 	overflow: hidden;
