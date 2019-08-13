@@ -8,7 +8,7 @@ import h5py
 import pandas as pd
 from etaprogress.progress import ProgressBar
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.sql.expression import bindparam
+from sqlalchemy.sql.expression import bindparam, select
 from timer_cm import Timer
 from werkzeug.security import generate_password_hash
 
@@ -28,6 +28,8 @@ def _add_user(username, password):
 
 
 def init_app(app):
+    #pylint: disable=unused-variable
+
     @app.cli.command()
     def reset_db():
         """
@@ -258,7 +260,7 @@ def init_app(app):
         password = getpass("Password: ")
         password_repeat = getpass("Retype Password: ")
 
-        if not len(password):
+        if not password:
             print("Password must not be empty!")
             return
 
@@ -316,7 +318,9 @@ def init_app(app):
     def export_log(filename):
         with database.engine.connect() as conn:
             log = pd.read_sql_query(
-                models.log.select(), conn, index_col="log_id")
+                select([models.log, models.nodes.c.project_id]),
+                conn,
+                index_col="log_id")
             log.to_csv(filename)
 
     @app.cli.command()
