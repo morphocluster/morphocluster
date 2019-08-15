@@ -28,7 +28,7 @@ def _add_user(username, password):
 
 
 def init_app(app):
-    #pylint: disable=unused-variable
+    # pylint: disable=unused-variable
 
     @app.cli.command()
     def reset_db():
@@ -318,7 +318,8 @@ def init_app(app):
     def export_log(filename):
         with database.engine.connect() as conn:
             log = pd.read_sql_query(
-                select([models.log, models.nodes.c.project_id]),
+                select([models.log, models.nodes.c.project_id])
+                .select_from(models.log.outerjoin(models.nodes)),
                 conn,
                 index_col="log_id")
             log.to_csv(filename)
