@@ -4,6 +4,7 @@ Created on 13.03.2018
 @author: mschroeder
 '''
 # pylint: disable=W,C,R
+import enum
 from sqlalchemy import Table, Column, ForeignKey, Index
 
 import datetime
@@ -85,8 +86,6 @@ nodes = Table('nodes', metadata,
               # An orig_id must be unique inside a project
               Index('idx_orig_proj', 'orig_id', 'project_id', unique=True),
 
-              # A node may not be its own child
-              CheckConstraint("node_id != parent_id")
               )
 
 nodes_objects = Table('nodes_objects', metadata,
@@ -139,8 +138,6 @@ log = Table("log", metadata,
 #     Column('ecotaxa_id', String)
 # )
 # ===============================================================================
-
-import enum
 
 
 class JobState(enum.Enum):
