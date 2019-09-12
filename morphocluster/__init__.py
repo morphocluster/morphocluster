@@ -2,8 +2,13 @@
 Create the MorphoCluster app.
 """
 
-from flask import Flask
 import os
+
+from flask import Flask
+
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
 
 
 def create_app(test_config=None):
