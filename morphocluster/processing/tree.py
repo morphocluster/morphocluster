@@ -31,7 +31,7 @@ class Tree(object):
     """
 
     @staticmethod
-    def from_collection(collection_fn, unlabeled_collection_fn=None):
+    def from_collection(collection_fn, unlabeled_collection_fn=None) -> 'Tree':
         """
         Read a collection of objects.
         """
@@ -78,7 +78,7 @@ class Tree(object):
         return Tree(nodes, objects)
 
     @staticmethod
-    def from_saved(tree_fn):
+    def from_saved(tree_fn) -> 'Tree':
         """
         Read a saved tree.
         """
@@ -99,7 +99,7 @@ class Tree(object):
         return Tree(nodes, objects, rejected_objects)
 
     @staticmethod
-    def from_HDBSCAN(path, root_first=True):
+    def from_HDBSCAN(path, root_first=True) -> 'Tree':
         """
         Read the tree from a HDBSCAN clustering.
         tree.csv is the condensed tree.
@@ -148,7 +148,7 @@ class Tree(object):
         return Tree(nodes, objects)
 
     @staticmethod
-    def from_labels(labels, object_ids):
+    def from_labels(labels, object_ids) -> 'Tree':
         """
         Construct a tree from a label vector and a vector of object_ids.
 
@@ -177,7 +177,7 @@ class Tree(object):
         return Tree(nodes, objects)
 
     @staticmethod
-    def from_cluster_labels(cluster_labels_fn, object_ids_fn=None):
+    def from_cluster_labels(cluster_labels_fn, object_ids_fn=None) -> 'Tree':
         """
         Construct tree from a cluster_labels file.
 
@@ -267,7 +267,8 @@ class Tree(object):
         Get the ID of the root node.
         """
         selector = self.nodes["parent_id"].isnull()
-        return np.asscalar(self.nodes.loc[selector, "node_id"])
+        result = self.nodes.loc[selector, "node_id"]
+        return next(iter(result), None)
 
     def topological_order(self):
         """
@@ -462,7 +463,7 @@ class Tree(object):
         # Check objects
         ons = set(self.objects["node_id"])
         nns = set(self.nodes["node_id"])
-        if len(ons - nns):
+        if ons - nns:
             raise ValueError("Some objects are not reachable.")
 
     def copy(self):
