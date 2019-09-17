@@ -1,0 +1,30 @@
+name: morphocluster
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - numpy
+  - pandas
+  - h5py>=2.8.0
+  - scikit-learn
+  - scipy
+  - pip
+  - hdbscan
+  - pip:
+    - gunicorn
+    - flask>=1.0.2
+    - psycopg2-binary
+    - sqlalchemy
+    - redis >= 3.0, < 3.1
+    - hiredis
+    - alembic
+    - Flask-SQLAlchemy
+    - flask-redis
+    - Flask-Migrate
+    - fire
+    - marshmallow>=3.0.0b20
+    - match_arrays
+    - Flask-RQ2
+    - tqdm
+

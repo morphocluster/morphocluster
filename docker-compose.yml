@@ -1,0 +1,17 @@
+version: '3'
+services:
+  morphocluster:
+    container_name: morphocluster
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+  postgres:
+    image: "postgres:10-alpine"
+    environment:
+      POSTGRES_USER: morphocluster
+      POSTGRES_PASSWORD: morphocluster
+      POSTGRES_DB: morphocluster

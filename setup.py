@@ -1,8 +1,11 @@
 from setuptools import setup
+import versioneer
 
 setup(
     name='morphocluster',
     packages=['morphocluster'],
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     include_package_data=True,
     install_requires=[
         'flask>=1.0.2',
@@ -25,6 +28,8 @@ setup(
         'marshmallow>=3.0.0b20',
         'match_arrays',
         'Flask-RQ2',
+        'tqdm',
+        'hdbscan',
     ],
     setup_requires=["pytest-runner"],
     tests_require=["pytest"],
