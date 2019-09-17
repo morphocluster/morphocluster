@@ -15,6 +15,7 @@ from werkzeug.security import generate_password_hash
 from morphocluster import models
 from morphocluster.extensions import database
 from morphocluster.tree import Tree
+from morphocluster.objects import load_object_collection, load_object_features
 
 
 def _add_user(username, password):
@@ -88,30 +89,7 @@ def init_app(app):
     @app.cli.command()
     @click.argument('collection_fn')
     def load_object_locations(collection_fn):
-        """
-        Load a collection of objects.
-        """
-        # Load collections
-        with database.engine.begin() as txn:
-            print("Loading {}...".format(collection_fn))
-            data = pd.read_csv(collection_fn,
-                               header=None,
-                               names=["object_id", "path", "label"],
-                               usecols=["object_id", "path"])
-
-            data_iter = data.itertuples()
-            bar = ProgressBar(len(data), max_width=40)
-            while True:
-                chunk = tuple(itertools.islice(data_iter, 5000))
-                if not chunk:
-                    break
-                txn.execute(models.objects.insert(),
-                            [row._asdict() for row in chunk])
-
-                bar.numerator += len(chunk)
-                print(bar, end="\r")
-            print()
-            print("Done.")
+        load_object_collection(collection_fn)
 
     @app.cli.command()
     @click.argument('features_fns', nargs=-1)
@@ -119,31 +97,7 @@ def init_app(app):
         """
         Load object features from an HDF5 file.
         """
-        for features_fn in features_fns:
-            print("Loading {}...".format(features_fn))
-            with h5py.File(features_fn, "r", libver="latest") as f_features, database.engine.begin() as conn:
-                object_ids = f_features["objids"]
-                vectors = f_features["features"]
-
-                stmt = (models.objects.update()
-                        .where(models.objects.c.object_id == bindparam('_object_id'))
-                        .values({
-                            'vector': bindparam('vector')
-                        }))
-
-                bar = ProgressBar(len(object_ids), max_width=40)
-                obj_iter = iter(zip(object_ids, vectors))
-                while True:
-                    chunk = tuple(itertools.islice(obj_iter, 1000))
-                    if not chunk:
-                        break
-                    conn.execute(stmt, [{"_object_id": str(object_id), "vector": vector} for (
-                        object_id, vector) in chunk])
-
-                    bar.numerator += len(chunk)
-                    print(bar, end="\r")
-                print()
-                print("Done.")
+        load_object_features(features_fns)
 
     @app.cli.command()
     @click.argument('tree_fn')
