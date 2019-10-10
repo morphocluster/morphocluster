@@ -35,7 +35,7 @@ from morphocluster.classifier import Classifier
 from morphocluster.extensions import database, redis_lru, rq
 from morphocluster.helpers import keydefaultdict, seq2array
 from morphocluster.schemas import JobSchema, LogSchema
-from morphocluster.tree import Tree
+from morphocluster.project import Project
 
 api = Blueprint("api", __name__)
 
@@ -51,7 +51,7 @@ def batch(iterable, n=1):
 
 def json_converter(value):
     if isinstance(value, np.floating):
-        return float(o)
+        return float(value)
     if isinstance(value, np.integer):
         return int(value)
     if isinstance(value, np.bool):
@@ -76,7 +76,8 @@ def jsonify(*args, **kwargs):
         raise
 
 
-def log(connection, action, node_id=None, reverse_action=None, data=None):
+def log(action, node_id=None, reverse_action=None, data=None):
+    connection = database.get_connection()
     auth = request.authorization
     username = auth.username if auth is not None else None
 
@@ -122,16 +123,17 @@ def _tree_root(project):
     project["text"] = project["name"]
     project["children"] = True
     project["icon"] = "mdi mdi-tree"
-    project["id"] = project["node_id"]
+    project["id"] = _node_id_frontend(
+        project["project_id"], project["node_id"])
 
     return project
 
 
-def _tree_node(node, supertree=False):
+def _tree_node(node):
     result = {
-        "id": node["node_id"],
+        "id": "{}:{}".format(node["project_id"], node["node_id"]),
         "text": "{} ({})".format(node["name"] or node["node_id"], node["_n_children"]),
-        "children": node["n_superchildren"] > 0 if supertree else node["_n_children"] > 0,
+        "children": node["_n_children"] > 0,
         "icon": _node_icon(node)
     }
 
@@ -140,27 +142,19 @@ def _tree_node(node, supertree=False):
 
 @api.route("/tree", methods=["GET"])
 def get_tree_root():
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
-        result = [_tree_root(p) for p in tree.get_projects()]
-
-        return jsonify(result)
+    result = [_tree_root(p) for p in Project.get_all()]
+    return jsonify(result)
 
 
-@api.route("/tree/<int:node_id>", methods=["GET"])
-def get_subtree(node_id):
-    flags = {k: request.args.get(k, 0, strtobool) for k in ("supertree",)}
+@api.route("/tree/<id_>", methods=["GET"])
+def get_subtree(id_: str):
 
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
+    project_id, node_id = (int(x) for x in id_.split(":", maxsplit=1))
 
-        if flags["supertree"]:
-            children = tree.get_children(
-                node_id, supertree=True, include="starred", order_by="_n_children DESC")
-        else:
-            children = tree.get_children(node_id, order_by="_n_children DESC")
+    with Project(project_id) as project:
+        children = project.get_children(node_id, order_by="_n_children DESC")
 
-        result = [_tree_node(c, flags["supertree"]) for c in children]
+        result = [_tree_node(c) for c in children]
 
         return jsonify(result)
 
@@ -175,17 +169,15 @@ def get_projects():
     parser.add_argument("include_progress", type=strtobool, default=0)
     arguments = parser.parse_args(strict=True)
 
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
+    projects = Project.get_all()
 
-        projects = tree.get_projects()
-
-        if arguments["include_progress"]:
-            for p in projects:
-                progress = tree.calculate_progress(p["node_id"])
+    if arguments["include_progress"]:
+        for p in projects:
+            with Project(p["project_id"]) as project:
+                progress = project.calculate_progress()
                 p["progress"] = progress
 
-        return jsonify(projects)
+    return jsonify(projects)
 
 
 @api.route("/projects/<int:project_id>", methods=["GET"])
@@ -195,31 +187,13 @@ def get_project(project_id):
     parser.add_argument("include_progress", type=strtobool, default=0)
     arguments = parser.parse_args(strict=True)
 
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
-        result = tree.get_project(project_id)
-
+    with Project(project_id) as project:
+        result = project.to_dict()
         if arguments["include_progress"]:
-            progress = tree.calculate_progress(result["node_id"])
+            progress = project.calculate_progress()
             result["progress"] = progress
 
         return jsonify(result)
-
-
-@api.route("/projects/<int:project_id>/unfilled_nodes", methods=["GET"])
-def get_unfilled_nodes(project_id):
-    # with database.engine.connect() as connection:
-    #     tree = Tree(connection)
-    #     result = tree.get_project(project_id)
-
-    #     if arguments["include_progress"]:
-    #         progress = tree.calculate_progress(result["node_id"])
-    #         result["progress"] = progress
-
-    #     return jsonify(result)
-
-    # TODO
-    return jsonify([10622])
 
 
 @api.route("/projects/<int:project_id>/save", methods=["POST"])
@@ -227,88 +201,86 @@ def save_project(project_id):
     """
     Save the project at PROJECT_EXPORT_DIR.
     """
-    with database.engine.connect() as conn:
-        tree = Tree(conn)
 
-        project = tree.get_project(project_id)
+    with Project(project_id) as project:
+        p_dict = project.to_dict()
 
-        root_id = tree.get_root_id(project_id)
+        tree_fn = os.path.join(
+            api.config["PROJECT_EXPORT_DIR"],
+            "{:%Y-%m-%d-%H-%M-%S}--{}--{}.zip".format(datetime.now(),
+                                                      p_dict["project_id"],
+                                                      p_dict["name"]))
 
-        tree_fn = os.path.join(api.config["PROJECT_EXPORT_DIR"],
-                               "{:%Y-%m-%d-%H-%M-%S}--{}--{}.zip".format(datetime.now(),
-                                                                         project["project_id"],
-                                                                         project["name"]))
-
-        tree.export_tree(root_id, tree_fn)
+        project.export_tree(tree_fn)
 
         return jsonify({
             "tree_fn": tree_fn,
         })
 
 # ===============================================================================
-# /nodes
+# /projects/<project_id>/nodes
 # ===============================================================================
 
 
-@api.route("/nodes", methods=["POST"])
-def create_node():
+@api.route("/projects/<int:project_id>/nodes", methods=["POST"])
+def create_node(project_id):
     """
     Create a new node.
 
     Request parameters:
-        project_id
         name
         members
         starred
     """
 
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
+    with Project(project_id) as project:
         data = request.get_json()
 
         object_ids = [m["object_id"]
                       for m in data["members"] if "object_id" in m]
-        node_ids = [m["node_id"] for m in data["members"] if "node_id" in m]
+        child_node_ids = [m["node_id"]
+                          for m in data["members"] if "node_id" in m]
 
-        project_id = data.get("project_id", None)
         name = data.get("name", None)
         parent_id = int(data.get("parent_id"))
 
         starred = strtobool(str(data.get("starred", "0")))
 
-        if project_id is None:
-            # Retrieve project_id for the parent_id
-            project_id = tree.get_node(parent_id)["project_id"]
-
         print(data)
 
-        with connection.begin():
-            node_id = tree.create_node(
-                int(project_id), parent_id=parent_id, name=name, starred=starred)
+        node_id = project.create_node(
+            parent_id=parent_id, name=name, starred=starred)
 
-            tree.relocate_nodes(node_ids, node_id)
+        project.relocate_nodes(child_node_ids, node_id)
 
-            tree.relocate_objects(object_ids, node_id)
+        project.relocate_objects(object_ids, node_id)
 
-            log(connection, "create_node", node_id=node_id)
+        log("create_node", node_id=node_id)
+        print("Created node {}.".format(node_id))
 
-            node = tree.get_node(node_id, require_valid=True)
+        node = project.get_node(node_id, require_valid=True)
 
-            print("Created node {}.".format(node_id))
-
-        result = _node(tree, node)
+        result = _node(project, node)
 
         return jsonify(result)
 
 
-def _node(tree, node, include_children=False):
+def _node_id_frontend(project_id, node_id):
+    """Generate a <project_id>:<node_id> ID for the frontend."""
+    return "{}:{}".format(project_id, node_id)
+
+
+def _node(project, node, include_children=False):
     if node["name"] is None:
         node["name"] = node["node_id"]
 
     result = {
         "node_id": node["node_id"],
         "id": node["node_id"],
-        "path": tree.get_path_ids(node["node_id"]),
+        "path": [
+            _node_id_frontend(project.project_id, nid)
+            for nid in project.get_path_ids(node["node_id"])
+        ],
         "text": "{} ({})".format(node["name"], node["_n_children"]),
         "name": node["name"],
         "children": node["_n_children"] > 0,
@@ -326,8 +298,8 @@ def _node(tree, node, include_children=False):
     }
 
     if include_children:
-        result["children"] = [_node(tree, c)
-                              for c in tree.get_children(node["node_id"])]
+        result["children"] = [_node(project, c)
+                              for c in project.get_children(node["node_id"])]
 
     return result
 
@@ -377,8 +349,8 @@ def _arrange_by_nleaves(result):
     return np.argsort(n_leaves)[::-1]
 
 
-def _members(tree, members):
-    return [_node(tree, m) if "node_id" in m else _object(m) for m in members]
+def _members(project, members):
+    return [_node(project, m) if "node_id" in m else _object(m) for m in members]
 
 
 def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=True):
@@ -400,7 +372,7 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
             if compress:
                 page_result = zlib.decompress(page_result).decode()
 
-            #print("Returning page {} from cached result".format(page))
+            # print("Returning page {} from cached result".format(page))
 
             return page_result, n_pages, request_id
 
@@ -425,11 +397,11 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
 
     if n_pages:
         if compress:
-            #raw_length = sum(len(p) for p in pages)
+            # raw_length = sum(len(p) for p in pages)
             cache_pages = [zlib.compress(p.encode()) for p in pages]
-            #compressed_length = sum(len(p) for p in pages)
+            # compressed_length = sum(len(p) for p in pages)
 
-            #print("Compressed pages. Ratio: {:.2%}".format(compressed_length / raw_length))
+            # print("Compressed pages. Ratio: {:.2%}".format(compressed_length / raw_length))
         else:
             cache_pages = pages
 
@@ -573,24 +545,23 @@ def _arrange_by_starred_sim(result, starred):
 
 
 @cache_serialize_page(".get_node_members")
-def _get_node_members(node_id, nodes=False, objects=False, arrange_by="", starred_first=False, descending=False):
-    with database.engine.connect() as connection, Timer("_get_node_members") as timer:
-        tree = Tree(connection)
+def _get_node_members(project_id, node_id, nodes=False, objects=False, arrange_by="", starred_first=False, descending=False):
+    with Project(project_id) as project, Timer("_get_node_members") as timer:
 
         sorted_nodes_include = "unstarred" if starred_first else None
 
         result = []
         if nodes:
-            with timer.child("tree.get_children()"):
-                result.extend(tree.get_children(
+            with timer.child("project.get_children()"):
+                result.extend(project.get_children(
                     node_id, include=sorted_nodes_include))
         if objects:
-            with timer.child("tree.get_objects()"):
-                result.extend(tree.get_objects(node_id))
+            with timer.child("project.get_objects()"):
+                result.extend(project.get_objects(node_id))
 
         if arrange_by == "starred_sim" or starred_first:
-            with timer.child("tree.get_children(starred)"):
-                starred = tree.get_children(node_id, include="starred")
+            with timer.child("project.get_children(starred)"):
+                starred = project.get_children(node_id, include="starred")
 
         if arrange_by != "":
             result = np.array(result, dtype=object)
@@ -605,7 +576,7 @@ def _get_node_members(node_id, nodes=False, objects=False, arrange_by="", starre
                 with timer.child("starred_sim"):
                     # If no starred members yet, arrange by distance to regular children
                     anchors = starred if len(
-                        starred) else tree.get_children(node_id)
+                        starred) else project.get_children(node_id)
 
                     order = _arrange_by_starred_sim(result, anchors)
             elif arrange_by == "interleaved":
@@ -641,12 +612,12 @@ def _get_node_members(node_id, nodes=False, objects=False, arrange_by="", starre
         if starred_first:
             result = starred + result
 
-        result = _members(tree, result)
+        result = _members(project, result)
 
         return result
 
 
-@api.route("/nodes/<int:node_id>/members", methods=["GET"])
+@api.route("/projects/<int:project_id>/nodes/<int:node_id>/members", methods=["GET"])
 def get_node_members(node_id):
     """
     Provide a collection of objects and/or children.
@@ -680,8 +651,8 @@ def get_node_members(node_id):
     return _get_node_members(node_id=node_id, **arguments)
 
 
-@api.route("/nodes/<int:node_id>/progress", methods=["GET"])
-def get_node_stats(node_id):
+@api.route("/projects/<int:project_id>/nodes/<int:node_id>/progress", methods=["GET"])
+def get_node_stats(project_id, node_id):
     """
     Return progress information about this node.
 
@@ -699,57 +670,49 @@ def get_node_stats(node_id):
     parser.add_argument("log", default=None)
     arguments = parser.parse_args(strict=True)
 
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
+    with Project(project_id) as project:
+        progress = project.calculate_progress(node_id)
 
-        with connection.begin():
-            progress = tree.calculate_progress(node_id)
+        if arguments["log"] is not None:
+            log("progress-{}".format(arguments["log"]),
+                node_id=node_id, data=json_dumps(progress))
 
-            if arguments["log"] is not None:
-                log(connection, "progress-{}".format(arguments["log"]),
-                    node_id=node_id, data=json_dumps(progress))
-
-            return jsonify(progress)
+        return jsonify(progress)
 
 
-@api.route("/nodes/<int:node_id>/members", methods=["POST"])
-def post_node_members(node_id):
+@api.route("/projects/<int:project_id>/nodes/<int:node_id>/members", methods=["POST"])
+def post_node_members(project_id, node_id):
     data = request.get_json()
 
     object_ids = [d["object_id"] for d in data if "object_id" in d]
     node_ids = [d["node_id"] for d in data if "node_id" in d]
 
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
+    with Project(project_id) as project:
+        project.relocate_nodes(node_ids, node_id)
+        project.relocate_objects(object_ids, node_id)
 
-        with connection.begin():
-            tree.relocate_nodes(node_ids, node_id)
-            tree.relocate_objects(object_ids, node_id)
-
-    return jsonify("ok")
+    return "", 204
 
 
-@api.route("/nodes/<int:node_id>", methods=["GET"])
-def get_node(node_id):
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
+@api.route("/projects/<int:project_id>/<int:node_id>", methods=["GET"])
+def get_node(project_id, node_id):
+    with Project(project_id) as project:
 
         flags = {k: request.args.get(k, 0, strtobool)
                  for k in ("include_children",)}
 
-        node = tree.get_node(node_id)
+        node = project.get_node(node_id)
 
-        log(connection, "get_node", node_id=node_id)
+        log("get_node", node_id=node_id)
 
-        result = _node(tree, node, **flags)
+        result = _node(project, node, **flags)
 
         return jsonify(result)
 
 
-@api.route("/nodes/<int:node_id>", methods=["PATCH"])
-def patch_node(node_id):
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
+@api.route("/projects/<int:project_id>/nodes/<int:node_id>", methods=["PATCH"])
+def patch_node(project_id, node_id):
+    with Project(project_id) as project:
 
         data = request.get_json()
         flags = {k: request.args.get(k, 0, strtobool)
@@ -759,26 +722,20 @@ def patch_node(node_id):
         if "starred" in data:
             data["starred"] = strtobool(str(data["starred"]))
 
-        if "parent_id" in data:
-            raise ValueError(
-                "parent_id must not be set directly, use /nodes/<node_id>/adopt.")
+        project.update_node(node_id, data)
 
-        with connection.begin():
-            tree.update_node(node_id, data)
+        log("update_node({})".format(json.dumps(data, sort_keys=True)),
+            node_id=node_id)
 
-            log(connection,
-                "update_node({})".format(json.dumps(data, sort_keys=True)),
-                node_id=node_id)
+        node = project.get_node(node_id, True)
 
-            node = tree.get_node(node_id, True)
-
-        result = _node(tree, node, **flags)
+        result = _node(project, node, **flags)
 
         return jsonify(result)
 
 
-@api.route("/nodes/<int:parent_id>/adopt_members", methods=["POST"])
-def node_adopt_members(parent_id):
+@api.route("/projects/<int:project_id>/nodes/<int:parent_id>/adopt_members", methods=["POST"])
+def node_adopt_members(project_id, parent_id):
     """
     Adopt a list of nodes.
 
@@ -791,17 +748,15 @@ def node_adopt_members(parent_id):
     Returns:
         Nothing.
     """
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
+    with Project(project_id) as project:
 
         members = request.get_json()["members"]
 
         node_ids = [int(m["node_id"]) for m in members if "node_id" in m]
         object_ids = [m["object_id"] for m in members if "object_id" in m]
 
-        with connection.begin():
-            tree.relocate_nodes(node_ids, parent_id)
-            tree.relocate_objects(object_ids, parent_id)
+        project.relocate_nodes(node_ids, parent_id)
+        project.relocate_objects(object_ids, parent_id)
 
         print("Node {} adopted {} nodes and {} objects."
               .format(parent_id, len(node_ids), len(object_ids)))
@@ -809,8 +764,8 @@ def node_adopt_members(parent_id):
         return jsonify({})
 
 
-@api.route("/nodes/<int:node_id>/accept_recommended_objects", methods=["POST"])
-def accept_recommended_objects(node_id):
+@api.route("/projects/<int:project_id>/nodes/<int:node_id>/accept_recommended_objects", methods=["POST"])
+def accept_recommended_objects(project_id, node_id):
     """
     Accept recommended objects.
 
@@ -840,6 +795,7 @@ def accept_recommended_objects(node_id):
         with t.child("assemble list of accepted objects"):
             object_ids = []
             for page in range(parameters["last_page"] + 1):
+                # pylint: disable=unexpected-keyword-arg
                 response = _node_get_recommended_objects(
                     node_id=node_id, request_id=parameters["request_id"], page=page)
                 page_object_ids = (v["object_id"]
@@ -865,7 +821,8 @@ def accept_recommended_objects(node_id):
 
         with t.child("filter accepted objects"):
             # Filter object_ids
-            object_ids = [o for o in object_ids if o not in rejected_object_ids]
+            object_ids = [
+                o for o in object_ids if o not in rejected_object_ids]
 
         # print(object_ids)
 
@@ -883,13 +840,11 @@ def accept_recommended_objects(node_id):
             raise ValueError(
                 "Parameter log_data should be a dict, got a {}!".format(type(addlog_data)))
 
-        with database.engine.connect() as connection:
-            tree = Tree(connection)
-            with t.child("save accepted/rejected to database"), connection.begin():
-                tree.relocate_objects(object_ids, node_id)
-                tree.reject_objects(node_id, rejected_object_ids)
+        with Project(project_id) as project, t.child("save accepted/rejected to database"):
+            project.relocate_objects(object_ids, node_id)
+            project.reject_objects(node_id, rejected_object_ids)
 
-            log(connection, "accept_recommended_objects",
+            log("accept_recommended_objects",
                 node_id=node_id,
                 data=json_dumps(log_data))
 
@@ -900,16 +855,15 @@ def accept_recommended_objects(node_id):
 
 
 @cache_serialize_page(".node_get_recommended_children", page_size=20)
-def _node_get_recommended_children(node_id, max_n):
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
-        result = [_node(tree, c)
-                  for c in tree.recommend_children(node_id, max_n=max_n)]
+def _node_get_recommended_children(project_id, node_id, max_n):
+    with Project(project_id) as project:
+        result = [_node(project, c)
+                  for c in project.recommend_children(node_id, max_n=max_n)]
         return result
 
 
-@api.route("/nodes/<int:node_id>/recommended_children", methods=["GET"])
-def node_get_recommended_children(node_id):
+@api.route("/projects/<int:project_id>/nodes/<int:node_id>/recommended_children", methods=["GET"])
+def node_get_recommended_children(project_id, node_id):
     """
     Recommend children for this node.
 
@@ -929,21 +883,21 @@ def node_get_recommended_children(node_id):
     # Limit max_n
     arguments.max_n = max(arguments.max_n, 1000)
 
-    return _node_get_recommended_children(node_id=node_id, **arguments)
+    return _node_get_recommended_children(project_id=project_id, node_id=node_id, **arguments)
 
 
 @cache_serialize_page(".node_get_recommended_objects", page_size=50)
-def _node_get_recommended_objects(node_id=None, max_n=None):
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
+def _node_get_recommended_objects(project_id=None, node_id=None, max_n=None):
+    with Project(project_id) as project:
 
-        result = [_object(o) for o in tree.recommend_objects(node_id, max_n)]
+        result = [_object(o)
+                  for o in project.recommend_objects(node_id, max_n)]
 
         return result
 
 
-@api.route("/nodes/<int:node_id>/recommended_objects", methods=["GET"])
-def node_get_recommended_objects(node_id):
+@api.route("/projects/<int:project_id>/nodes/<int:node_id>/recommended_objects", methods=["GET"])
+def node_get_recommended_objects(project_id, node_id):
     """
     Recommend objects for this node.
 
@@ -964,27 +918,18 @@ def node_get_recommended_objects(node_id):
     # Limit max_n
     arguments.max_n = max(arguments.max_n, 1000)
 
-    return _node_get_recommended_objects(node_id=node_id, **arguments)
+    return _node_get_recommended_objects(project_id=project_id, node_id=node_id, **arguments)
 
 
-@api.route("/nodes/<int:node_id>/tip", methods=["GET"])
-def node_get_tip(node_id):
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
-
-        return jsonify(tree.get_tip(node_id))
-
-
-@api.route("/nodes/<int:node_id>/next", methods=["GET"])
-def node_get_next(node_id):
+@api.route("/projects/<int:project_id>/nodes/<int:node_id>/next_unapproved", methods=["GET"])
+def node_get_next(project_id, node_id):
     parser = reqparse.RequestParser()
     parser.add_argument("leaf", type=strtobool, default=False)
     arguments = parser.parse_args(strict=True)
 
     print(arguments)
 
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
+    with Project(project_id) as project:
 
         # Descend if the successor is not approved
         # Rationale: Approval is for a whole subtree.
@@ -993,11 +938,17 @@ def node_get_next(node_id):
         # Filter descendants that are not approved
         def filter(subtree): return subtree.c.approved == False
 
-        return jsonify(tree.get_next_node(node_id, leaf=arguments["leaf"], recurse_cb=recurse, filter=filter))
+        result = project.get_next_node(
+            node_id,
+            leaf=arguments["leaf"],
+            recurse_cb=recurse,
+            filter=filter)
+
+        return jsonify(result)
 
 
-@api.route("/nodes/<int:node_id>/next_unfilled", methods=["GET"])
-def node_get_next_unfilled(node_id):
+@api.route("/projects/<int:project_id>/nodes/<int:node_id>/next_unfilled", methods=["GET"])
+def node_get_next_unfilled(project_id, node_id):
     parser = reqparse.RequestParser()
     parser.add_argument("leaf", type=strtobool, default=False)
     parser.add_argument("preferred_first", type=strtobool, default=False)
@@ -1005,30 +956,23 @@ def node_get_next_unfilled(node_id):
 
     print(arguments)
 
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
+    with Project(project_id) as project:
 
         # Filter descendants that are approved and unfilled
         def filter(subtree): return (subtree.c.approved ==
                                      True) & (subtree.c.filled == False)
 
-        return jsonify(tree.get_next_node(node_id, leaf=arguments["leaf"], preferred_first=arguments["preferred_first"], filter=filter))
+        result = project.get_next_node(
+            node_id,
+            leaf=arguments["leaf"],
+            preferred_first=arguments["preferred_first"],
+            filter=filter)
+
+        return jsonify(result)
 
 
-@api.route("/nodes/<int:node_id>/n_sorted", methods=["GET"])
-def node_get_n_sorted(node_id):
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
-
-        nodes = tree.get_minlevel_starred(node_id)
-
-        n_sorted = sum(n["_n_objects_deep"] for n in nodes)
-
-        return jsonify(n_sorted)
-
-
-@api.route("/nodes/<int:node_id>/merge_into", methods=["POST"])
-def post_node_merge_into(node_id):
+@api.route("/projects/<int:project_id>/nodes/<int:node_id>/merge_into", methods=["POST"])
+def post_node_merge_into(project_id, node_id):
     """
     Merge a node into another node.
 
@@ -1038,24 +982,23 @@ def post_node_merge_into(node_id):
     Request parameters (body):
         dest_node_id: Node that absorbs the children and objects.
     """
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
+    with Project(project_id) as project:
 
         data = request.get_json()
 
         print(data)
 
         # TODO: Unapprove
-        tree.merge_node_into(node_id, data["dest_node_id"])
+        project.merge_node_into(node_id, data["dest_node_id"])
 
-        log(connection, "merge_node_into({}, {})".format(node_id, data["dest_node_id"]),
+        log("merge_node_into({}, {})".format(node_id, data["dest_node_id"]),
             node_id=data["dest_node_id"])
 
         return jsonify(None)
 
 
-@api.route("/nodes/<int:node_id>/classify", methods=["POST"])
-def post_node_classify(node_id):
+@api.route("/projects/<int:project_id>/nodes/<int:node_id>/classify", methods=["POST"])
+def post_node_classify(project_id, node_id):
     """
     Classify the members of a node into their starred siblings.
 
@@ -1077,87 +1020,85 @@ def post_node_classify(node_id):
     n_predicted_children = 0
     n_predicted_objects = 0
 
-    with database.engine.connect() as connection:
-        tree = Tree(connection)
+    with Project(project_id) as project:
 
         # Split children into starred and unstarred
-        with connection.begin():
-            children = tree.get_children(node_id)
+        children = project.get_children(node_id)
 
-            starred = []
-            unstarred = []
-            for c in children:
-                (starred if c["starred"] else unstarred).append(c)
+        starred = []
+        unstarred = []
+        for c in children:
+            (starred if c["starred"] else unstarred).append(c)
 
-            starred_centroids = np.array([c["_centroid"] for c in starred])
+        starred_centroids = np.array([c["_centroid"] for c in starred])
 
-            print("|starred_centroids|", np.linalg.norm(
-                starred_centroids, axis=1))
+        print("|starred_centroids|", np.linalg.norm(
+            starred_centroids, axis=1))
 
-            # Initialize classifier
-            classifier = Classifier(starred_centroids)
+        # Initialize classifier
+        classifier = Classifier(starred_centroids)
 
-            if flags["subnode"]:
-                def _subnode_for(node_id):
-                    return tree.create_node(parent_id=node_id, name="classified")
-                target_nodes = keydefaultdict(_subnode_for)
-            else:
-                target_nodes = keydefaultdict(lambda k: k)
+        if flags["subnode"]:
+            def _subnode_for(node_id):
+                return project.create_node(parent_id=node_id, name="classified")
+            target_nodes = keydefaultdict(_subnode_for)
+        else:
+            target_nodes = keydefaultdict(lambda k: k)
 
-            if flags["nodes"]:
-                unstarred_centroids = np.array(
-                    [c["_centroid"] for c in unstarred])
-                unstarred_ids = np.array([c["node_id"] for c in unstarred])
+        if flags["nodes"]:
+            unstarred_centroids = np.array(
+                [c["_centroid"] for c in unstarred])
+            unstarred_ids = np.array([c["node_id"] for c in unstarred])
 
-                # Predict unstarred children (if any)
-                n_unstarred = len(unstarred_centroids)
-                if n_unstarred > 0:
-                    print("Predicting {} unstarred children of {}...".format(
-                        n_unstarred, node_id))
-                    type_predicted = classifier.classify(
-                        unstarred_centroids, safe=flags["safe"])
-
-                    for i, starred_node in enumerate(starred):
-                        nodes_to_move = [
-                            int(n) for n in unstarred_ids[type_predicted == i]]
-
-                        if len(nodes_to_move):
-                            target_node_id = target_nodes[starred_node["node_id"]]
-                            tree.relocate_nodes(nodes_to_move,
-                                                target_node_id,
-                                                unapprove=True)
-
-                    n_predicted_children = np.sum(type_predicted > -1)
-
-            if flags["objects"]:
-                # Predict objects
-                objects = tree.get_objects(node_id)
-                print("Predicting {} objects of {}...".format(
-                    len(objects), node_id))
-                object_vectors = np.array([o["vector"] for o in objects])
-                object_ids = np.array([o["object_id"] for o in objects])
-
+            # Predict unstarred children (if any)
+            n_unstarred = len(unstarred_centroids)
+            if n_unstarred > 0:
+                print("Predicting {} unstarred children of {}...".format(
+                    n_unstarred, node_id))
                 type_predicted = classifier.classify(
-                    object_vectors, safe=flags["safe"])
+                    unstarred_centroids, safe=flags["safe"])
 
                 for i, starred_node in enumerate(starred):
-                    objects_to_move = [str(o)
-                                       for o in object_ids[type_predicted == i]]
-                    if len(objects_to_move):
+                    nodes_to_move = [
+                        int(n) for n in unstarred_ids[type_predicted == i]]
+
+                    if len(nodes_to_move):
                         target_node_id = target_nodes[starred_node["node_id"]]
-                        print(
-                            "Moving objects {!r} -> {}".format(objects_to_move, target_node_id))
-                        tree.relocate_objects(objects_to_move,
-                                              target_node_id,
-                                              unapprove=True)
+                        project.relocate_nodes(nodes_to_move,
+                                               target_node_id,
+                                               unapprove=True)
 
-                n_predicted_objects = np.sum(type_predicted > -1)
+                n_predicted_children = np.sum(type_predicted > -1)
 
-            log(connection, "classify_members(nodes={nodes},objects={objects})".format(
-                **flags), node_id=node_id)
+        if flags["objects"]:
+            # Predict objects
+            objects = project.get_objects(node_id)
+            print("Predicting {} objects of {}...".format(
+                len(objects), node_id))
+            object_vectors = np.array([o["vector"] for o in objects])
+            object_ids = np.array([o["object_id"] for o in objects])
 
-            return jsonify({"n_predicted_children": int(n_predicted_children),
-                            "n_predicted_objects": int(n_predicted_objects)})
+            type_predicted = classifier.classify(
+                object_vectors, safe=flags["safe"])
+
+            for i, starred_node in enumerate(starred):
+                objects_to_move = [str(o)
+                                   for o in object_ids[type_predicted == i]]
+                if len(objects_to_move):
+                    target_node_id = target_nodes[starred_node["node_id"]]
+                    print(
+                        "Moving objects {!r} -> {}".format(objects_to_move, target_node_id))
+                    project.relocate_objects(objects_to_move,
+                                             target_node_id,
+                                             unapprove=True)
+
+            n_predicted_objects = np.sum(type_predicted > -1)
+
+        log("classify_members(nodes={nodes},objects={objects})".format(
+            **flags), node_id=node_id)
+
+        return jsonify({"n_predicted_children": int(n_predicted_children),
+                        "n_predicted_objects": int(n_predicted_objects)})
 
 
 @api.route("/log", methods=["POST"])
@@ -1166,12 +1107,12 @@ def create_log_entry():
 
     print("Log:", log_data)
 
-    with database.engine.connect() as connection:
-        log(connection,
-            log_data["action"],
-            node_id=log_data["node_id"],
-            reverse_action=log_data["reverse_action"],
-            data=json_dumps(log_data["data"]))
+    log(
+        log_data["action"],
+        node_id=log_data["node_id"],
+        reverse_action=log_data["reverse_action"],
+        data=json_dumps(log_data["data"])
+    )
 
     return jsonify({})
 

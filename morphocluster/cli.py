@@ -13,18 +13,18 @@ from timer_cm import Timer
 from werkzeug.security import generate_password_hash
 
 from morphocluster import models
+from morphocluster.dataset import Dataset
 from morphocluster.extensions import database
 from morphocluster.tree import Tree
-from morphocluster.objects import load_object_collection, load_object_features
 
 
 def _add_user(username, password):
     pwhash = generate_password_hash(
-        password, method='pbkdf2:sha256:10000', salt_length=12)
+        password, method='pbkdf2:sha256:10000', salt_length=12
+    )
 
     with database.engine.connect() as conn:
-        stmt = models.users.insert(
-            {"username": username, "pwhash": pwhash})
+        stmt = models.users.insert({"username": username, "pwhash": pwhash})
         conn.execute(stmt)
 
 
@@ -37,7 +37,9 @@ def init_app(app):
         Drop all tables and recreate.
         """
         print("Resetting the database.")
-        print("WARNING: This is a destructive operation and all data will be lost.")
+        print(
+            "WARNING: This is a destructive operation and all data will be lost."
+        )
 
         if input("Continue? (y/n) ") != "y":
             print("Canceled.")
@@ -57,7 +59,8 @@ def init_app(app):
         with database.engine.begin() as txn:
             # Cached values are prefixed with an underscore
             cached_columns = list(
-                c for c in models.nodes.columns.keys() if c.startswith("_"))
+                c for c in models.nodes.columns.keys() if c.startswith("_")
+            )
             values = {c: None for c in cached_columns}
             values["cache_valid"] = False
             stmt = models.nodes.update().values(values)
@@ -71,7 +74,9 @@ def init_app(app):
         Delete all project-related data.
         """
         print("Clearing projects.")
-        print("WARNING: This is a destructive operation and all data will be lost.")
+        print(
+            "WARNING: This is a destructive operation and all data will be lost."
+        )
 
         if input("Continue? (y/n) ") != "y":
             print("Canceled.")
@@ -81,8 +86,9 @@ def init_app(app):
 
         print("Clearing project data...")
         with database.engine.begin() as txn:
-            affected_tables = [models.nodes,
-                               models.projects, models.nodes_objects]
+            affected_tables = [
+                models.nodes, models.projects, models.nodes_objects
+            ]
             database.metadata.drop_all(txn, tables=affected_tables)
             database.metadata.create_all(txn, tables=affected_tables)
 
@@ -115,10 +121,8 @@ def init_app(app):
                 project_name = os.path.basename(os.path.splitext(tree_fn)[0])
 
             with conn.begin():
-                print("Loading {}...".format(
-                    tree_fn))
-                project_id = tree.load_project(
-                    project_name, tree_fn)
+                print("Loading {}...".format(tree_fn))
+                project_id = tree.load_project(project_name, tree_fn)
                 root_id = tree.get_root_id(project_id)
 
                 if consolidate:
@@ -183,10 +187,13 @@ def init_app(app):
             return int(value)
         except ValueError:
             raise click.BadParameter(
-                'root_id can be "all", "visible" or an actual id.')
+                'root_id can be "all", "visible" or an actual id.'
+            )
 
     @app.cli.command()
-    @click.argument('root_id', default="visible", callback=validate_consolidate_root_id)
+    @click.argument(
+        'root_id', default="visible", callback=validate_consolidate_root_id
+    )
     def consolidate(root_id):
         with database.engine.connect() as conn, Timer("Consolidate") as timer:
             tree = Tree(conn)
@@ -239,12 +246,17 @@ def init_app(app):
             return
 
         pwhash = generate_password_hash(
-            password, method='pbkdf2:sha256:10000', salt_length=12)
+            password, method='pbkdf2:sha256:10000', salt_length=12
+        )
 
         try:
             with database.engine.connect() as conn:
                 stmt = models.users.insert(
-                    {"username": username, "pwhash": pwhash})
+                    {
+                        "username": username,
+                        "pwhash": pwhash
+                    }
+                )
                 conn.execute(stmt)
         except IntegrityError as e:
             print(e)
@@ -264,18 +276,22 @@ def init_app(app):
         with database.engine.connect() as conn, open(filename, "w") as f:
             tree = Tree(conn)
 
-            f.writelines("{}\n".format(o["object_id"])
-                         for o in tree.get_objects(node_id))
+            f.writelines(
+                "{}\n".format(o["object_id"])
+                for o in tree.get_objects(node_id)
+            )
 
     @app.cli.command()
     @click.argument('filename')
     def export_log(filename):
         with database.engine.connect() as conn:
             log = pd.read_sql_query(
-                select([models.log, models.nodes.c.project_id])
-                .select_from(models.log.outerjoin(models.nodes)),
+                select([models.log, models.nodes.c.project_id]).select_from(
+                    models.log.outerjoin(models.nodes)
+                ),
                 conn,
-                index_col="log_id")
+                index_col="log_id"
+            )
             log.to_csv(filename)
 
     @app.cli.command()
@@ -284,7 +300,9 @@ def init_app(app):
         Truncate the log.
         """
         print("Truncate log")
-        print("WARNING: This is a destructive operation and all data will be lost.")
+        print(
+            "WARNING: This is a destructive operation and all data will be lost."
+        )
 
         if input("Continue? (y/n) ") != "y":
             print("Canceled.")
@@ -293,3 +311,12 @@ def init_app(app):
         with database.engine.connect() as conn:
             stmt = models.log.delete()
             conn.execute(stmt)
+
+    @app.cli.group()
+    def dataset():
+        pass
+
+    @dataset.command("create")
+    @click.argument("name")
+    def dataset_create(name):
+        Dataset.create(name)

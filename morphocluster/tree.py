@@ -210,115 +210,6 @@ class Tree(object):
                       .as_scalar())
         return self.lock_project(project_id)
 
-    def __load_project_old(self, name, path, root_first=True):
-        tree_fn = os.path.join(path, "tree.csv")
-        objids_fn = os.path.join(path, "objids.csv")
-
-        raw_tree = pd.read_csv(tree_fn,
-                               index_col=False,
-                               dtype={
-                                   "parent": np.uint64,
-                                   "child": np.uint64,
-                                   "lambda_val": np.float64,
-                                   "child_size": np.uint64,
-                                   "name": str
-                               }
-                               )
-
-        objids = pd.read_csv(objids_fn, index_col=False, names=[
-                             "objid"], header=None, squeeze=True)
-
-        raw_tree_nodes = raw_tree[raw_tree["child_size"] > 1].sort_values(
-            "parent", ascending=root_first)
-        raw_tree_objects = raw_tree[raw_tree["child_size"] == 1]
-
-        root_orig_id = int(raw_tree_nodes["parent"].iloc[0])
-
-        with self.connection.begin():
-            project_id = self.create_project(name)
-
-            bar = ProgressBar(len(raw_tree_objects) +
-                              len(raw_tree_nodes), max_width=40)
-
-            def progress_cb(nadd):
-                bar.numerator += nadd
-                print(bar, end="\r")
-
-            # Get object ids for the root
-            object_idxs = raw_tree_objects[raw_tree_objects["parent"]
-                                           == root_orig_id]["child"]
-            object_ids = objids[object_idxs]
-
-            # Create root
-            root_node_id = self.create_node(project_id,
-                                            root_orig_id,
-                                            object_ids=object_ids,
-                                            progress_cb=progress_cb)
-
-            for row in raw_tree_nodes.itertuples():
-                # row.child is the current node
-                # row.parent is its parent
-
-                # Get object ids for the current node
-                object_idxs = raw_tree_objects[raw_tree_objects["parent"]
-                                               == row.child]["child"]
-                object_ids = objids[object_idxs]
-
-                name = row.name if hasattr(
-                    row, "name") and pd.notnull(row.name) else None
-
-                self.create_node(project_id,
-                                 orig_node_id=row.child,
-                                 orig_parent=row.parent,
-                                 object_ids=object_ids,
-                                 name=name,
-                                 starred=name is not None,
-                                 progress_cb=progress_cb)
-                bar.numerator += 1
-
-            print()
-
-        print("Done after {}s.".format(bar._eta.elapsed))
-        print("Created root (orig/real):", root_orig_id, root_node_id)
-
-        return project_id
-
-    def connect_supertree(self, root_id):
-        with self.connection.begin():
-            successors = _rquery_subtree(root_id)
-
-            supersuccessor_ids = (select([successors.c.node_id])
-                                  .where(successors.c.starred == True))
-            supersuccessor_ids = (self.connection.execute(supersuccessor_ids)
-                                  .fetchall())
-            supersuccessor_ids = [node_id for (node_id,) in supersuccessor_ids]
-            supersuccessor_ids.insert(0, root_id)
-
-            bar = ProgressBar(len(supersuccessor_ids), max_width=40)
-
-            for node_id in supersuccessor_ids:
-                def recurse_cb(q, _):
-                    return q.c.starred == False
-
-                successors = _rquery_subtree(node_id, recurse_cb)
-
-                # ===============================================================
-                # UPDATE nodes
-                # SET superparent_id=node_id
-                # WHERE node_id IN (SELECT node_id from successors);
-                # ===============================================================
-                successor_ids = select([successors.c.node_id]).where(
-                    successors.c.node_id != node_id)
-                stmt = (nodes
-                        .update()
-                        .values(superparent_id=node_id)
-                        .where(nodes.c.node_id.in_(successor_ids)))
-                self.connection.execute(stmt)
-
-                bar.numerator += 1
-                print(bar, end="\r")
-            print()
-
     def get_objects_recursive(self, node_id):
         # Recursively select all descendants
         rquery = select([nodes]).where(
@@ -792,6 +683,8 @@ class Tree(object):
         n will be deleted.
         """
 
+        # TODO: Invalidate all ancestors (until common root)
+
         with self.connection.begin():
             # Change node for objects
             stmt = nodes_objects.update().values(node_id=dest_node_id).where(
@@ -950,7 +843,7 @@ class Tree(object):
                 vectors = np.array(vectors)
 
             with timer.child("Calculate distances"):
-                prots = node["_prototypes"]
+                prots: Prototypes = node["_prototypes"]
                 if prots is None:
                     raise TreeError("Node has no prototypes!")
 
@@ -1312,7 +1205,7 @@ class Tree(object):
                             n_children])
                     .order_by(invalid_subtree.c.level.desc()))
 
-            invalid_subtree = pd.read_sql_query(
+            invalid_subtree: pd.DataFrame = pd.read_sql_query(
                 stmt, self.connection, index_col="node_id")
 
             if len(invalid_subtree) == 0:
@@ -1362,7 +1255,7 @@ class Tree(object):
                     invalid_subtree.at[node_id, "_type_objects"] = (
                         self._calc_type_objects(children_dict, objects_))
 
-                    if len(children_dict) > 0 and len(invalid_subtree.at[node_id, "_type_objects"]) == 0:
+                    if children_dict and len(invalid_subtree.at[node_id, "_type_objects"]) == 0:
                         print(
                             "\nNode {} has no type objects although it has children!".format(node_id))
 
