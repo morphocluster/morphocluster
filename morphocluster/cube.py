@@ -26,6 +26,9 @@ class Cube(UserDefinedType):
     def bind_processor(self, dialect):
 
         def process(value):
+            if value is None:
+                return None
+
             if isinstance(value, (numbers.Number)):
                 return str(value)
 
@@ -43,7 +46,9 @@ class Cube(UserDefinedType):
 
     def result_processor(self, dialect, coltype):
 
-        def process(value: str):
+        def process(value):
+            if value is None:
+                return value
             return parse(value)
 
         return process

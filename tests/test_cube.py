@@ -24,7 +24,7 @@ def cube_table(flask_app):
         txn.rollback()
 
 
-#@pytest.mark.skip()
+# @pytest.mark.skip()
 def test_cube(cube_table):
     connection = db.get_connection()
 
@@ -32,14 +32,16 @@ def test_cube(cube_table):
         # Number: 1d point
         (1.0, (1.0, )),
         (float("inf"), (float("inf"), )),
-        #(float("nan"), (float("nan"), )), # Problem: nan != nan
+        # (float("nan"), (float("nan"), )), # Problem: nan != nan
 
         # Points
         ((), ()),
         ((1, 2), (1., 2.)),
 
         # Cubes
-        ([(1, 2), (3, 4)], [(1.0, 2.0), (3.0, 4.0)])
+        ([(1, 2), (3, 4)], [(1.0, 2.0), (3.0, 4.0)]),
+
+        (None, None),
     ]
     connection.execute(
         cube_table.insert(),
