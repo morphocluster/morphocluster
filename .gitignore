@@ -17,3 +17,4 @@ htmlcov/**
 .eggs/**
 .coverage.*
 dump.rdb
+.ipynb_checkpoints
