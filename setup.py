@@ -11,7 +11,7 @@ setup(
         'flask>=1.0.2',
         'psycopg2-binary',
         'pandas',
-        'sqlalchemy',
+        'sqlalchemy>=1.3',
         'etaprogress',
         'h5py>=2.8.0',
         'scikit-learn',
@@ -31,6 +31,11 @@ setup(
         'tqdm',
         'hdbscan',
     ],
-    setup_requires=["pytest-runner"],
-    tests_require=["pytest"],
+    extras_require={
+        'tests': [
+            'pytest',
+            "requests",
+            "pytest-cov",
+        ],
+    },
 )

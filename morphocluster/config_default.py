@@ -24,3 +24,6 @@ RECLUSTER_FEATURES = [
 # Save the results of accept_recommended_objects
 # to enable the calculation of scores like average precision
 SAVE_RECOMMENDATION_STATS = False
+
+# Directory where the data will be stored
+DATA_DIR = ""
