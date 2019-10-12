@@ -16,15 +16,14 @@ def parse(string: str):
 
 
 class Cube(UserDefinedType):
-
-    def __init__(self, precision=8):
-        self.precision = precision
+    def __init__(self, as_numpy=False):
+        # TODO: as_numpy
+        self.as_numpy = as_numpy
 
     def get_col_spec(self, **kw):
         return "cube"
 
     def bind_processor(self, dialect):
-
         def process(value):
             if value is None:
                 return None
@@ -38,14 +37,11 @@ class Cube(UserDefinedType):
             if isinstance(value, list):
                 return "[" + ",".join(map(process, value)) + "]"
 
-            raise ValueError(
-                "Unexpected value({}): {!r}".format(type(value), value)
-            )
+            raise ValueError("Unexpected value({}): {!r}".format(type(value), value))
 
         return process
 
     def result_processor(self, dialect, coltype):
-
         def process(value):
             if value is None:
                 return value

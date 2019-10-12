@@ -1,5 +1,6 @@
 import os.path
 
+import pandas as pd
 import pytest
 from sqlalchemy import func, select
 
@@ -58,19 +59,46 @@ def test_project(project: Project, datadir):
         with project:
             project.import_tree(datadir / "tree.zip")
 
-    # # Assert exported tree is the same as imported
-    # with project:
-    #     db_tree = project.export_tree()
-    #     orig_tree = Tree.from_saved(str(datadir / "tree.zip"))
+    # Assert exported tree is the same as imported
+    with project:
+        db_tree = project.export_tree()
+        orig_tree = Tree.from_saved(str(datadir / "tree.zip"))
 
-    #     assert set(db_tree.nodes.itertuples()) == set(
-    #         orig_tree.nodes.itertuples()
-    #     )
+        node_columns = sorted(orig_tree.nodes.columns)
+        orig_nodes = (
+            orig_tree.nodes[node_columns]
+            .sort_values(by="node_id")
+            .reset_index(drop=True)
+        )
+        db_nodes = (
+            db_tree.nodes[node_columns].sort_values(by="node_id").reset_index(drop=True)
+        )
 
-    #     assert set(db_tree.objects.itertuples()) == set(
-    #         orig_tree.objects.itertuples()
-    #     )
+        for name in node_columns:
+            assert list(null2None(orig_nodes[name])) == list(null2None(db_nodes[name]))
+
+        object_columns = sorted(orig_tree.objects.columns)
+        orig_objects = (
+            orig_tree.objects[object_columns]
+            .sort_values(by="object_id")
+            .reset_index(drop=True)
+        )
+        db_objects = (
+            db_tree.objects[object_columns]
+            .sort_values(by="object_id")
+            .reset_index(drop=True)
+        )
+
+        for name in object_columns:
+            assert list(null2None(orig_objects[name])) == list(
+                null2None(db_objects[name])
+            )
 
     # Assert create_node can calculate node_id
     with project:
         node_id = project.create_node()
+        assert node_id is not None
+
+
+def null2None(df):
+    return df.where((pd.notnull(df)), None)
