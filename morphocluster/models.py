@@ -39,7 +39,7 @@ datasets = Table(
 objects = Table(
     "objects",
     metadata,
-    Column("object_id", String),
+    Column("object_id", String, nullable=False),
     Column("path", String, nullable=False),
     Column("vector", PickleType, nullable=True),
     # rand is for quasi-random samples (e.g. type object calculation)
@@ -50,6 +50,7 @@ objects = Table(
         ForeignKey(
             "datasets.dataset_id", ondelete="CASCADE", name="datasets_dataset_id_fkey"
         ),
+        nullable=False,
     ),
     PrimaryKeyConstraint("dataset_id", "object_id", name="objects_pk"),
     postgresql_partition_by="LIST(dataset_id)",
@@ -59,7 +60,7 @@ objects = Table(
 projects = Table(
     "projects",
     metadata,
-    Column("project_id", Integer, primary_key=True),
+    Column("project_id", Integer, primary_key=True, nullable=False),
     Column("name", String),
     Column("creation_date", DateTime, default=datetime.datetime.now),
     Column("visible", Boolean, nullable=False, server_default="t"),
@@ -69,6 +70,7 @@ projects = Table(
         ForeignKey(
             "datasets.dataset_id", ondelete="CASCADE", name="projects_dataset_id_fkey"
         ),
+        nullable=False,
     ),
 )
 
@@ -77,8 +79,7 @@ nodes = Table(
     "nodes",
     metadata,
     ## Regular properties
-    Column("node_id", BigInteger),
-    Column("orig_id", BigInteger, nullable=True),
+    Column("node_id", BigInteger, nullable=False),
     Column(
         "project_id",
         None,
@@ -133,11 +134,12 @@ nodes = Table(
 nodes_objects = Table(
     "nodes_objects",
     metadata,
-    Column("project_id", None),
-    Column("node_id", None, index=True),
-    Column("dataset_id", None),
-    Column("object_id", None),
+    Column("project_id", None, nullable=False),
+    Column("node_id", None, index=True, nullable=False),
+    Column("dataset_id", None, nullable=False),
+    Column("object_id", None, nullable=False),
     UniqueConstraint("project_id", "object_id"),
+    Index("idx_nodes_objects_project_id_node_id", "project_id", "node_id"),
     ForeignKeyConstraint(
         ["project_id", "node_id"],
         ["nodes.project_id", "nodes.node_id"],
@@ -156,10 +158,10 @@ nodes_objects = Table(
 nodes_rejected_objects = Table(
     "nodes_rejected_objects",
     metadata,
-    Column("project_id", None),
-    Column("node_id", None, index=True),
-    Column("dataset_id", None),
-    Column("object_id", None),
+    Column("project_id", None, nullable=False),
+    Column("node_id", None, index=True, nullable=False),
+    Column("dataset_id", None, nullable=False),
+    Column("object_id", None, nullable=False),
     ForeignKeyConstraint(
         ["project_id", "node_id"],
         ["nodes.project_id", "nodes.node_id"],

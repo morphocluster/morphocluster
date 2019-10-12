@@ -8,7 +8,7 @@ from morphocluster.dataset import Dataset
 from morphocluster.extensions import database
 from morphocluster.models import nodes
 from morphocluster.processing import Tree
-from morphocluster.project import Project
+from morphocluster.project import Project, ProjectError
 
 
 @pytest.fixture()
@@ -55,14 +55,35 @@ def test_project(project: Project, datadir):
             pass
 
     # Assert project may not import a second tree
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ProjectError):
         with project:
             project.import_tree(datadir / "tree.zip")
+
+    orig_tree = Tree.from_saved(str(datadir / "tree.zip"))
+
+    # Assert that get_objects retrieves the right objects
+    with project:
+        for node_id in orig_tree.nodes["node_id"]:
+            db_objects = project.get_objects(node_id)
+
+            orig_object_selector = orig_tree.objects["node_id"] == node_id
+            orig_object_ids = orig_tree.objects.loc[orig_object_selector, "object_id"]
+
+            db_object_ids = {o["object_id"] for o in db_objects}
+
+            assert (
+                set(orig_object_ids) == db_object_ids
+            ), "Objects do not match for node_id={}".format(node_id)
+
+    # Assert that consolidate_node works as expected
+    with project:
+        root_id = project.get_root_id()
+        result = project.consolidate_node(root_id, return_="raw")
+        # TODO
 
     # Assert exported tree is the same as imported
     with project:
         db_tree = project.export_tree()
-        orig_tree = Tree.from_saved(str(datadir / "tree.zip"))
 
         node_columns = sorted(orig_tree.nodes.columns)
         orig_nodes = (

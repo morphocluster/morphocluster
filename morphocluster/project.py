@@ -138,10 +138,26 @@ class Project:
 
     def __init__(self, project_id):
         self.project_id = project_id
+        self._dataset_id = None
 
         self._connection = database.get_connection()
         self._transactions: T.List[Transaction] = []
         self._locked = 0
+
+    @property
+    def dataset_id(self):
+        if self._dataset_id is not None:
+            return self._dataset_id
+
+        stmt = select([projects.c.dataset_id]).where(projects.c.project_id == self.project_id)
+        dataset_id = self._connection.execute(stmt).scalar()
+
+        if dataset_id is None:
+            raise ProjectError("dataset_id is None")
+
+        self._dataset_id = dataset_id
+
+        return dataset_id
 
     def import_tree(self, tree):
         """Fill the project with the supplied tree.
@@ -161,7 +177,7 @@ class Project:
             .where(nodes.c.project_id == self.project_id)
         )
         if self._connection.execute(stmt).scalar() != 0:
-            raise RuntimeError(
+            raise ProjectError(
                 "Project project_id={} already contains a tree.".format(self.project_id)
             )
 
@@ -234,6 +250,8 @@ class Project:
 
         self._connection.execute(stmt)
 
+        dataset_id = self.dataset_id
+
         # Insert object_ids
         if object_ids is not None:
             object_ids = iter(object_ids)
@@ -242,7 +260,7 @@ class Project:
 
                 data = [
                     dict(
-                        project_id=self.project_id, node_id=node_id, object_id=object_id
+                        project_id=self.project_id, node_id=node_id, object_id=object_id, dataset_id=dataset_id
                     )
                     for object_id in chunk
                 ]
@@ -662,16 +680,18 @@ class Project:
         return [dict(r) for r in result]
 
     def get_objects(self, node_id, offset=None, limit=None, order_by=None):
-        """
-        Get objects directly below a node.
-        """
+        """Get objects directly below a node."""
 
         assert self._locked
 
         stmt = (
             select([objects])
             .select_from(objects.join(nodes_objects))
-            .where(nodes_objects.c.node_id == node_id)
+            .where(
+                (nodes_objects.c.node_id == node_id)
+                & (nodes_objects.c.project_id == self.project_id)
+                & (nodes_objects.c.dataset_id == self.dataset_id)
+            )
         )
 
         if order_by is not None:
@@ -1046,7 +1066,6 @@ class Project:
 
         assert self._locked
 
-        # Wrap everything in a transaction
         if depth == -1:
             if descend_approved:
                 recurse_cb = None
@@ -1122,140 +1141,143 @@ class Project:
             stmt, connection, index_col="node_id"
         )
 
-        if len(invalid_subtree) == 0:
+        if not len(invalid_subtree): #pylint: disable=len-as-condition
             raise ProjectError("Unknown node: {}".format(node_id))
 
         if not invalid_subtree["cache_valid"].all():
             invalid_subtree["updated__"] = False
 
             # Iterate over DataFrame fixing the values along the way (deepest nodes)
-            for node_id in tqdm.tqdm(invalid_subtree.index):
-                n: dict = invalid_subtree.loc[node_id].to_dict()
-                updated_names = ["n_children_", "n_objects_own_"]
+            with tqdm.tqdm(invalid_subtree.index) as t:
+                for node_id in t:
+                    t.set_description("Consolidating {}".format(node_id))
 
-                if n["cache_valid"]:
-                    # Don't recalculate valid nodes as invalid_subtree (rightly)
-                    # doesn't include their children.
-                    continue
+                    n: dict = invalid_subtree.loc[node_id].to_dict()
+                    updated_names = ["n_children_", "n_objects_own_"]
 
-                child_selector = invalid_subtree["parent_id"] == node_id
-                children = invalid_subtree.loc[child_selector]
+                    if n["cache_valid"]:
+                        # Don't recalculate valid nodes as invalid_subtree (rightly)
+                        # doesn't include their children.
+                        continue
 
-                children_collection = MemberCollection(
-                    children.reset_index().to_dict("records"), "zero"
-                )
+                    child_selector = invalid_subtree["parent_id"] == node_id
+                    children = invalid_subtree.loc[child_selector]
 
-                ## n_children_
-                # Is already present as calculated by the database
-
-                ## n_objects_own_
-                # Is already present as calculated by the database
-
-                ## n_objects_
-                if pd.isnull(n["n_objects_"]):
-                    n["n_objects_"] = n["n_objects_own_"] + children["n_objects_"].sum()
-                    updated_names.append("n_objects_")
-
-                N_OBJECTS_SAMPLE = 1000
-
-                # Sample 1000 objects to speed up the calculation
-                if (
-                    pd.isnull(n["vector_own_"]) or pd.isnull(n["type_objects_own_"])
-                ) and n["n_objects_"]:
-                    objects_sample = self.get_objects(
-                        node_id, order_by=objects.c.rand, limit=N_OBJECTS_SAMPLE
-                    )
-                else:
-                    objects_sample = []
-
-                objects_sample = MemberCollection(objects_sample, "raise")
-                n_objects_sample = len(objects_sample)  # actual sample size
-                objects_sample_vectors = objects_sample.vectors
-
-                ## vector_own_
-                if pd.isnull(n["vector_own_"]) and n_objects_sample:
-                    n["vector_own_"] = np.sum(objects_sample_vectors, axis=0)
-
-                    if n_objects_sample < n["n_objects_own_"]:
-                        # If the sample size is smaller than the actual number of objects, we need to account for that
-                        n["vector_own_"] *= n["n_objects_own_"] / n_objects_sample
-
-                    updated_names.append("vector_own_")
-
-                ## vector_
-                if pd.isnull(n["vector_"]):
-                    vector_values = []
-                    for cv in children["vector_"]:
-                        if not pd.isnull(cv):
-                            vector_values.append(cv)
-                    if not pd.isnull(n["vector_own_"]):
-                        vector_values.append(n["vector_own_"])
-
-                    if vector_values:
-                        n["vector_"] = seq2array(vector_values, len(vector_values)).sum(
-                            axis=0
-                        )
-                        updated_names.append("vector_")
-
-                ## type_objects_own_
-                N_TYPE_OBJECTS = 9
-                if pd.isnull(n["type_objects_own_"]) and n_objects_sample:
-                    vector_own_mean = n["vector_own_"] / n_objects_sample
-                    # Order objects_sample_vectors by distance to vector_own_mean
-                    sqdistances = cdist(
-                        vector_own_mean[np.newaxis, :],
-                        objects_sample_vectors,
-                        "sqeuclidean",
-                    )[0]
-                    ordered_idx = np.argsort(sqdistances)
-                    # Find central N_TYPE_OBJECTS
-                    central_idx = ordered_idx[
-                        _slice_center(ordered_idx, N_TYPE_OBJECTS)
-                    ]
-
-                    n["type_objects_own_"] = [
-                        objects_sample[i]["object_id"] for i in central_idx
-                    ]
-                    updated_names.append("type_objects_own_")
-
-                ## type_objects_
-                if pd.isnull(n["type_objects_"]):
-                    type_pool = []
-                    if not pd.isnull(n["type_objects_own_"]):
-                        type_pool.extend(n["type_objects_own_"])
-                    
-                    for to in children["type_objects_"]:
-                        if not pd.isnull(to):
-                            type_pool.extend(to)
-                        
-                    if type_pool:
-                        n["type_objects_"] = np.random.choice(
-                            type_pool, min(len(type_pool), 9), replace=False
-                        )
-                        updated_names.append("type_objects_")
-
-                ## n_(approved|filled|preferred)_objects_
-                ## n_(approved|filled|preferred)_nodes_
-                for flag in ("approved", "filled", "preferred"):
-                    n_X_objects_name = "n_{}_objects_".format(flag)
-                    n_X_nodes_name = "n_{}_nodes_".format(flag)
-
-                    n[n_X_objects_name] = (
-                        n[flag] * n["n_objects_own_"] + children[n_X_objects_name].sum()
+                    children_collection = MemberCollection(
+                        children.reset_index().to_dict("records"), "zero"
                     )
 
-                    n[n_X_nodes_name] = int(n[flag]) + children[n_X_nodes_name].sum()
+                    ## n_children_
+                    # Is already present as calculated by the database
 
-                    updated_names.append(n_X_objects_name)
-                    updated_names.append(n_X_nodes_name)
+                    ## n_objects_own_
+                    # Is already present as calculated by the database
 
-                ## Finally, flag as updated
-                n["updated__"] = True
-                updated_names.append("updated__")
+                    ## n_objects_
+                    if pd.isnull(n["n_objects_"]):
+                        n["n_objects_"] = n["n_objects_own_"] + children["n_objects_"].sum()
+                        updated_names.append("n_objects_")
 
-                # Write values back
-                updated_values = tuple(n[name] for name in updated_names)
-                invalid_subtree.loc[node_id, updated_names] = updated_values
+                    N_OBJECTS_SAMPLE = 1000
+
+                    # Sample 1000 objects to speed up the calculation
+                    if (
+                        pd.isnull(n["vector_own_"]) or pd.isnull(n["type_objects_own_"])
+                    ) and n["n_objects_"]:
+                        objects_sample = self.get_objects(
+                            node_id, order_by=objects.c.rand, limit=N_OBJECTS_SAMPLE
+                        )
+                    else:
+                        objects_sample = []
+
+                    objects_sample = MemberCollection(objects_sample, "raise")
+                    n_objects_sample = len(objects_sample)  # actual sample size
+                    objects_sample_vectors = objects_sample.vectors
+
+                    ## vector_own_
+                    if pd.isnull(n["vector_own_"]) and n_objects_sample:
+                        n["vector_own_"] = np.sum(objects_sample_vectors, axis=0)
+
+                        if n_objects_sample < n["n_objects_own_"]:
+                            # If the sample size is smaller than the actual number of objects, we need to account for that
+                            n["vector_own_"] *= n["n_objects_own_"] / n_objects_sample
+
+                        updated_names.append("vector_own_")
+
+                    ## vector_
+                    if pd.isnull(n["vector_"]):
+                        vector_values = []
+                        for cv in children["vector_"]:
+                            if cv is not None:
+                                vector_values.append(cv)
+                        if n["vector_own_"] is not None:
+                            vector_values.append(n["vector_own_"])
+
+                        if vector_values:
+                            n["vector_"] = seq2array(vector_values, len(vector_values)).sum(
+                                axis=0
+                            )
+                            updated_names.append("vector_")
+
+                    ## type_objects_own_
+                    N_TYPE_OBJECTS = 9
+                    if pd.isnull(n["type_objects_own_"]) and n_objects_sample:
+                        vector_own_mean = n["vector_own_"] / n_objects_sample
+                        # Order objects_sample_vectors by distance to vector_own_mean
+                        sqdistances = cdist(
+                            vector_own_mean[np.newaxis, :],
+                            objects_sample_vectors,
+                            "sqeuclidean",
+                        )[0]
+                        ordered_idx = np.argsort(sqdistances)
+                        # Find central N_TYPE_OBJECTS
+                        central_idx = ordered_idx[
+                            _slice_center(len(ordered_idx), N_TYPE_OBJECTS)
+                        ]
+
+                        n["type_objects_own_"] = [
+                            objects_sample[i]["object_id"] for i in central_idx
+                        ]
+                        updated_names.append("type_objects_own_")
+
+                    ## type_objects_
+                    if n["type_objects_"] is None:
+                        type_pool = []
+                        if n["type_objects_own_"] is not None:
+                            type_pool.extend(n["type_objects_own_"])
+
+                        for cto in children["type_objects_"]:
+                            if cto is not None:
+                                type_pool.extend(cto)
+
+                        if type_pool:
+                            n["type_objects_"] = np.random.choice(
+                                type_pool, min(len(type_pool), 9), replace=False
+                            )
+                            updated_names.append("type_objects_")
+
+                    ## n_(approved|filled|preferred)_objects_
+                    ## n_(approved|filled|preferred)_nodes_
+                    for flag in ("approved", "filled", "preferred"):
+                        n_X_objects_name = "n_{}_objects_".format(flag)
+                        n_X_nodes_name = "n_{}_nodes_".format(flag)
+
+                        n[n_X_objects_name] = (
+                            n[flag] * n["n_objects_own_"] + children[n_X_objects_name].sum()
+                        )
+
+                        n[n_X_nodes_name] = int(n[flag]) + children[n_X_nodes_name].sum()
+
+                        updated_names.append(n_X_objects_name)
+                        updated_names.append(n_X_nodes_name)
+
+                    ## Finally, flag as updated
+                    n["updated__"] = True
+                    updated_names.append("updated__")
+
+                    # Write values back
+                    updated_values = tuple(n[name] for name in updated_names)
+                    invalid_subtree.loc[node_id, updated_names] = updated_values
 
             # Convert n_objects_own_ to int (might be object when containing NULL values in the database)
             invalid_subtree["n_objects_own_"] = invalid_subtree[
@@ -1304,13 +1326,13 @@ class Project:
 
                 print("Updated {:d} nodes.".format(n_updated))
 
-            if return_ == "node":
-                return invalid_subtree.loc[node_id].to_dict()
+        if return_ == "node":
+            return invalid_subtree.loc[node_id].to_dict()
 
-            if return_ == "children":
-                return invalid_subtree[invalid_subtree["parent_id"] == node_id].to_dict(
-                    "records"
-                )
+        if return_ == "children":
+            return invalid_subtree[invalid_subtree["parent_id"] == node_id].to_dict(
+                "records"
+            )
 
-            if return_ == "raw":
-                return invalid_subtree
+        if return_ == "raw":
+            return invalid_subtree

@@ -1,6 +1,7 @@
 import numbers
 
 from sqlalchemy.types import UserDefinedType
+import numpy as np
 
 
 def parse(string: str):
@@ -36,6 +37,15 @@ class Cube(UserDefinedType):
 
             if isinstance(value, list):
                 return "[" + ",".join(map(process, value)) + "]"
+
+            if isinstance(value, np.ndarray):
+                ndim = value.ndim
+                if ndim == 1:
+                    return process(tuple(value))
+                if ndim == 2:
+                    return process([tuple(v) for v in value])
+
+                raise ValueError("Unexpected number of dimensions: {}".format(ndim))
 
             raise ValueError("Unexpected value({}): {!r}".format(type(value), value))
 
