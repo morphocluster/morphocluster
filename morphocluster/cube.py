@@ -55,6 +55,9 @@ class Cube(UserDefinedType):
         def process(value):
             if value is None:
                 return value
-            return parse(value)
+            value = parse(value)
+            if self.as_numpy:
+                return np.array(value)
+            return value
 
         return process

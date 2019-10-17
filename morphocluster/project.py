@@ -1,19 +1,19 @@
 import itertools
+import operator
 import typing as T
-from genericpath import commonprefix
 
 import numpy as np
-import pandas as pd
 import tqdm
 from scipy.spatial.distance import cdist
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.engine import Transaction
 from sqlalchemy.sql import text
 from sqlalchemy.sql.elements import literal_column
-from sqlalchemy.sql.expression import bindparam, literal, select
-from sqlalchemy.sql.functions import func
+from sqlalchemy.sql.expression import bindparam, literal
 from timer_cm import Timer
 
+import pandas as pd
+import pandas.api.types
 from morphocluster import processing
 from morphocluster.extensions import database
 from morphocluster.helpers import seq2array
@@ -29,6 +29,23 @@ from morphocluster.models import (
 
 class ProjectError(Exception):
     pass
+
+
+def commonprefix(paths):
+    "Given a list of paths, return the longest common leading component, ignoring the last component."
+    paths = [p[:-1] for p in paths]
+    s1 = min(paths)
+    s2 = max(paths)
+    for i, c in enumerate(s1):
+        if c != s2[i]:
+            return s1[:i]
+    return s1
+
+
+def is_scalar_na(v):
+    if pandas.api.types.is_scalar(v):
+        return pd.isna(v)
+    return False
 
 
 def _paths_from_common_ancestor(paths):
@@ -149,7 +166,9 @@ class Project:
         if self._dataset_id is not None:
             return self._dataset_id
 
-        stmt = select([projects.c.dataset_id]).where(projects.c.project_id == self.project_id)
+        stmt = select([projects.c.dataset_id]).where(
+            projects.c.project_id == self.project_id
+        )
         dataset_id = self._connection.execute(stmt).scalar()
 
         if dataset_id is None:
@@ -260,7 +279,10 @@ class Project:
 
                 data = [
                     dict(
-                        project_id=self.project_id, node_id=node_id, object_id=object_id, dataset_id=dataset_id
+                        project_id=self.project_id,
+                        node_id=node_id,
+                        object_id=object_id,
+                        dataset_id=dataset_id,
                     )
                     for object_id in chunk
                 ]
@@ -289,7 +311,9 @@ class Project:
         # Get complete subtree with up to date cached values
 
         print("Consolidating cached values...")
-        subtree = self.consolidate_node(root_id, depth="full", return_="raw")
+        subtree = self.consolidate_node(
+            root_id, depth="full", return_="raw", exact_vector="approx"
+        )
 
         keep_columns = [
             "parent_id",
@@ -387,73 +411,182 @@ class Project:
 
         return dict(result)
 
-    def relocate_objects(self, object_ids, node_id, unapprove=False):
-        """
-        Relocate an object to another node.
-
-        TODO: This is slow!
-        """
-
-        if not object_ids:
-            return
-
-        assert self._locked
-
-        new_node_path = self.get_path(node_id)
-
-        # Find current node_ids of the objects
-        # This is slow!
-        # old_node_ids is required for invalidation
-        # TODO: Distinct!
-        stmt = select([nodes_objects.c.node_id], for_update=True).where(
-            nodes_objects.c.object_id.in_(object_ids)
-            & (nodes_objects.c.project_id == self.project_id)
-        )
-        result = self._connection.execute(stmt)
-        old_node_ids = [r["node_id"] for r in result.fetchall()]
-
-        # Update assignments
+    def relocate_objects(self, object_ids, new_node_id):
+        # https://stackoverflow.com/questions/7923237/return-pre-update-column-values-using-sql-only-postgresql-version
+        # UPDATE node_objects x
+        # SET    node_id = :new_node_id
+        # FROM   node_objects y JOIN objects z ON x.object_id=z.object.id
+        # WHERE  x.object_id = y.object_id
+        # AND    x.object_id IN :object_ids
+        # AND    x.project_id = :project_id AND y.project_id=:project_id
+        # RETURNING y.node_id AS old_node_id, z.vector ORDER BY old_node_id;
+        old_node_objects = nodes_objects.alias("old")
         stmt = (
-            # pylint: disable=no-value-for-parameter
-            nodes_objects.update()
-            .values({"node_id": node_id})
+            update(nodes_objects)
+            .values(node_id=new_node_id)
             .where(
                 nodes_objects.c.object_id.in_(object_ids)
                 & (nodes_objects.c.project_id == self.project_id)
+                & (old_node_objects.c.project_id == self.project_id)
+                & (old_node_objects.c.object_id == nodes_objects.c.object_id)
+                & (objects.c.dataset_id == self.dataset_id)
+                & (objects.c.object_id == nodes_objects.c.object_id)
             )
+            .returning(old_node_objects.c.node_id, objects.c.vector)
         )
-        self._connection.execute(stmt)
 
-        # # Return distinct old `parent_id`s
-        # stmt = text("""
-        # WITH updater AS (
-        #     UPDATE nodes_objects x
-        #     SET node_id = :node_id
-        #     FROM  (SELECT object_id, node_id FROM nodes_objects
-        #         WHERE project_id = :project_id AND object_id IN :object_ids FOR UPDATE) y
-        #     WHERE  project_id = :project_id AND x.object_id = y.object_id
-        #     RETURNING y.node_id AS old_node_id
-        # )
-        # SELECT DISTINCT old_node_id FROM updater;
-        # """)
+        rows = self._connection.execute(stmt).fetchall()
 
-        # # Fetch old_parent_ids
-        # result = self.connection.execute(stmt,
-        #                                  node_id=node_id,
-        #                                  project_id=project_id,
-        #                                  object_ids=tuple(object_ids)
-        #                                  ).fetchall()
+        new_path = self.get_path(new_node_id)
 
-        # Invalidate subtree rooted at first common ancestor
-        paths = [new_node_path] + [old_node_ids]
-        paths_to_update = _paths_from_common_ancestor(paths)
-        nodes_to_invalidate = set(sum(paths_to_update, []))
+        affected_precursers = set(new_path)
 
-        print("Invalidating {!r}...".format(nodes_to_invalidate))
+        # Calculate update values for old nodes
+        old_node_ids = []
+        old_vectors = []
+        old_counts = []
+        old_paths = []
+        for old_node_id, old_rows in itertools.groupby(rows, operator.itemgetter(0)):
+            old_node_ids.append(old_node_id)
+            vectors = [r[1] for r in old_rows]
+            vectors = np.array(vectors)
+            old_vectors.append(np.sum(vectors, axis=0))
+            old_counts.append(len(vectors))
+            old_path = self.get_path(old_node_id)
+            old_paths.append(old_path)
+            affected_precursers.update(old_path)
 
-        assert node_id in nodes_to_invalidate
+        all_paths = old_paths + [new_path]
 
-        self.invalidate_nodes(nodes_to_invalidate, unapprove)
+        # Calculate common prefix of all paths #[:-1] (excluding the node_id itself)
+        prefix = commonprefix(all_paths)
+        len_prefix = len(prefix)
+
+        # # Set cached values = NULL for all
+        # update_node_ids = set(sum((p[len_prefix:] for p in all_paths), []))
+        # values = {c: None for c in nodes.c.keys() if c.endswith("_")}
+        # self.update_cached_values(update_node_ids, "=", **values)
+
+        new_vector = np.sum(old_vectors, axis=0)
+
+        assert new_vector is not None
+        
+        # TODO: Update vectors
+
+        # Update new node
+        self.update_cached_values(
+            [new_node_id],
+            "+",
+            n_objects_own_=len(rows),
+            vector_own_=None, #new_vector,
+            type_objects_own_=None,
+        )
+
+        # Update new tree (this includes the new node)
+        update_new_node_ids = new_path[len_prefix:]
+        self.update_cached_values(
+            update_new_node_ids,
+            "+",
+            n_objects_=len(rows),
+            vector_=None, #new_vector,
+            type_objects_=None,
+        )
+
+        # Update old
+        for old_node_id, old_vector, old_count, old_path in zip(
+            old_node_ids, old_vectors, old_counts, old_paths
+        ):
+            assert old_vector is not None
+
+            # Update old node
+            self.update_cached_values(
+                [old_node_id],
+                "-",
+                n_objects_own_=old_count,
+                vector_own_=None, #old_vector,
+                type_objects_own_=None,
+            )
+
+            # Update old tree (this includes old node)
+            update_old_node_ids = old_path[len_prefix:]
+            self.update_cached_values(
+                update_old_node_ids,
+                "-",
+                n_objects_=old_count,
+                vector_=None,#old_vector,
+                type_objects_=None,
+            )
+
+        # Update flag summary in affected precursors
+        self.update_cached_values(
+            affected_precursers,
+            "=",
+            n_approved_objects_=None,
+            n_filled_objects_=None,
+            n_preferred_objects_=None,
+        )
+
+    def update_cached_values(self, node_ids, op, **values):
+        assert self._locked
+
+        if op == "=":
+            values["cache_valid"] = False
+            stmt = (
+                # pylint: disable=no-value-for-parameter
+                nodes.update()
+                .values(values)
+                .where(
+                    (nodes.c.project_id == self.project_id)
+                    & (nodes.c.node_id.in_(node_ids))
+                )
+            )
+            self._connection.execute(stmt)
+            return
+
+        try:
+            op = {"+": operator.add, "-": operator.sub}[op]
+        except KeyError:
+            raise ValueError("Unexpected op: {!r}".format(op)) from None
+
+        # Get current values
+        columns = [nodes.c[c] for c in values.keys()]
+        stmt = select([nodes.c.node_id.label("_node_id")] + columns).where(
+            (nodes.c.project_id == self.project_id) & (nodes.c.node_id.in_(node_ids))
+        )
+        rows = self._connection.execute(stmt).fetchall()
+
+        def _calc_new_value(row, k, v):
+            if is_scalar_na(v):
+                # None means reset to None, regardless of old value
+                return v
+
+            if is_scalar_na(row[k]):
+                # NA: No previous value. This is allowed for vectors.
+                if k in ("vector_", "vector_own_"):
+                    return v
+                raise ValueError("row[{}] is NA.".format(k))
+
+            return op(row[k], v)
+
+        # Update values
+        rows = [
+            dict(
+                ((k, _calc_new_value(row, k, v)) for k, v in values.items()),
+                _node_id=row["_node_id"],
+                cache_valid=False,
+            )
+            for row in rows
+        ]
+
+        # Write updated values
+        columns.append("cache_valid")
+        stmt = (
+            # pylint: disable=no-value-for-parameter
+            nodes.update()
+            .where(nodes.c.node_id == bindparam("_node_id"))
+            .values({c: bindparam(c) for c in columns})
+        )
+        self._connection.execute(stmt, rows)
 
     def relocate_nodes(self, node_ids, parent_id, unapprove=False):
         """
@@ -1039,7 +1172,54 @@ class Project:
 
         self.project_id = None
 
-    def consolidate_node(self, node_id, depth=0, descend_approved=True, return_=None):
+    def get_subtree(self, node_id, recurse_cb=None, **replace_columns) -> pd.DataFrame:
+        """
+        Get the subtree below node_id as a DataFrame.
+
+        Args:
+            node_id: Root of the subtree
+            recurse_cb: Callback for recursion. See _rquery_subtree.
+            **replace_columns: Replace stored values with other values (e.g. calculated).
+
+        Returns:
+            pd.DataFrame
+        """
+
+        assert self._locked
+
+        invalid_subtree = _rquery_subtree(node_id, recurse_cb)
+
+        columns = {c.key: c for c in invalid_subtree.c}
+        columns.update(
+            {
+                k: v(invalid_subtree) if callable(v) else v
+                for k, v in replace_columns.items()
+            }
+        )
+
+        stmt = (
+            select(columns.values())
+            # Deepest nodes first
+            .order_by(invalid_subtree.c.level.desc())
+        )
+
+        invalid_subtree: pd.DataFrame = pd.read_sql_query(
+            stmt, self._connection, index_col="node_id"
+        )
+
+        if not len(invalid_subtree):  # pylint: disable=len-as-condition
+            raise ProjectError("Unknown node: {}".format(node_id))
+
+        return invalid_subtree
+
+    def consolidate_node(
+        self,
+        node_id,
+        depth=0,
+        descend_approved=True,
+        exact_vector="raise",
+        return_=None,
+    ):
         """
         Ensure that the calculated values of this node are valid.
 
@@ -1048,6 +1228,10 @@ class Project:
         Parameters:
             node_id: Root of the subtree that gets consolidated.
             depth: Ensure validity of cached values at least up to a certain depth.
+            exact_vector (str, "exact"|"raise"|"approx"):
+                exact: Calculate vector as the sum of all objects.
+                raise: Do not recalculate vector and raise an exception instead.
+                approx: Calculate approximation from a subsample of objects.
             return_: None | "node" | "children". Return this node or its children.
 
         Returns:
@@ -1062,7 +1246,8 @@ class Project:
             else:
                 raise NotImplementedError("Unknown depth string: {}".format(depth))
 
-        connection = database.get_connection()
+        if exact_vector not in ("exact", "raise", "approx"):
+            raise ValueError("exact_vector has to be one of exact, raise, approx")
 
         assert self._locked
 
@@ -1084,65 +1269,30 @@ class Project:
             def recurse_cb(q, s):
                 return (q.c.cache_valid == False) | (q.c.level < depth)
 
-        invalid_subtree = _rquery_subtree(node_id, recurse_cb)
-
         # Readily query real n_objects
-        n_objects_own = (
-            select([func.count()])
-            .select_from(nodes_objects)
-            .where(nodes_objects.c.node_id == invalid_subtree.c.node_id)
-            .as_scalar()
-            .label("n_objects_own_")
-        )
+        def n_objects_own_(invalid_subtree):
+            return (
+                select([func.count()])
+                .select_from(nodes_objects)
+                .where(nodes_objects.c.node_id == invalid_subtree.c.node_id)
+                .as_scalar()
+                .label("n_objects_own_")
+            )
 
         # Readily query real n_children
-        children = nodes.alias("children")
-        n_children = (
-            select([func.count()])
-            .select_from(children)
-            .where(children.c.parent_id == invalid_subtree.c.node_id)
-            .as_scalar()
-            .label("n_children_")
-        )
-
-        stmt = (
-            select(
-                [
-                    # Properties
-                    invalid_subtree.c.node_id,
-                    invalid_subtree.c.name,
-                    invalid_subtree.c.parent_id,
-                    invalid_subtree.c.cache_valid,
-                    invalid_subtree.c.approved,
-                    invalid_subtree.c.filled,
-                    invalid_subtree.c.preferred,
-                    # Current cached values
-                    invalid_subtree.c.n_objects_,
-                    invalid_subtree.c.vector_own_,
-                    invalid_subtree.c.vector_,
-                    invalid_subtree.c.type_objects_own_,
-                    invalid_subtree.c.type_objects_,
-                    invalid_subtree.c.n_approved_objects_,
-                    invalid_subtree.c.n_approved_nodes_,
-                    invalid_subtree.c.n_filled_objects_,
-                    invalid_subtree.c.n_filled_nodes_,
-                    invalid_subtree.c.n_preferred_objects_,
-                    invalid_subtree.c.n_preferred_nodes_,
-                    # Calculated
-                    n_objects_own,  # n_objects_own_
-                    n_children,  # n_children_
-                ]
+        def n_children_(invalid_subtree):
+            children = nodes.alias("children")
+            return (
+                select([func.count()])
+                .select_from(children)
+                .where(children.c.parent_id == invalid_subtree.c.node_id)
+                .as_scalar()
+                .label("n_children_")
             )
-            # Deepest nodes first
-            .order_by(invalid_subtree.c.level.desc())
-        )
 
-        invalid_subtree: pd.DataFrame = pd.read_sql_query(
-            stmt, connection, index_col="node_id"
+        invalid_subtree = self.get_subtree(
+            node_id, recurse_cb, n_children_=n_children_, n_objects_own_=n_objects_own_
         )
-
-        if not len(invalid_subtree): #pylint: disable=len-as-condition
-            raise ProjectError("Unknown node: {}".format(node_id))
 
         if not invalid_subtree["cache_valid"].all():
             invalid_subtree["updated__"] = False
@@ -1150,7 +1300,7 @@ class Project:
             # Iterate over DataFrame fixing the values along the way (deepest nodes)
             with tqdm.tqdm(invalid_subtree.index) as t:
                 for node_id in t:
-                    t.set_description("Consolidating {}".format(node_id))
+                    #t.set_description("Consolidating {}".format(node_id))
 
                     n: dict = invalid_subtree.loc[node_id].to_dict()
                     updated_names = ["n_children_", "n_objects_own_"]
@@ -1175,17 +1325,20 @@ class Project:
 
                     ## n_objects_
                     if pd.isnull(n["n_objects_"]):
-                        n["n_objects_"] = n["n_objects_own_"] + children["n_objects_"].sum()
+                        n["n_objects_"] = (
+                            n["n_objects_own_"] + children["n_objects_"].sum()
+                        )
                         updated_names.append("n_objects_")
 
                     N_OBJECTS_SAMPLE = 1000
 
                     # Sample 1000 objects to speed up the calculation
                     if (
-                        pd.isnull(n["vector_own_"]) or pd.isnull(n["type_objects_own_"])
+                        n["vector_own_"] is None or n["type_objects_own_"] is None
                     ) and n["n_objects_"]:
+                        limit = None if exact_vector == "exact" else N_OBJECTS_SAMPLE
                         objects_sample = self.get_objects(
-                            node_id, order_by=objects.c.rand, limit=N_OBJECTS_SAMPLE
+                            node_id, order_by=objects.c.rand, limit=limit
                         )
                     else:
                         objects_sample = []
@@ -1195,7 +1348,10 @@ class Project:
                     objects_sample_vectors = objects_sample.vectors
 
                     ## vector_own_
-                    if pd.isnull(n["vector_own_"]) and n_objects_sample:
+                    if n["vector_own_"] is None and n_objects_sample:
+                        if exact_vector == "raise":
+                            raise ProjectError("vector_own_ is not set")
+
                         n["vector_own_"] = np.sum(objects_sample_vectors, axis=0)
 
                         if n_objects_sample < n["n_objects_own_"]:
@@ -1205,7 +1361,7 @@ class Project:
                         updated_names.append("vector_own_")
 
                     ## vector_
-                    if pd.isnull(n["vector_"]):
+                    if n["vector_"] is None:
                         vector_values = []
                         for cv in children["vector_"]:
                             if cv is not None:
@@ -1214,14 +1370,14 @@ class Project:
                             vector_values.append(n["vector_own_"])
 
                         if vector_values:
-                            n["vector_"] = seq2array(vector_values, len(vector_values)).sum(
-                                axis=0
-                            )
+                            n["vector_"] = seq2array(
+                                vector_values, len(vector_values)
+                            ).sum(axis=0)
                             updated_names.append("vector_")
 
                     ## type_objects_own_
                     N_TYPE_OBJECTS = 9
-                    if pd.isnull(n["type_objects_own_"]) and n_objects_sample:
+                    if n["type_objects_own_"] is None and n_objects_sample:
                         vector_own_mean = n["vector_own_"] / n_objects_sample
                         # Order objects_sample_vectors by distance to vector_own_mean
                         sqdistances = cdist(
@@ -1262,14 +1418,18 @@ class Project:
                         n_X_objects_name = "n_{}_objects_".format(flag)
                         n_X_nodes_name = "n_{}_nodes_".format(flag)
 
-                        n[n_X_objects_name] = (
-                            n[flag] * n["n_objects_own_"] + children[n_X_objects_name].sum()
-                        )
+                        if pd.isnull(n[n_X_objects_name]):
+                            n[n_X_objects_name] = (
+                                n[flag] * n["n_objects_own_"]
+                                + children[n_X_objects_name].sum()
+                            )
+                            updated_names.append(n_X_objects_name)
 
-                        n[n_X_nodes_name] = int(n[flag]) + children[n_X_nodes_name].sum()
-
-                        updated_names.append(n_X_objects_name)
-                        updated_names.append(n_X_nodes_name)
+                        if pd.isnull(n[n_X_nodes_name]):
+                            n[n_X_nodes_name] = (
+                                int(n[flag]) + children[n_X_nodes_name].sum()
+                            )
+                            updated_names.append(n_X_nodes_name)
 
                     ## Finally, flag as updated
                     n["updated__"] = True
@@ -1312,6 +1472,7 @@ class Project:
                 ]
 
                 stmt = (
+                    # pylint: disable=no-value-for-parameter
                     nodes.update()
                     .where(nodes.c.node_id == bindparam("_node_id"))
                     .values({k: bindparam(k) for k in update_fields})
@@ -1322,9 +1483,12 @@ class Project:
                 result.index.rename("_node_id", inplace=True)
                 result.reset_index(inplace=True)
 
-                connection.execute(stmt, result.to_dict("records"))
+                self._connection.execute(stmt, result.to_dict("records"))
 
                 print("Updated {:d} nodes.".format(n_updated))
+
+            # Drop updated__ column again to be compatible with Project.get_subtree
+            invalid_subtree.drop(columns=["updated__"], inplace=True)
 
         if return_ == "node":
             return invalid_subtree.loc[node_id].to_dict()
@@ -1336,3 +1500,35 @@ class Project:
 
         if return_ == "raw":
             return invalid_subtree
+
+    def reset_cached_values(self):
+        assert self._locked
+
+        # Cached values are prefixed with an underscore
+        values = {
+            c: None for c in nodes.columns.keys() if c.endswith("_")
+        }  # pylint: disable=no-value-for-parameter
+        values["cache_valid"] = False
+        stmt = (
+            # pylint: disable=no-value-for-parameter
+            nodes.update()
+            .values(values)
+            .where(nodes.c.project_id == self.project_id)
+        )
+        self._connection.execute(stmt)
+
+    def get_n_objects(self):
+        assert self._locked
+
+        stmt = (
+            select([func.count()])
+            .select_from(nodes_objects)
+            .where(
+                (nodes_objects.c.project_id == self.project_id)
+                & (nodes_objects.c.dataset_id == self.dataset_id)
+            )
+        )
+
+        n_objects = self._connection.execute(stmt).scalar()
+
+        return n_objects

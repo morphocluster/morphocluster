@@ -102,9 +102,9 @@ nodes = Table(
     # Number of all objects anywhere below this node
     Column("n_objects_", BigInteger, nullable=True),
     # Recursive sum of vectors
-    Column("vector_", Cube, nullable=True),
+    Column("vector_", Cube(as_numpy=True), nullable=True),
     # Sum of own vectors
-    Column("vector_own_", Cube, nullable=True),
+    Column("vector_own_", Cube(as_numpy=True), nullable=True),
     # object_ids of type objects directly under this node (used as preview for the node's objects)
     Column("type_objects_own_", ARRAY(String), nullable=True),
     # object_ids of type objects representative for all descendants (used as preview)
