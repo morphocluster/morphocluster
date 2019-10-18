@@ -470,7 +470,7 @@ class Project:
         new_vector = np.sum(old_vectors, axis=0)
 
         assert new_vector is not None
-        
+
         # TODO: Update vectors
 
         # Update new node
@@ -478,7 +478,7 @@ class Project:
             [new_node_id],
             "+",
             n_objects_own_=len(rows),
-            vector_own_=None, #new_vector,
+            vector_own_=new_vector,
             type_objects_own_=None,
         )
 
@@ -488,7 +488,7 @@ class Project:
             update_new_node_ids,
             "+",
             n_objects_=len(rows),
-            vector_=None, #new_vector,
+            vector_=new_vector,
             type_objects_=None,
         )
 
@@ -503,7 +503,7 @@ class Project:
                 [old_node_id],
                 "-",
                 n_objects_own_=old_count,
-                vector_own_=None, #old_vector,
+                vector_own_=old_vector,
                 type_objects_own_=None,
             )
 
@@ -513,7 +513,7 @@ class Project:
                 update_old_node_ids,
                 "-",
                 n_objects_=old_count,
-                vector_=None,#old_vector,
+                vector_=old_vector,
                 type_objects_=None,
             )
 
@@ -1300,7 +1300,7 @@ class Project:
             # Iterate over DataFrame fixing the values along the way (deepest nodes)
             with tqdm.tqdm(invalid_subtree.index) as t:
                 for node_id in t:
-                    #t.set_description("Consolidating {}".format(node_id))
+                    # t.set_description("Consolidating {}".format(node_id))
 
                     n: dict = invalid_subtree.loc[node_id].to_dict()
                     updated_names = ["n_children_", "n_objects_own_"]
@@ -1506,7 +1506,7 @@ class Project:
 
         # Cached values are prefixed with an underscore
         values = {
-            c: None for c in nodes.columns.keys() if c.endswith("_")
+            c: None for c in nodes.c.keys() if c.endswith("_")
         }  # pylint: disable=no-value-for-parameter
         values["cache_valid"] = False
         stmt = (

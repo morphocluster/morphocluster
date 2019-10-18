@@ -216,7 +216,9 @@ def test_relocate_objects(project: Project, orig_tree: pd.DataFrame):
             tree0 = project.consolidate_node(
                 root_id, depth=-1, exact_vector="exact", return_="raw"
             )
-            tree0, _ = _prepare_tree(tree0, ["vector_own_", "vector_"], IGNORE_COLUMNS)
+            tree0, _ = _prepare_tree(
+                tree0, [], IGNORE_COLUMNS + ["vector_own_", "vector_"]
+            )
 
             assert tree0.loc[root_id, "n_objects_"] == n_objects
 
