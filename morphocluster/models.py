@@ -97,14 +97,16 @@ nodes = Table(
     ## Cached values
     # Number of direct children
     Column("n_children_", BigInteger, nullable=True),
+    # Recursive number of below nodes
+    Column("n_nodes_", BigInteger, nullable=True),
     # Number of objects directly below this node
     Column("n_objects_own_", BigInteger, nullable=True),
     # Number of all objects anywhere below this node
     Column("n_objects_", BigInteger, nullable=True),
     # Recursive sum of vectors
-    Column("vector_", Cube(as_numpy=True), nullable=True),
+    Column("vector_sum_", Cube(as_numpy=True), nullable=True),
     # Sum of own vectors
-    Column("vector_own_", Cube(as_numpy=True), nullable=True),
+    Column("vector_sum_own_", Cube(as_numpy=True), nullable=True),
     # object_ids of type objects directly under this node (used as preview for the node's objects)
     Column("type_objects_own_", ARRAY(String), nullable=True),
     # object_ids of type objects representative for all descendants (used as preview)
@@ -126,7 +128,7 @@ nodes = Table(
     ForeignKeyConstraint(
         ["project_id", "parent_id"],
         ["nodes.project_id", "nodes.node_id"],
-        ondelete="SET NULL",
+        ondelete="RESTRICT",
         name="nodes_project_id_node_id_fkey",
     ),
 )
