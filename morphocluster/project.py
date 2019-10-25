@@ -18,8 +18,13 @@ from morphocluster import processing
 from morphocluster.extensions import database
 from morphocluster.helpers import seq2array
 from morphocluster.member import MemberCollection
-from morphocluster.models import (nodes, nodes_objects, nodes_rejected_objects,
-                                  objects, projects)
+from morphocluster.models import (
+    nodes,
+    nodes_objects,
+    nodes_rejected_objects,
+    objects,
+    projects,
+)
 
 
 class ProjectError(Exception):
@@ -537,8 +542,9 @@ class Project:
         assert self._locked
 
         if op == "=":
-            # Invalidate iff some values are None
-            values["cache_valid"] = None in values.values()
+            # Cache is invalidated if None in values
+            if None in values.values():
+                values["cache_valid"] = False
             stmt = (
                 # pylint: disable=no-value-for-parameter
                 nodes.update()
@@ -576,8 +582,8 @@ class Project:
 
             return op(row[k], v)
 
-        # TODO: Reset "vector_sum_", "vector_sum_own_" to None if n_objects[_own]_ is 0
         def _cleanup_vectors(row):
+            """Reset "vector_sum_", "vector_sum_own_" to None if n_objects[_own]_ is 0."""
             if "n_objects_own_" in row and row["n_objects_own_"] == 0:
                 row["vector_sum_own_"] = None
             if "n_objects_" in row and row["n_objects_"] == 0:
@@ -697,7 +703,6 @@ class Project:
         prefix = commonprefix(old_parent_paths + [new_parent_path])
         len_prefix = len(prefix)
 
-        # TODO:
         new_vector_sum = np.sum(old_vector_sums, axis=0)
         new_n_objects = sum(old_n_objectss)
         new_n_nodes = sum(old_n_nodess)
@@ -741,7 +746,7 @@ class Project:
             self.update_cached_values(
                 old_parent_path[len_prefix:],
                 "-",
-                n_nodes_=old_n_nodes,
+                n_nodes_=None,  # old_n_nodes, # Can not be reliably calculated.
                 n_objects_=old_n_objects,
                 vector_sum_=old_vector_sum,
                 type_objects_=None,
@@ -1404,6 +1409,7 @@ class Project:
 
                     ## n_nodes_
                     if pd.isnull(n["n_nodes_"]):
+                        assert not pd.isna(children["n_nodes_"]).any()
                         n["n_nodes_"] = n["n_children_"] + children["n_nodes_"].sum()
                         updated_names.append("n_nodes_")
 
@@ -1532,6 +1538,8 @@ class Project:
             invalid_subtree["n_objects_own_"] = invalid_subtree[
                 "n_objects_own_"
             ].astype(int)
+
+            invalid_subtree["n_nodes_"] = invalid_subtree["n_nodes_"].astype(int)
 
             # Flag all rows as valid
             invalid_subtree["cache_valid"] = True

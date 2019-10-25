@@ -1,12 +1,11 @@
 import os.path
-import sys
 
 import h5py
 import numpy as np
 import pandas as pd
 import pytest
 from numpy.testing import assert_allclose
-from pandas.testing import assert_frame_equal, assert_series_equal
+from pandas.testing import assert_frame_equal, assert_index_equal, assert_series_equal
 from timer_cm import Timer
 
 from morphocluster.dataset import Dataset
@@ -178,7 +177,7 @@ def test_create_node(project: Project):
 
 
 def assert_vectors_equal(node_ids, vec_a, vec_b, obj="Vectors", atol=1e-5):
-    __tracebackhide__ = True
+    __tracebackhide__ = True  # pylint: disable=unused-variable
 
     dist = np.linalg.norm(vec_a - vec_b, axis=1)
     assert len(dist) == len(node_ids)
@@ -205,11 +204,21 @@ def test_commonprefix():
     assert commonprefix([[1], [1, 2, 3], [1, 4, 5], [1, 6, 7, 8]]) == []
 
 
-def assert_all_valid(df, columns):
-    # __tracebackhide__ = True
+def assert_all_valid(df, columns, extra_cb=None):
+    __tracebackhide__ = True  # pylint: disable=unused-variable
 
     for col in columns:
-        assert not pd.isna(df[col]).any(), "{} has to be valid for all rows".format(col)
+        valid = ~pd.isna(df[col])
+        fails_for = df[~valid].index
+        extra_info = extra_cb(fails_for) if extra_cb is not None else None
+        assert (
+            valid.all()
+        ), "{col} not valid for {n_invalid:d} indexes {indexes} ({extra_info})".format(
+            col=col,
+            n_invalid=(~valid).sum(),
+            indexes=fails_for.values,
+            extra_info=extra_info,
+        )
 
 
 def assert_all_valid_iff(df, condition, columns):
@@ -760,16 +769,15 @@ def test_relocate_nodes(project: Project):
             "n_preferred_nodes_",
         ]
 
-        # Record tree after merge
+        # Record tree after relocate_nodes
         tree1 = project.get_subtree(root_id)
 
         ## Assert that a new parent_id was actually set
         assert (tree1.loc[node_ids, "parent_id"] == new_parent_id).all()
 
         # relocate_nodes has to keep all these values valid
-        assert_all_valid(
-            tree1, ("n_objects_own_", "n_objects_", "n_children_", "n_nodes_")
-        )
+        # n_nodes_ can not be calculated reliably.
+        assert_all_valid(tree1, ("n_objects_own_", "n_objects_", "n_children_"))
 
         # relocate_nodes needs to create a valid vectors if n_objects[_own]_ > 0
         assert_all_valid_iff(tree1, tree1["n_objects_own_"] > 0, ("vector_sum_own_",))
@@ -808,8 +816,28 @@ def test_relocate_nodes(project: Project):
             )
         time_consolidate_partial = t.elapsed
 
+        assert_all_cache_valid(tree2)
+
         tree2, (vector_sum_own_2, vector_sum_2) = _prepare_tree(
             tree2, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
+        )
+
+        # Assert that all calculated values are valid
+        assert_all_valid(
+            tree2,
+            (
+                "n_children_",
+                "n_nodes_",
+                "n_objects_own_",
+                "n_objects_",
+                "n_approved_objects_",
+                "n_approved_nodes_",
+                "n_filled_objects_",
+                "n_filled_nodes_",
+                "n_preferred_objects_",
+                "n_preferred_nodes_",
+            ),
+            lambda fails_for: fails_for.isin(node_ids),
         )
 
         ## Assert that certain properties for root don't change
@@ -828,6 +856,9 @@ def test_relocate_nodes(project: Project):
                 root_id, depth=-1, exact_vector="exact", return_="raw"
             )
         time_consolidate_full = t.elapsed
+
+        assert_all_cache_valid(tree3)
+
         tree3, (vector_sum_own_3, vector_sum_3) = _prepare_tree(
             tree3, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
         )
@@ -853,12 +884,14 @@ def test_relocate_nodes(project: Project):
             "n_filled_nodes_",
             "n_preferred_nodes_",
         ]
-        print(tree1.drop(columns=invalidated_columns).columns)
-        assert_frame_equal(
-            tree1.drop(columns=invalidated_columns),
-            tree3.drop(columns=invalidated_columns),
-            check_dtype=False,
+
+        # n_nodes_ can not be calculated reliably.
+        assert_frame_equal2(
+            tree1.drop(columns=invalidated_columns + ["n_nodes_"]),
+            tree3.drop(columns=invalidated_columns + ["n_nodes_"]),
+            lambda fails_for: fails_for.isin(node_ids),
         )
+
         # Vectors after relocate_nodes should be the same as full rebuild
         assert_vectors_equal(
             tree1.index,
@@ -879,7 +912,8 @@ def test_relocate_nodes(project: Project):
         # Assert tree2 == tree3 for relevant properties
         assert list(tree2.columns) == list(tree3.columns)
         # print(list(tree2.columns))
-        assert_frame_equal(tree2, tree3, check_dtype=False)
+        # assert_frame_equal(tree2, tree3, check_dtype=False)
+        assert_frame_equal2(tree2, tree3, lambda fails_for: fails_for.isin(node_ids))
         assert_vectors_equal(
             tree2.index,
             vector_sum_own_2,
@@ -894,3 +928,35 @@ def test_relocate_nodes(project: Project):
             atol=1e-4,
             obj="vector_sum_2:vector_sum_3",
         )
+
+
+def assert_frame_equal2(a, b, extra_cb=None):
+    __tracebackhide__ = True  # pylint: disable=unused-variable
+
+    for i, col in enumerate(a.columns):
+        assert col in b.columns
+        equal = a.iloc[:, i] == b.iloc[:, i]
+        equal[pd.isnull(a.iloc[:, i]) & pd.isnull(b.iloc[:, i])] = True  # NaN == NaN
+        fails_for = a[~equal].index
+        extra_info = extra_cb(fails_for) if extra_cb is not None else None
+        assert (
+            equal.all()
+        ), "{col} not equal for {n_neq:d} indexes {indexes} ({extra_info}):\nleft: {left}\nright: {right}".format(
+            indexes=fails_for.values,
+            extra_info=extra_info,
+            left=a[~equal].iloc[:, i].values,
+            right=b[~equal].iloc[:, i].values,
+            col=col,
+            n_neq=(~equal).sum(),
+        )
+
+
+def assert_all_cache_valid(tree, extra_cb=None):
+    __tracebackhide__ = True  # pylint: disable=unused-variable
+
+    cache_valid = tree["cache_valid"]
+    fails_for = tree[~cache_valid].index
+    extra_info = extra_cb(fails_for) if extra_cb is not None else None
+    assert cache_valid.all(), "Cache not valid for indexes {} ({})".format(
+        fails_for.values, extra_info
+    )
