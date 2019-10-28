@@ -104,9 +104,13 @@ nodes = Table(
     # Number of all objects anywhere below this node
     Column("n_objects_", BigInteger, nullable=True),
     # Recursive sum of vectors
-    Column("vector_sum_", Cube(as_numpy=True), nullable=True),
+    Column("vector_sum_", PickleType, nullable=True),
     # Sum of own vectors
-    Column("vector_sum_own_", Cube(as_numpy=True), nullable=True),
+    Column("vector_sum_own_", PickleType, nullable=True),
+    # Recursive mean of vectors
+    Column("vector_mean_", Cube(as_numpy=True), nullable=True),
+    # Mean of own vectors
+    Column("vector_mean_own_", Cube(as_numpy=True), nullable=True),
     # object_ids of type objects directly under this node (used as preview for the node's objects)
     Column("type_objects_own_", ARRAY(String), nullable=True),
     # object_ids of type objects representative for all descendants (used as preview)

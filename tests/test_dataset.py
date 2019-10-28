@@ -62,8 +62,56 @@ def _orig_tree(datadir):
     return Tree.from_saved(str(datadir / "tree.zip"))
 
 
+# relocate_nodes has to keep all these values valid
+# n_nodes_ can not be calculated reliably.
+VALID_AFTER_RELOCATE_NODES = (
+    "n_objects_own_",
+    "n_objects_",
+    "n_children_",
+    "vector_sum_own_",
+    "vector_sum_",
+)
+
+# These vales needs to be invalidated for affected precursers
+AP_INVALID_AFTER_RELOCATE_NODES = (
+    "n_approved_objects_",
+    "n_filled_objects_",
+    "n_preferred_objects_",
+    "n_approved_nodes_",
+    "n_filled_nodes_",
+    "n_preferred_nodes_",
+    "vector_mean_",
+)
+
+
+def assert_all_valid_after_consolidate(tree):
+    assert_all_cache_valid(tree)
+    assert_all_valid(
+        tree,
+        (
+            "n_children_",
+            "n_objects_own_",
+            "n_objects_",
+            "n_approved_objects_",
+            "n_approved_nodes_",
+            "n_filled_objects_",
+            "n_filled_nodes_",
+            "n_preferred_objects_",
+            "n_preferred_nodes_",
+            "vector_sum_",
+            "vector_sum_own_",
+        ),
+    )
+    assert_all_valid_iff(
+        tree, tree["n_objects_"] > 0, ("type_objects_", "vector_mean_")
+    )
+    assert_all_valid_iff(
+        tree, tree["n_objects_own_"] > 0, ("type_objects_own_", "vector_mean_own_")
+    )
+
+
+# Assert that consolidate_node works as expected
 def test_consolidate_node_raw(project, orig_tree, datadir):
-    # Assert that consolidate_node works as expected
     features_fn = str(datadir / "features.h5")
     with project, h5py.File(features_fn, "r") as f_features:
         object_ids = f_features["object_id"]
@@ -73,6 +121,8 @@ def test_consolidate_node_raw(project, orig_tree, datadir):
         result = project.consolidate_node(
             root_id, depth=-1, return_="raw", exact_vector="exact"
         )
+
+        assert_all_valid_after_consolidate(result)
 
         for node_id, values in result.iterrows():
             ## Assert that n_children_ is correct
@@ -97,7 +147,7 @@ def test_consolidate_node_raw(project, orig_tree, datadir):
                     err_msg="Unexpected vector_sum_own_ for node_id={}".format(node_id),
                 )
             else:
-                assert values["vector_sum_own_"] == None
+                assert values["vector_sum_own_"] is 0
 
             # TODO: Other cached values
 
@@ -221,13 +271,39 @@ def assert_all_valid(df, columns, extra_cb=None):
         )
 
 
-def assert_all_valid_iff(df, condition, columns):
-    # __tracebackhide__ = True
+def assert_all_invalid(df, columns, extra_cb=None):
+    __tracebackhide__ = True  # pylint: disable=unused-variable
+
+    for col in columns:
+        invalid = pd.isna(df.loc[:, col])
+        fails_for = df[~invalid].index
+        extra_info = extra_cb(fails_for) if extra_cb is not None else None
+        assert (
+            invalid.all()
+        ), "{col} not invalid for {n_valid:d} indexes {indexes} ({extra_info})".format(
+            col=col,
+            n_valid=(~invalid).sum(),
+            indexes=fails_for.values,
+            extra_info=extra_info,
+        )
+
+
+def assert_all_valid_iff(df, condition, columns, extra_cb=None):
+    __tracebackhide__ = True
 
     for col in columns:
         valid = ~pd.isna(df[col])
-        assert_series_equal(
-            condition, valid, check_names=False, obj="Validity of {}".format(col)
+        equal = condition == valid
+        fails_for = df[~equal].index
+        assert (
+            equal.all()
+        ), "{col} validity does not match condition for {n_neq:d} indexes {indexes} ({extra_info}):\ncondition: {condition}\nvalid: {valid}".format(
+            indexes=fails_for.values,
+            extra_info=extra_cb(fails_for) if extra_cb is not None else None,
+            condition=condition[~equal].values,
+            valid=valid[~equal].values,
+            col=col,
+            n_neq=(~equal).sum(),
         )
 
 
@@ -250,31 +326,12 @@ def test_relocate_objects(project: Project, orig_tree: pd.DataFrame):
         )
 
         # Assert that all calculated values are valid
-        assert_all_valid(
-            tree0,
-            (
-                "n_children_",
-                "n_objects_own_",
-                "n_objects_",
-                "n_approved_objects_",
-                "n_approved_nodes_",
-                "n_filled_objects_",
-                "n_filled_nodes_",
-                "n_preferred_objects_",
-                "n_preferred_nodes_",
-            ),
-        )
-
-        assert_all_valid_iff(
-            tree0, tree0["n_objects_"] > 0, ("vector_sum_", "type_objects_")
-        )
-
-        assert_all_valid_iff(
-            tree0, tree0["n_objects_own_"] > 0, ("vector_sum_own_", "type_objects_own_")
-        )
+        assert_all_valid_after_consolidate(tree0)
 
         tree0, _ = _prepare_tree(
-            tree0, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
+            tree0,
+            ["vector_sum_own_", "vector_sum_", "vector_mean_own_", "vector_mean_"],
+            IGNORE_COLUMNS,
         )
 
         assert tree0.shape[0] == n_nodes
@@ -317,14 +374,19 @@ def test_relocate_objects(project: Project, orig_tree: pd.DataFrame):
         tree1 = project.get_subtree(root_id)
 
         # relocate_objects has to keep all these values valid
-        assert_all_valid(tree1, ("n_objects_own_", "n_objects_"))
+        assert_all_valid(
+            tree1, ("n_objects_own_", "n_objects_", "vector_sum_own_", "vector_sum_")
+        )
 
-        # relocate_objects needs to create a valid vectors if n_objects[_own]_ > 0
-        assert_all_valid_iff(tree1, tree1["n_objects_own_"] > 0, ("vector_sum_own_",))
-        assert_all_valid_iff(tree1, tree1["n_objects_"] > 0, ("vector_sum_",))
-
-        tree1, (vector_sum_own_1, vector_sum_1) = _prepare_tree(
-            tree1, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
+        tree1, (
+            vector_sum_own_1,
+            vector_sum_1,
+            vector_mean_own_1,
+            vector_mean_1,
+        ) = _prepare_tree(
+            tree1,
+            ["vector_sum_own_", "vector_sum_", "vector_mean_own_", "vector_mean_"],
+            IGNORE_COLUMNS,
         )
 
         # relocate_objects has to reset all flag summaries for all predecessors
@@ -347,8 +409,17 @@ def test_relocate_objects(project: Project, orig_tree: pd.DataFrame):
             )
         time_consolidate_partial = t.elapsed
 
-        tree2, (vector_sum_own_2, vector_sum_2) = _prepare_tree(
-            tree2, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
+        assert_all_valid_after_consolidate(tree2)
+
+        tree2, (
+            vector_sum_own_2,
+            vector_sum_2,
+            vector_mean_own_2,
+            vector_mean_2,
+        ) = _prepare_tree(
+            tree2,
+            ["vector_sum_own_", "vector_sum_", "vector_mean_own_", "vector_mean_"],
+            IGNORE_COLUMNS,
         )
 
         # Numbers for root must not change
@@ -364,8 +435,16 @@ def test_relocate_objects(project: Project, orig_tree: pd.DataFrame):
                 root_id, depth=-1, exact_vector="exact", return_="raw"
             )
         time_consolidate_full = t.elapsed
-        tree3, (vector_sum_own_3, vector_sum_3) = _prepare_tree(
-            tree3, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
+
+        tree3, (
+            vector_sum_own_3,
+            vector_sum_3,
+            vector_mean_own_3,
+            vector_mean_3,
+        ) = _prepare_tree(
+            tree3,
+            ["vector_sum_own_", "vector_sum_", "vector_mean_own_", "vector_mean_"],
+            IGNORE_COLUMNS,
         )
 
         # TODO: Assert that partial consolidate is faster
@@ -475,31 +554,12 @@ def test_merge_node(project: Project):
         )
 
         # Assert that all calculated values are valid
-        assert_all_valid(
-            tree0,
-            (
-                "n_children_",
-                "n_objects_own_",
-                "n_objects_",
-                "n_approved_objects_",
-                "n_approved_nodes_",
-                "n_filled_objects_",
-                "n_filled_nodes_",
-                "n_preferred_objects_",
-                "n_preferred_nodes_",
-            ),
-        )
-
-        assert_all_valid_iff(
-            tree0, tree0["n_objects_"] > 0, ("vector_sum_", "type_objects_")
-        )
-
-        assert_all_valid_iff(
-            tree0, tree0["n_objects_own_"] > 0, ("vector_sum_own_", "type_objects_own_")
-        )
+        assert_all_valid_after_consolidate(tree0)
 
         tree0, _ = _prepare_tree(
-            tree0, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
+            tree0,
+            ["vector_sum_own_", "vector_sum_", "vector_mean_own_", "vector_mean_"],
+            IGNORE_COLUMNS,
         )
 
         assert tree0.shape[0] == n_nodes
@@ -519,6 +579,8 @@ def test_merge_node(project: Project):
 
         assert node_id not in dest_node_path
 
+        n_children = (subtree["parent_id"] == node_id).sum()
+
         affected_precursers = set(old_path)
         affected_precursers.update(dest_node_path)
 
@@ -533,11 +595,14 @@ def test_merge_node(project: Project):
         print("{} affected subtree nodes.".format(len(affected_subtree_nodes)))
 
         ## Merge node
-        n_relocated_objects, n_relocated_nodes = project.merge_node_into(
+        print("Merging {} into {}...".format(node_id, dest_node_id))
+        n_relocated_objects, n_relocated_children = project.merge_node_into(
             node_id, dest_node_id
         )
 
-        assert n_relocated_nodes == 1
+        print("Relocated {} objects.".format(n_relocated_objects))
+        print("Relocated {} children.".format(n_relocated_children))
+        assert n_relocated_children == n_children
 
         # The flag summaries change between before and after merge
         FLAG_SUMMARY_NAMES = [
@@ -556,23 +621,43 @@ def test_merge_node(project: Project):
         assert node_id not in tree1.index
 
         # merge_node_into has to keep all these values valid
+        # n_nodes_ can not be calculated reliably.
         assert_all_valid(
-            tree1, ("n_objects_own_", "n_objects_", "n_children_", "n_nodes_")
+            tree1,
+            (
+                "n_objects_own_",
+                "n_objects_",
+                "n_children_",
+                "vector_sum_own_",
+                "vector_sum_",
+            ),
         )
 
-        # merge_node_into needs to create a valid vectors if n_objects[_own]_ > 0
-        assert_all_valid_iff(tree1, tree1["n_objects_own_"] > 0, ("vector_sum_own_",))
-        assert_all_valid_iff(tree1, tree1["n_objects_"] > 0, ("vector_sum_",))
-
-        tree1, (vector_sum_own_1, vector_sum_1) = _prepare_tree(
-            tree1, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
+        tree1, (
+            vector_sum_own_1,
+            vector_sum_1,
+            vector_mean_own_1,
+            vector_mean_1,
+        ) = _prepare_tree(
+            tree1,
+            ["vector_sum_own_", "vector_sum_", "vector_mean_own_", "vector_mean_"],
+            IGNORE_COLUMNS,
         )
 
-        # merge_node_into has to reset all flag summaries for all predecessors
-        for flag_summary_name in FLAG_SUMMARY_NAMES:
-            assert pd.isna(
-                tree1.loc[affected_precursers, flag_summary_name]
-            ).all(), "{} has to be reset for all predecessors".format(flag_summary_name)
+        # merge_node_into does not necessarily reset all affected_precursers,
+        # e.g. when the merged node has no objects
+        if n_relocated_objects:
+            assert_all_invalid(
+                tree1.loc[affected_precursers],
+                ("n_approved_objects_", "n_filled_objects_", "n_preferred_objects_"),
+            )
+
+        assert_all_invalid(
+            tree1.loc[affected_precursers],
+            ("n_approved_nodes_", "n_filled_nodes_", "n_preferred_nodes_"),
+        )
+
+        # assert_all_invalid(tree1.loc[affected_precursers], FLAG_SUMMARY_NAMES)
 
         ## Assert that certain properties for root don't change
         # These properties are affected by merge_node_into, ignore.
@@ -592,8 +677,17 @@ def test_merge_node(project: Project):
             )
         time_consolidate_partial = t.elapsed
 
-        tree2, (vector_sum_own_2, vector_sum_2) = _prepare_tree(
-            tree2, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
+        assert_all_valid_after_consolidate(tree2)
+
+        tree2, (
+            vector_sum_own_2,
+            vector_sum_2,
+            vector_mean_own_2,
+            vector_mean_2,
+        ) = _prepare_tree(
+            tree2,
+            ["vector_sum_own_", "vector_sum_", "vector_mean_own_", "vector_mean_"],
+            IGNORE_COLUMNS,
         )
 
         ## Assert that certain properties for root don't change
@@ -612,8 +706,16 @@ def test_merge_node(project: Project):
                 root_id, depth=-1, exact_vector="exact", return_="raw"
             )
         time_consolidate_full = t.elapsed
-        tree3, (vector_sum_own_3, vector_sum_3) = _prepare_tree(
-            tree3, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
+
+        tree3, (
+            vector_sum_own_3,
+            vector_sum_3,
+            vector_mean_own_3,
+            vector_mean_3,
+        ) = _prepare_tree(
+            tree3,
+            ["vector_sum_own_", "vector_sum_", "vector_mean_own_", "vector_mean_"],
+            IGNORE_COLUMNS,
         )
 
         # TODO: Assert that partial consolidate is faster
@@ -637,10 +739,15 @@ def test_merge_node(project: Project):
             "n_filled_nodes_",
             "n_preferred_nodes_",
         ]
-        assert_frame_equal(
-            tree1.drop(columns=invalidated_columns),
-            tree3.drop(columns=invalidated_columns),
-            check_dtype=False,
+        # n_nodes_ can not be calculated reliably
+        assert_frame_equal2(
+            tree1.drop(columns=invalidated_columns + ["n_nodes_"]),
+            tree3.drop(columns=invalidated_columns + ["n_nodes_"]),
+            lambda fails_for: {
+                node_id: "node_id",
+                dest_node_id: "dest_node_id",
+                root_id: "root_id",
+            }.get(fails_for[0], "no match"),
         )
         # Vectors after relocate should be the same as full rebuild
         assert_vectors_equal(
@@ -679,6 +786,19 @@ def test_merge_node(project: Project):
         )
 
 
+RELOCATE_NODES_INVARIANT_ROOT_BEFORE_AFTER = [
+    "project_id",
+    "parent_id",
+    "name",
+    "starred",
+    "approved",
+    "filled",
+    "preferred",
+    "n_objects_own_",
+    "n_objects_",
+]
+
+
 def test_relocate_nodes(project: Project):
     with project:
         root_id = project.get_root_id()
@@ -697,31 +817,12 @@ def test_relocate_nodes(project: Project):
         )
 
         # Assert that all calculated values are valid
-        assert_all_valid(
-            tree0,
-            (
-                "n_children_",
-                "n_objects_own_",
-                "n_objects_",
-                "n_approved_objects_",
-                "n_approved_nodes_",
-                "n_filled_objects_",
-                "n_filled_nodes_",
-                "n_preferred_objects_",
-                "n_preferred_nodes_",
-            ),
-        )
-
-        assert_all_valid_iff(
-            tree0, tree0["n_objects_"] > 0, ("vector_sum_", "type_objects_")
-        )
-
-        assert_all_valid_iff(
-            tree0, tree0["n_objects_own_"] > 0, ("vector_sum_own_", "type_objects_own_")
-        )
+        assert_all_valid_after_consolidate(tree0)
 
         tree0, _ = _prepare_tree(
-            tree0, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
+            tree0,
+            ["vector_sum_own_", "vector_sum_", "vector_mean_own_", "vector_mean_"],
+            IGNORE_COLUMNS,
         )
 
         assert tree0.shape[0] == n_nodes
@@ -759,7 +860,7 @@ def test_relocate_nodes(project: Project):
 
         assert n_relocated_nodes == len(node_ids)
 
-        # The flag summaries change between before and after merge
+        # The flag summaries change between before and after relocate
         FLAG_SUMMARY_NAMES = [
             "n_approved_objects_",
             "n_filled_objects_",
@@ -775,37 +876,31 @@ def test_relocate_nodes(project: Project):
         ## Assert that a new parent_id was actually set
         assert (tree1.loc[node_ids, "parent_id"] == new_parent_id).all()
 
-        # relocate_nodes has to keep all these values valid
-        # n_nodes_ can not be calculated reliably.
-        assert_all_valid(tree1, ("n_objects_own_", "n_objects_", "n_children_"))
+        ## Assert that these values are valid
+        assert_all_valid(tree1, VALID_AFTER_RELOCATE_NODES)
 
-        # relocate_nodes needs to create a valid vectors if n_objects[_own]_ > 0
-        assert_all_valid_iff(tree1, tree1["n_objects_own_"] > 0, ("vector_sum_own_",))
-        assert_all_valid_iff(tree1, tree1["n_objects_"] > 0, ("vector_sum_",))
-
-        tree1, (vector_sum_own_1, vector_sum_1) = _prepare_tree(
-            tree1, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
+        ## Assert that these values are reset for affected precursors
+        assert_all_invalid(
+            tree1.loc[affected_precursers], AP_INVALID_AFTER_RELOCATE_NODES
         )
 
-        # relocate_nodes has to reset all flag summaries for all predecessors
-        for flag_summary_name in FLAG_SUMMARY_NAMES:
-            ok_mask = pd.isna(tree1.loc[affected_precursers, flag_summary_name])
-            fails_for = ok_mask[~ok_mask].index
-            in_node_ids = fails_for.isin(node_ids)
-            assert (
-                ok_mask.all()
-            ), "{} has to be reset for all predecessors. Fails for {} ({}).".format(
-                flag_summary_name, ",".join(str(i) for i in fails_for), in_node_ids
-            )
+        tree1, (
+            vector_sum_own_1,
+            vector_sum_1,
+            vector_mean_own_1,
+            vector_mean_1,
+        ) = _prepare_tree(
+            tree1,
+            ["vector_sum_own_", "vector_sum_", "vector_mean_own_", "vector_mean_"],
+            IGNORE_COLUMNS,
+        )
 
         ## Assert that certain properties for root don't change
-        # These properties are affected by relocate_nodes, ignore:
-        variants_for_root = FLAG_SUMMARY_NAMES + ["n_nodes_", "n_children_"]
         assert_series_equal(
-            tree1.drop(columns=variants_for_root).loc[root_id],
-            tree0.drop(columns=variants_for_root).loc[root_id],
+            tree1.loc[root_id, RELOCATE_NODES_INVARIANT_ROOT_BEFORE_AFTER],
+            tree0.loc[root_id, RELOCATE_NODES_INVARIANT_ROOT_BEFORE_AFTER],
             obj="Series({})".format(
-                ",".join(tree1.drop(columns=variants_for_root).columns)
+                ",".join(tree1[RELOCATE_NODES_INVARIANT_ROOT_BEFORE_AFTER].columns)
             ),
         )
 
@@ -816,36 +911,25 @@ def test_relocate_nodes(project: Project):
             )
         time_consolidate_partial = t.elapsed
 
-        assert_all_cache_valid(tree2)
+        assert_all_valid_after_consolidate(tree2)
 
-        tree2, (vector_sum_own_2, vector_sum_2) = _prepare_tree(
-            tree2, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
-        )
-
-        # Assert that all calculated values are valid
-        assert_all_valid(
+        tree2, (
+            vector_sum_own_2,
+            vector_sum_2,
+            vector_mean_own_2,
+            vector_mean_2,
+        ) = _prepare_tree(
             tree2,
-            (
-                "n_children_",
-                "n_nodes_",
-                "n_objects_own_",
-                "n_objects_",
-                "n_approved_objects_",
-                "n_approved_nodes_",
-                "n_filled_objects_",
-                "n_filled_nodes_",
-                "n_preferred_objects_",
-                "n_preferred_nodes_",
-            ),
-            lambda fails_for: fails_for.isin(node_ids),
+            ["vector_sum_own_", "vector_sum_", "vector_mean_own_", "vector_mean_"],
+            IGNORE_COLUMNS,
         )
 
         ## Assert that certain properties for root don't change
         assert_series_equal(
-            tree2.drop(columns=variants_for_root).loc[root_id],
-            tree0.drop(columns=variants_for_root).loc[root_id],
+            tree2.loc[root_id, RELOCATE_NODES_INVARIANT_ROOT_BEFORE_AFTER],
+            tree0.loc[root_id, RELOCATE_NODES_INVARIANT_ROOT_BEFORE_AFTER],
             obj="Series({})".format(
-                ",".join(tree2.drop(columns=variants_for_root).columns)
+                ",".join(tree1[RELOCATE_NODES_INVARIANT_ROOT_BEFORE_AFTER].columns)
             ),
         )
 
@@ -857,10 +941,15 @@ def test_relocate_nodes(project: Project):
             )
         time_consolidate_full = t.elapsed
 
-        assert_all_cache_valid(tree3)
-
-        tree3, (vector_sum_own_3, vector_sum_3) = _prepare_tree(
-            tree3, ["vector_sum_own_", "vector_sum_"], IGNORE_COLUMNS
+        tree3, (
+            vector_sum_own_3,
+            vector_sum_3,
+            vector_mean_own_3,
+            vector_mean_3,
+        ) = _prepare_tree(
+            tree3,
+            ["vector_sum_own_", "vector_sum_", "vector_mean_own_", "vector_mean_"],
+            IGNORE_COLUMNS,
         )
 
         # TODO: Assert that partial consolidate is faster
@@ -868,10 +957,10 @@ def test_relocate_nodes(project: Project):
 
         ## Assert that certain properties for root don't change
         assert_series_equal(
-            tree3.drop(columns=variants_for_root).loc[root_id],
-            tree0.drop(columns=variants_for_root).loc[root_id],
+            tree3.loc[root_id, RELOCATE_NODES_INVARIANT_ROOT_BEFORE_AFTER],
+            tree0.loc[root_id, RELOCATE_NODES_INVARIANT_ROOT_BEFORE_AFTER],
             obj="Series({})".format(
-                ",".join(tree3.drop(columns=variants_for_root).columns)
+                ",".join(tree1[RELOCATE_NODES_INVARIANT_ROOT_BEFORE_AFTER].columns)
             ),
         )
 
@@ -885,7 +974,7 @@ def test_relocate_nodes(project: Project):
             "n_preferred_nodes_",
         ]
 
-        # n_nodes_ can not be calculated reliably.
+        # n_nodes_ can not be calculated reliably
         assert_frame_equal2(
             tree1.drop(columns=invalidated_columns + ["n_nodes_"]),
             tree3.drop(columns=invalidated_columns + ["n_nodes_"]),
@@ -938,12 +1027,11 @@ def assert_frame_equal2(a, b, extra_cb=None):
         equal = a.iloc[:, i] == b.iloc[:, i]
         equal[pd.isnull(a.iloc[:, i]) & pd.isnull(b.iloc[:, i])] = True  # NaN == NaN
         fails_for = a[~equal].index
-        extra_info = extra_cb(fails_for) if extra_cb is not None else None
         assert (
             equal.all()
         ), "{col} not equal for {n_neq:d} indexes {indexes} ({extra_info}):\nleft: {left}\nright: {right}".format(
             indexes=fails_for.values,
-            extra_info=extra_info,
+            extra_info=extra_cb(fails_for) if extra_cb is not None else None,
             left=a[~equal].iloc[:, i].values,
             right=b[~equal].iloc[:, i].values,
             col=col,
