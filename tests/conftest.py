@@ -1,13 +1,16 @@
+import multiprocessing
 import os.path
+import pathlib
+import signal
 
 import flask_migrate
 import psycopg2
 import pytest
+import redis
 
 from morphocluster import create_app
 from morphocluster.cli import _add_user
 from morphocluster.extensions import database
-import pathlib
 
 
 def check_postgres(ip, port):
@@ -21,26 +24,46 @@ def check_postgres(ip, port):
         return False
 
 
-@pytest.fixture(scope='session')
+def check_redis(ip, port):
+    try:
+        r = redis.Redis(host=ip, port=port)
+        r.info()
+        return True
+    except redis.ConnectionError:
+        return False
+
+
+@pytest.fixture(scope="session")
 def docker_postgres(docker_services):
-    docker_services.start('postgres')
+    docker_services.start("postgres")
     public_port = docker_services.wait_for_service(
         "postgres", 5432, check_server=check_postgres
     )
     url = "postgresql://morphocluster:morphocluster@{docker_services.docker_ip}:{public_port}/morphocluster".format(
-        docker_services=docker_services,
-        public_port=public_port,
+        docker_services=docker_services, public_port=public_port
     )
     return url
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
+def docker_redis_persistent(docker_services):
+    docker_services.start("redis-persistent")
+    public_port = docker_services.wait_for_service(
+        "redis-persistent", 6379, check_server=check_redis
+    )
+    url = "redis://{docker_services.docker_ip}:{public_port}/0".format(
+        docker_services=docker_services, public_port=public_port
+    )
+    return url
+
+
+@pytest.fixture(scope="session")
 def session_tmp_path(tmp_path_factory):
     return tmp_path_factory.mktemp("session")
 
 
-@pytest.fixture(scope='session')
-def flask_app(docker_postgres, session_tmp_path: pathlib.Path):
+@pytest.fixture(scope="session")
+def flask_app(docker_postgres, docker_redis_persistent, session_tmp_path: pathlib.Path):
     """Create and configure a new app instance for the session."""
 
     data_dir = session_tmp_path / "data"
@@ -50,6 +73,7 @@ def flask_app(docker_postgres, session_tmp_path: pathlib.Path):
     app = create_app(
         {
             "SQLALCHEMY_DATABASE_URI": docker_postgres,
+            "RQ_REDIS_URL": docker_redis_persistent,
             "DATA_DIR": str(data_dir),
         }
     )
@@ -64,18 +88,37 @@ def flask_app(docker_postgres, session_tmp_path: pathlib.Path):
     # Cleanup
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
+def flask_rq_worker(flask_app):
+
+    ctx = multiprocessing.get_context("fork")
+
+    print("Starting worker...")
+    runner = flask_app.test_cli_runner()
+    p = ctx.Process(target=lambda: runner.invoke(args=["rq", "worker"]))
+    p.start()
+
+    yield
+
+    print("Stopping worker...")
+    os.kill(p.pid, signal.SIGINT)
+    p.join(1.0)
+
+    print("Worker stopped.")
+
+
+@pytest.fixture(scope="session")
 def flask_client(flask_app):
     with flask_app.test_client() as c:
         yield c
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def flask_cli(flask_app):
     with flask_app.test_cli_runner() as r:
         yield r
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def datadir():
     return pathlib.Path(__file__).parent / "data"
