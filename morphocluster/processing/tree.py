@@ -270,19 +270,22 @@ class Tree(object):
         result = self.nodes.loc[selector, "node_id"]
         return next(iter(result), None)
 
-    def topological_order(self):
+    def topological_order(self, root_id=None):
         """
         Yield nodes in topological order.
         """
 
-        for node_idx in self.topological_order_idx():
+        for node_idx in self.topological_order_idx(root_id=root_id):
             yield self.nodes.loc[node_idx]
 
-    def topological_order_idx(self):
+    def topological_order_idx(self, root_id=None):
         """
         Yield node indices in topological order.
         """
-        queue = [self.get_root_id()]
+        if root_id is None:
+            root_id = self.get_root_id()
+
+        queue = [root_id]
 
         while queue:
             node_id = queue.pop()
