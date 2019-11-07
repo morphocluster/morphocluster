@@ -1352,6 +1352,7 @@ class Project:
         Parameters:
             node_id: Root of the subtree that gets consolidated.
             depth: Ensure validity of cached values at least up to a certain depth.
+                -1 means full subtree.
             exact_vector (str, "exact"|"raise"|"approx"):
                 exact: Calculate vector as the sum of all objects.
                 raise: Do not recalculate vector and raise an exception instead.

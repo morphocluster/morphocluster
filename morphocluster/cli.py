@@ -14,6 +14,7 @@ from werkzeug.security import generate_password_hash
 
 from morphocluster import models
 from morphocluster.dataset import Dataset
+from morphocluster.project import Project
 from morphocluster.extensions import database
 from morphocluster.tree import Tree
 
@@ -100,31 +101,59 @@ def init_app(app):
         load_object_features(features_fns)
 
     @app.cli.command()
-    @click.argument("tree_fn")
-    @click.argument("project_name", default=None)
+    @click.argument("name")
+    @click.argument("owner")
+    @click.option("--objects", "objects_fn")
+    @click.option("--features", "features_fn")
+    def create_dataset(name, owner, objects_fn, features_fn):
+        """Create a dataset."""
+
+        connection = database.get_connection()
+
+        with connection.begin():
+            dataset = Dataset.create(name, owner)
+
+            if objects_fn:
+                dataset.load_objects(objects_fn)
+
+            if features_fn:
+                dataset.load_object_features(features_fn)
+
+        print(
+            "Created dataset: {} (id {:d}) for {}.".format(
+                name, dataset.dataset_id, owner
+            )
+        )
+
+    @app.cli.command()
+    @click.argument("name")
+    @click.argument("dataset_id", type=int)
+    @click.option("--tree", "tree_fn")
     @click.option("--consolidate/--no-consolidate", default=True)
-    def load_project(tree_fn, project_name, consolidate):
-        """
-        Load a project from a saved tree.
-        """
+    def create_project(name, dataset_id, tree_fn, consolidate):
+        """Create a project."""
 
-        with database.engine.connect() as conn:
-            tree = Tree(conn)
+        connection = database.get_connection()
 
-            if project_name is None:
-                project_name = os.path.basename(os.path.splitext(tree_fn)[0])
+        with connection.begin():
+            with Project.create(name, dataset_id) as project:
 
-            with conn.begin():
-                print("Loading {}...".format(tree_fn))
-                project_id = tree.load_project(project_name, tree_fn)
-                root_id = tree.get_root_id(project_id)
+                if tree_fn:
+                    project.import_tree(tree_fn)
 
-                if consolidate:
-                    print("Consolidating ...")
-                    tree.consolidate_node(root_id)
+                    root_id = project.get_root_id()
 
-            print("Root ID: {}".format(root_id))
-            print("Project ID: {}".format(project_id))
+                    if consolidate:
+                        print("Consolidating ...")
+                        project.consolidate_node(
+                            root_id, depth=-1, exact_vector="exact"
+                        )
+
+        print(
+            "Created project: {} (id {:d}) in {}.".format(
+                name, project.project_id, dataset_id
+            )
+        )
 
     @app.cli.command()
     @click.argument("root_id", type=int)
@@ -293,12 +322,3 @@ def init_app(app):
         with database.engine.connect() as conn:
             stmt = models.log.delete()
             conn.execute(stmt)
-
-    @app.cli.group()
-    def dataset():
-        pass
-
-    @dataset.command("create")
-    @click.argument("name")
-    def dataset_create(name):
-        Dataset.create(name)

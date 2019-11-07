@@ -33,6 +33,12 @@ datasets = Table(
     metadata,
     Column("dataset_id", Integer, primary_key=True),
     Column("name", String),
+    Column(
+        "owner",
+        None,
+        ForeignKey("users.username", ondelete="CASCADE", name="users_username_fkey"),
+        nullable=False,
+    ),
 )
 
 #: :type objects: sqlalchemy.sql.schema.Table
@@ -43,7 +49,7 @@ objects = Table(
     Column("path", String, nullable=False),
     Column("vector", PickleType, nullable=True),
     # rand is for quasi-random samples (e.g. type object calculation)
-    Column("rand", Float, server_default=func.random()),
+    Column("rand", Float, server_default=func.random(), nullable=False),
     Column(
         "dataset_id",
         None,
@@ -62,7 +68,7 @@ projects = Table(
     metadata,
     Column("project_id", Integer, primary_key=True, nullable=False),
     Column("name", String),
-    Column("creation_date", DateTime, default=datetime.datetime.now),
+    Column("creation_date", DateTime, default=datetime.datetime.now, nullable=False),
     Column("visible", Boolean, nullable=False, server_default="t"),
     Column(
         "dataset_id",
@@ -226,5 +232,7 @@ class Job(db.Model):
     id = Column(String, primary_key=True)
     name = Column(String)
     description = Column(String)
-    username = Column(None, ForeignKey("users.username", name="users_username_fkey"))
+    username = Column(
+        None, ForeignKey("users.username", name="users_username_fkey"), nullable=False
+    )
 

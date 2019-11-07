@@ -81,7 +81,7 @@ def flask_app(docker_postgres, docker_redis_persistent, session_tmp_path: pathli
     with app.app_context():
         flask_migrate.upgrade()
 
-        _add_user("test", "test")
+        _add_user("test_user", "test_user")
 
         yield app
 
