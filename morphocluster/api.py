@@ -1,8 +1,3 @@
-'''
-Created on 19.03.2018
-
-@author: mschroeder
-'''
 import json
 import os
 import uuid
@@ -34,8 +29,8 @@ from morphocluster import background, models
 from morphocluster.classifier import Classifier
 from morphocluster.extensions import database, redis_lru, rq
 from morphocluster.helpers import keydefaultdict, seq2array
-from morphocluster.schemas import JobSchema, LogSchema
 from morphocluster.project import Project
+from morphocluster.schemas import JobSchema, LogSchema
 
 api = Blueprint("api", __name__)
 
@@ -46,7 +41,7 @@ def batch(iterable, n=1):
     """
     l = len(iterable)
     for ndx in range(0, l, n):
-        yield iterable[ndx:min(ndx + n, l)]
+        yield iterable[ndx : min(ndx + n, l)]
 
 
 def json_converter(value):
@@ -81,11 +76,15 @@ def log(action, node_id=None, reverse_action=None, data=None):
     auth = request.authorization
     username = auth.username if auth is not None else None
 
-    stmt = models.log.insert({'node_id': node_id,
-                              'username': username,
-                              'action': action,
-                              'reverse_action': reverse_action,
-                              'data': data})
+    stmt = models.log.insert(
+        {
+            "node_id": node_id,
+            "username": username,
+            "action": action,
+            "reverse_action": reverse_action,
+            "data": data,
+        }
+    )
 
     connection.execute(stmt)
 
@@ -97,10 +96,12 @@ def record(state):
 
 @api.after_request
 def api_headers(response):
-    response.headers['Last-Modified'] = datetime.now()
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '-1'
+    response.headers["Last-Modified"] = datetime.now()
+    response.headers[
+        "Cache-Control"
+    ] = "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "-1"
 
     return response
 
@@ -114,6 +115,7 @@ def _node_icon(node):
 
     return "mdi mdi-hexagon-multiple"
 
+
 # ===============================================================================
 # /tree
 # ===============================================================================
@@ -123,8 +125,7 @@ def _tree_root(project):
     project["text"] = project["name"]
     project["children"] = True
     project["icon"] = "mdi mdi-tree"
-    project["id"] = _node_id_frontend(
-        project["project_id"], project["node_id"])
+    project["id"] = _node_id_frontend(project["project_id"], project["node_id"])
 
     return project
 
@@ -134,7 +135,7 @@ def _tree_node(node):
         "id": "{}:{}".format(node["project_id"], node["node_id"]),
         "text": "{} ({})".format(node["name"] or node["node_id"], node["_n_children"]),
         "children": node["_n_children"] > 0,
-        "icon": _node_icon(node)
+        "icon": _node_icon(node),
     }
 
     return result
@@ -207,15 +208,15 @@ def save_project(project_id):
 
         tree_fn = os.path.join(
             api.config["PROJECT_EXPORT_DIR"],
-            "{:%Y-%m-%d-%H-%M-%S}--{}--{}.zip".format(datetime.now(),
-                                                      p_dict["project_id"],
-                                                      p_dict["name"]))
+            "{:%Y-%m-%d-%H-%M-%S}--{}--{}.zip".format(
+                datetime.now(), p_dict["project_id"], p_dict["name"]
+            ),
+        )
 
         project.export_tree(tree_fn)
 
-        return jsonify({
-            "tree_fn": tree_fn,
-        })
+        return jsonify({"tree_fn": tree_fn})
+
 
 # ===============================================================================
 # /projects/<project_id>/nodes
@@ -236,10 +237,8 @@ def create_node(project_id):
     with Project(project_id) as project:
         data = request.get_json()
 
-        object_ids = [m["object_id"]
-                      for m in data["members"] if "object_id" in m]
-        child_node_ids = [m["node_id"]
-                          for m in data["members"] if "node_id" in m]
+        object_ids = [m["object_id"] for m in data["members"] if "object_id" in m]
+        child_node_ids = [m["node_id"] for m in data["members"] if "node_id" in m]
 
         name = data.get("name", None)
         parent_id = int(data.get("parent_id"))
@@ -248,8 +247,7 @@ def create_node(project_id):
 
         print(data)
 
-        node_id = project.create_node(
-            parent_id=parent_id, name=name, starred=starred)
+        node_id = project.create_node(parent_id=parent_id, name=name, starred=starred)
 
         project.relocate_nodes(child_node_ids, node_id)
 
@@ -298,8 +296,9 @@ def _node(project, node, include_children=False):
     }
 
     if include_children:
-        result["children"] = [_node(project, c)
-                              for c in project.get_children(node["node_id"])]
+        result["children"] = [
+            _node(project, c) for c in project.get_children(node["node_id"])
+        ]
 
     return result
 
@@ -319,19 +318,21 @@ def _arrange_by_sim(result):
         return ()
 
     # Get vector values
-    vectors = seq2array([m["_centroid"] if "_centroid" in m else m["vector"] for m in result],
-                        len(result))
+    vectors = seq2array(
+        [m["_centroid"] if "_centroid" in m else m["vector"] for m in result],
+        len(result),
+    )
 
     if vectors.shape[0] <= ISOMAP_FIT_SUBSAMPLE_N:
         subsample = vectors
     else:
-        idxs = np.random.choice(
-            vectors.shape[0], ISOMAP_FIT_SUBSAMPLE_N, replace=False)
+        idxs = np.random.choice(vectors.shape[0], ISOMAP_FIT_SUBSAMPLE_N, replace=False)
         subsample = vectors[idxs]
 
     try:
-        isomap = Isomap(
-            n_components=1, n_neighbors=ISOMAP_N_NEIGHBORS, n_jobs=4).fit(subsample)
+        isomap = Isomap(n_components=1, n_neighbors=ISOMAP_N_NEIGHBORS, n_jobs=4).fit(
+            subsample
+        )
         order = np.squeeze(isomap.transform(vectors))
     except ValueError:
         print(subsample)
@@ -343,8 +344,9 @@ def _arrange_by_sim(result):
 
 
 def _arrange_by_nleaves(result):
-    n_leaves = np.array([len(m["_leaves"]) if "_leaves" in m else 0 for m in result],
-                        dtype=int)
+    n_leaves = np.array(
+        [len(m["_leaves"]) if "_leaves" in m else 0 for m in result], dtype=int
+    )
 
     return np.argsort(n_leaves)[::-1]
 
@@ -359,8 +361,7 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
     # If a request_id is given, load the result from the cache
     if request_id is not None:
         try:
-            cache_key = '{}:{}'.format(func.__name__,
-                                       request_id)
+            cache_key = "{}:{}".format(func.__name__, request_id)
             print("Loading cache key {}...".format(cache_key))
             page_result = redis_lru.lindex(cache_key, page)
 
@@ -378,11 +379,12 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
 
         except RedisError as exc:
             raise ValueError(
-                "Could not retrieve cache_key: {}".format(cache_key)) from exc
+                "Could not retrieve cache_key: {}".format(cache_key)
+            ) from exc
 
     # Otherwise calculate a result
     request_id = uuid.uuid4().hex
-    cache_key = '{}:{}'.format(func.__name__, request_id)
+    cache_key = "{}:{}".format(func.__name__, request_id)
 
     # Calculate result
     result = func(**func_kwargs)
@@ -444,30 +446,22 @@ def cache_serialize_page(endpoint, **kwargs):
                 raise ValueError("page may not be None!")
 
             raw_result, n_pages, request_id = _load_or_calc(
-                func, func_kwargs, request_id, page, **kwargs)
+                func, func_kwargs, request_id, page, **kwargs
+            )
 
-            meta = {
-                'request_id': request_id,
-                'last_page': n_pages - 1,
-            }
+            meta = {"request_id": request_id, "last_page": n_pages - 1}
 
             if 0 < page < n_pages:
-                meta['previous_page'] = page - 1
+                meta["previous_page"] = page - 1
 
             if page + 1 < n_pages:
-                meta['next_page'] = page + 1
+                meta["next_page"] = page + 1
 
             link_parameters = func_kwargs.copy()
             link_parameters["request_id"] = request_id
-            links = {
-                'self': url_for(endpoint, **link_parameters)
-            }
+            links = {"self": url_for(endpoint, **link_parameters)}
 
-            result = {
-                'meta': meta,
-                'links': links,
-                'data': "$data-placeholder$"
-            }
+            result = {"meta": meta, "links": links, "data": "$data-placeholder$"}
 
             result = json_dumps(result)
 
@@ -476,8 +470,7 @@ def cache_serialize_page(endpoint, **kwargs):
             # ===================================================================
             # Construct response
             # ===================================================================
-            response = Response(
-                result, mimetype=api.config['JSONIFY_MIMETYPE'])
+            response = Response(result, mimetype=api.config["JSONIFY_MIMETYPE"])
 
             # =======================================================================
             # Generate Link response header
@@ -501,7 +494,7 @@ def cache_serialize_page(endpoint, **kwargs):
             url = url_for(endpoint, **link_parameters)
             link_header_fields.append('<{}>; rel="last"'.format(url))
 
-            response.headers["Link"] = ",". join(link_header_fields)
+            response.headers["Link"] = ",".join(link_header_fields)
 
             return response
 
@@ -519,10 +512,11 @@ def _arrange_by_starred_sim(result, starred):
 
     try:
         # Get vectors
-        vectors = seq2array((m["_centroid"] if "_centroid" in m else m["vector"] for m in result),
-                            len(result))
-        starred_vectors = seq2array((m["_centroid"] for m in starred),
-                                    len(starred))
+        vectors = seq2array(
+            (m["_centroid"] if "_centroid" in m else m["vector"] for m in result),
+            len(result),
+        )
+        starred_vectors = seq2array((m["_centroid"] for m in starred), len(starred))
     except ValueError as e:
         print(e)
         return ()
@@ -534,7 +528,8 @@ def _arrange_by_starred_sim(result, starred):
         max_dist_idx = np.argsort(max_dist)[::-1]
 
         assert len(max_dist_idx) == len(result), "{} != {}".format(
-            len(max_dist_idx), len(result))
+            len(max_dist_idx), len(result)
+        )
 
         return max_dist_idx
 
@@ -545,7 +540,15 @@ def _arrange_by_starred_sim(result, starred):
 
 
 @cache_serialize_page(".get_node_members")
-def _get_node_members(project_id, node_id, nodes=False, objects=False, arrange_by="", starred_first=False, descending=False):
+def _get_node_members(
+    project_id,
+    node_id,
+    nodes=False,
+    objects=False,
+    arrange_by="",
+    starred_first=False,
+    descending=False,
+):
     with Project(project_id) as project, Timer("_get_node_members") as timer:
 
         sorted_nodes_include = "unstarred" if starred_first else None
@@ -553,8 +556,9 @@ def _get_node_members(project_id, node_id, nodes=False, objects=False, arrange_b
         result = []
         if nodes:
             with timer.child("project.get_children()"):
-                result.extend(project.get_children(
-                    node_id, include=sorted_nodes_include))
+                result.extend(
+                    project.get_children(node_id, include=sorted_nodes_include)
+                )
         if objects:
             with timer.child("project.get_objects()"):
                 result.extend(project.get_objects(node_id))
@@ -575,8 +579,7 @@ def _get_node_members(project_id, node_id, nodes=False, objects=False, arrange_b
             elif arrange_by == "starred_sim":
                 with timer.child("starred_sim"):
                     # If no starred members yet, arrange by distance to regular children
-                    anchors = starred if len(
-                        starred) else project.get_children(node_id)
+                    anchors = starred if len(starred) else project.get_children(node_id)
 
                     order = _arrange_by_starred_sim(result, anchors)
             elif arrange_by == "interleaved":
@@ -590,8 +593,7 @@ def _get_node_members(project_id, node_id, nodes=False, objects=False, arrange_b
                 with timer.child("random"):
                     order = np.random.permutation(len(result))
             else:
-                warnings.warn(
-                    "arrange_by={} not supported!".format(arrange_by))
+                warnings.warn("arrange_by={} not supported!".format(arrange_by))
                 order = ()
 
             if descending:
@@ -674,8 +676,11 @@ def get_node_stats(project_id, node_id):
         progress = project.calculate_progress(node_id)
 
         if arguments["log"] is not None:
-            log("progress-{}".format(arguments["log"]),
-                node_id=node_id, data=json_dumps(progress))
+            log(
+                "progress-{}".format(arguments["log"]),
+                node_id=node_id,
+                data=json_dumps(progress),
+            )
 
         return jsonify(progress)
 
@@ -698,8 +703,7 @@ def post_node_members(project_id, node_id):
 def get_node(project_id, node_id):
     with Project(project_id) as project:
 
-        flags = {k: request.args.get(k, 0, strtobool)
-                 for k in ("include_children",)}
+        flags = {k: request.args.get(k, 0, strtobool) for k in ("include_children",)}
 
         node = project.get_node(node_id)
 
@@ -715,8 +719,7 @@ def patch_node(project_id, node_id):
     with Project(project_id) as project:
 
         data = request.get_json()
-        flags = {k: request.args.get(k, 0, strtobool)
-                 for k in ("include_children",)}
+        flags = {k: request.args.get(k, 0, strtobool) for k in ("include_children",)}
 
         # TODO: Use argparse
         if "starred" in data:
@@ -724,8 +727,7 @@ def patch_node(project_id, node_id):
 
         project.update_node(node_id, data)
 
-        log("update_node({})".format(json.dumps(data, sort_keys=True)),
-            node_id=node_id)
+        log("update_node({})".format(json.dumps(data, sort_keys=True)), node_id=node_id)
 
         node = project.get_node(node_id, True)
 
@@ -734,7 +736,9 @@ def patch_node(project_id, node_id):
         return jsonify(result)
 
 
-@api.route("/projects/<int:project_id>/nodes/<int:parent_id>/adopt_members", methods=["POST"])
+@api.route(
+    "/projects/<int:project_id>/nodes/<int:parent_id>/adopt_members", methods=["POST"]
+)
 def node_adopt_members(project_id, parent_id):
     """
     Adopt a list of nodes.
@@ -758,13 +762,19 @@ def node_adopt_members(project_id, parent_id):
         project.relocate_nodes(node_ids, parent_id)
         project.relocate_objects(object_ids, parent_id)
 
-        print("Node {} adopted {} nodes and {} objects."
-              .format(parent_id, len(node_ids), len(object_ids)))
+        print(
+            "Node {} adopted {} nodes and {} objects.".format(
+                parent_id, len(node_ids), len(object_ids)
+            )
+        )
 
         return jsonify({})
 
 
-@api.route("/projects/<int:project_id>/nodes/<int:node_id>/accept_recommended_objects", methods=["POST"])
+@api.route(
+    "/projects/<int:project_id>/nodes/<int:node_id>/accept_recommended_objects",
+    methods=["POST"],
+)
 def accept_recommended_objects(project_id, node_id):
     """
     Accept recommended objects.
@@ -790,16 +800,19 @@ def accept_recommended_objects(project_id, node_id):
 
         with t.child("assemble set of rejected objects"):
             rejected_object_ids = set(
-                m[1:] for m in parameters["rejected_members"] if m.startswith("o"))
+                m[1:] for m in parameters["rejected_members"] if m.startswith("o")
+            )
 
         with t.child("assemble list of accepted objects"):
             object_ids = []
             for page in range(parameters["last_page"] + 1):
                 # pylint: disable=unexpected-keyword-arg
                 response = _node_get_recommended_objects(
-                    node_id=node_id, request_id=parameters["request_id"], page=page)
-                page_object_ids = (v["object_id"]
-                                   for v in json.loads(response.data.decode())["data"])
+                    node_id=node_id, request_id=parameters["request_id"], page=page
+                )
+                page_object_ids = (
+                    v["object_id"] for v in json.loads(response.data.decode())["data"]
+                )
                 object_ids.extend(page_object_ids)
 
         # Save list of objects to enable calculation of Average Precision and the like
@@ -809,20 +822,20 @@ def accept_recommended_objects(project_id, node_id):
                 with t2.child("calc rejected"):
                     rejected = [o in rejected_object_ids for o in object_ids]
                 with t2.child("assemble DataFrame"):
-                    data = pd.DataFrame(
-                        {"object_id": object_ids, "rejected": rejected})
+                    data = pd.DataFrame({"object_id": object_ids, "rejected": rejected})
 
                 data_fn = os.path.join(
                     app.config["PROJECT_EXPORT_DIR"],
-                    "{:%Y-%m-%d-%H-%M-%S}--accept-reject--{}.csv".format(datetime.now(),
-                                                                         node_id))
+                    "{:%Y-%m-%d-%H-%M-%S}--accept-reject--{}.csv".format(
+                        datetime.now(), node_id
+                    ),
+                )
                 with t2.child("write data"):
                     data.to_csv(data_fn, index=False)
 
         with t.child("filter accepted objects"):
             # Filter object_ids
-            object_ids = [
-                o for o in object_ids if o not in rejected_object_ids]
+            object_ids = [o for o in object_ids if o not in rejected_object_ids]
 
         # print(object_ids)
 
@@ -838,18 +851,26 @@ def accept_recommended_objects(project_id, node_id):
             log_data.update(addlog_data)
         elif addlog_data is not None:
             raise ValueError(
-                "Parameter log_data should be a dict, got a {}!".format(type(addlog_data)))
+                "Parameter log_data should be a dict, got a {}!".format(
+                    type(addlog_data)
+                )
+            )
 
-        with Project(project_id) as project, t.child("save accepted/rejected to database"):
+        with Project(project_id) as project, t.child(
+            "save accepted/rejected to database"
+        ):
             project.relocate_objects(object_ids, node_id)
             project.reject_objects(node_id, rejected_object_ids)
 
-            log("accept_recommended_objects",
-                node_id=node_id,
-                data=json_dumps(log_data))
+            log(
+                "accept_recommended_objects", node_id=node_id, data=json_dumps(log_data)
+            )
 
-        print("Node {} adopted {} objects and rejected {} objects."
-              .format(node_id, len(object_ids), len(rejected_object_ids)))
+        print(
+            "Node {} adopted {} objects and rejected {} objects.".format(
+                node_id, len(object_ids), len(rejected_object_ids)
+            )
+        )
 
         return jsonify({})
 
@@ -857,12 +878,16 @@ def accept_recommended_objects(project_id, node_id):
 @cache_serialize_page(".node_get_recommended_children", page_size=20)
 def _node_get_recommended_children(project_id, node_id, max_n):
     with Project(project_id) as project:
-        result = [_node(project, c)
-                  for c in project.recommend_children(node_id, max_n=max_n)]
+        result = [
+            _node(project, c) for c in project.recommend_children(node_id, max_n=max_n)
+        ]
         return result
 
 
-@api.route("/projects/<int:project_id>/nodes/<int:node_id>/recommended_children", methods=["GET"])
+@api.route(
+    "/projects/<int:project_id>/nodes/<int:node_id>/recommended_children",
+    methods=["GET"],
+)
 def node_get_recommended_children(project_id, node_id):
     """
     Recommend children for this node.
@@ -883,20 +908,24 @@ def node_get_recommended_children(project_id, node_id):
     # Limit max_n
     arguments.max_n = max(arguments.max_n, 1000)
 
-    return _node_get_recommended_children(project_id=project_id, node_id=node_id, **arguments)
+    return _node_get_recommended_children(
+        project_id=project_id, node_id=node_id, **arguments
+    )
 
 
 @cache_serialize_page(".node_get_recommended_objects", page_size=50)
 def _node_get_recommended_objects(project_id=None, node_id=None, max_n=None):
     with Project(project_id) as project:
 
-        result = [_object(o)
-                  for o in project.recommend_objects(node_id, max_n)]
+        result = [_object(o) for o in project.recommend_objects(node_id, max_n)]
 
         return result
 
 
-@api.route("/projects/<int:project_id>/nodes/<int:node_id>/recommended_objects", methods=["GET"])
+@api.route(
+    "/projects/<int:project_id>/nodes/<int:node_id>/recommended_objects",
+    methods=["GET"],
+)
 def node_get_recommended_objects(project_id, node_id):
     """
     Recommend objects for this node.
@@ -918,10 +947,14 @@ def node_get_recommended_objects(project_id, node_id):
     # Limit max_n
     arguments.max_n = max(arguments.max_n, 1000)
 
-    return _node_get_recommended_objects(project_id=project_id, node_id=node_id, **arguments)
+    return _node_get_recommended_objects(
+        project_id=project_id, node_id=node_id, **arguments
+    )
 
 
-@api.route("/projects/<int:project_id>/nodes/<int:node_id>/next_unapproved", methods=["GET"])
+@api.route(
+    "/projects/<int:project_id>/nodes/<int:node_id>/next_unapproved", methods=["GET"]
+)
 def node_get_next(project_id, node_id):
     parser = reqparse.RequestParser()
     parser.add_argument("leaf", type=strtobool, default=False)
@@ -933,21 +966,23 @@ def node_get_next(project_id, node_id):
 
         # Descend if the successor is not approved
         # Rationale: Approval is for a whole subtree.
-        def recurse(_, s): return s.c.approved == False
+        def recurse(_, s):
+            return s.c.approved == False
 
         # Filter descendants that are not approved
-        def filter(subtree): return subtree.c.approved == False
+        def filter(subtree):
+            return subtree.c.approved == False
 
         result = project.get_next_node(
-            node_id,
-            leaf=arguments["leaf"],
-            recurse_cb=recurse,
-            filter=filter)
+            node_id, leaf=arguments["leaf"], recurse_cb=recurse, filter=filter
+        )
 
         return jsonify(result)
 
 
-@api.route("/projects/<int:project_id>/nodes/<int:node_id>/next_unfilled", methods=["GET"])
+@api.route(
+    "/projects/<int:project_id>/nodes/<int:node_id>/next_unfilled", methods=["GET"]
+)
 def node_get_next_unfilled(project_id, node_id):
     parser = reqparse.RequestParser()
     parser.add_argument("leaf", type=strtobool, default=False)
@@ -959,19 +994,22 @@ def node_get_next_unfilled(project_id, node_id):
     with Project(project_id) as project:
 
         # Filter descendants that are approved and unfilled
-        def filter(subtree): return (subtree.c.approved ==
-                                     True) & (subtree.c.filled == False)
+        def filter(subtree):
+            return (subtree.c.approved == True) & (subtree.c.filled == False)
 
         result = project.get_next_node(
             node_id,
             leaf=arguments["leaf"],
             preferred_first=arguments["preferred_first"],
-            filter=filter)
+            filter=filter,
+        )
 
         return jsonify(result)
 
 
-@api.route("/projects/<int:project_id>/nodes/<int:node_id>/merge_into", methods=["POST"])
+@api.route(
+    "/projects/<int:project_id>/nodes/<int:node_id>/merge_into", methods=["POST"]
+)
 def post_node_merge_into(project_id, node_id):
     """
     Merge a node into another node.
@@ -991,8 +1029,10 @@ def post_node_merge_into(project_id, node_id):
         # TODO: Unapprove
         project.merge_node_into(node_id, data["dest_node_id"])
 
-        log("merge_node_into({}, {})".format(node_id, data["dest_node_id"]),
-            node_id=data["dest_node_id"])
+        log(
+            "merge_node_into({}, {})".format(node_id, data["dest_node_id"]),
+            node_id=data["dest_node_id"],
+        )
 
         return jsonify(None)
 
@@ -1012,8 +1052,10 @@ def post_node_classify(project_id, node_id):
         subnode (boolean): Move classified objects into a child of the target node. (Default: False)
     """
 
-    flags = {k: request.args.get(k, 0, strtobool)
-             for k in ("nodes", "objects", "safe", "subnode")}
+    flags = {
+        k: request.args.get(k, 0, strtobool)
+        for k in ("nodes", "objects", "safe", "subnode")
+    }
 
     print(flags)
 
@@ -1032,73 +1074,82 @@ def post_node_classify(project_id, node_id):
 
         starred_centroids = np.array([c["_centroid"] for c in starred])
 
-        print("|starred_centroids|", np.linalg.norm(
-            starred_centroids, axis=1))
+        print("|starred_centroids|", np.linalg.norm(starred_centroids, axis=1))
 
         # Initialize classifier
         classifier = Classifier(starred_centroids)
 
         if flags["subnode"]:
+
             def _subnode_for(node_id):
                 return project.create_node(parent_id=node_id, name="classified")
+
             target_nodes = keydefaultdict(_subnode_for)
         else:
             target_nodes = keydefaultdict(lambda k: k)
 
         if flags["nodes"]:
-            unstarred_centroids = np.array(
-                [c["_centroid"] for c in unstarred])
+            unstarred_centroids = np.array([c["_centroid"] for c in unstarred])
             unstarred_ids = np.array([c["node_id"] for c in unstarred])
 
             # Predict unstarred children (if any)
             n_unstarred = len(unstarred_centroids)
             if n_unstarred > 0:
-                print("Predicting {} unstarred children of {}...".format(
-                    n_unstarred, node_id))
+                print(
+                    "Predicting {} unstarred children of {}...".format(
+                        n_unstarred, node_id
+                    )
+                )
                 type_predicted = classifier.classify(
-                    unstarred_centroids, safe=flags["safe"])
+                    unstarred_centroids, safe=flags["safe"]
+                )
 
                 for i, starred_node in enumerate(starred):
-                    nodes_to_move = [
-                        int(n) for n in unstarred_ids[type_predicted == i]]
+                    nodes_to_move = [int(n) for n in unstarred_ids[type_predicted == i]]
 
                     if len(nodes_to_move):
                         target_node_id = target_nodes[starred_node["node_id"]]
-                        project.relocate_nodes(nodes_to_move,
-                                               target_node_id,
-                                               unapprove=True)
+                        project.relocate_nodes(
+                            nodes_to_move, target_node_id, unapprove=True
+                        )
 
                 n_predicted_children = np.sum(type_predicted > -1)
 
         if flags["objects"]:
             # Predict objects
             objects = project.get_objects(node_id)
-            print("Predicting {} objects of {}...".format(
-                len(objects), node_id))
+            print("Predicting {} objects of {}...".format(len(objects), node_id))
             object_vectors = np.array([o["vector"] for o in objects])
             object_ids = np.array([o["object_id"] for o in objects])
 
-            type_predicted = classifier.classify(
-                object_vectors, safe=flags["safe"])
+            type_predicted = classifier.classify(object_vectors, safe=flags["safe"])
 
             for i, starred_node in enumerate(starred):
-                objects_to_move = [str(o)
-                                   for o in object_ids[type_predicted == i]]
+                objects_to_move = [str(o) for o in object_ids[type_predicted == i]]
                 if len(objects_to_move):
                     target_node_id = target_nodes[starred_node["node_id"]]
                     print(
-                        "Moving objects {!r} -> {}".format(objects_to_move, target_node_id))
-                    project.relocate_objects(objects_to_move,
-                                             target_node_id,
-                                             unapprove=True)
+                        "Moving objects {!r} -> {}".format(
+                            objects_to_move, target_node_id
+                        )
+                    )
+                    project.relocate_objects(
+                        objects_to_move, target_node_id, unapprove=True
+                    )
 
             n_predicted_objects = np.sum(type_predicted > -1)
 
-        log("classify_members(nodes={nodes},objects={objects})".format(
-            **flags), node_id=node_id)
+        log(
+            "classify_members(nodes={nodes},objects={objects})".format(**flags),
+            node_id=node_id,
+        )
 
-        return jsonify({"n_predicted_children": int(n_predicted_children),
-                        "n_predicted_objects": int(n_predicted_objects)})
+        return jsonify(
+            {
+                "n_predicted_children": int(n_predicted_children),
+                "n_predicted_objects": int(n_predicted_objects),
+            }
+        )
 
 
 @api.route("/log", methods=["POST"])
@@ -1111,7 +1162,7 @@ def create_log_entry():
         log_data["action"],
         node_id=log_data["node_id"],
         reverse_action=log_data["reverse_action"],
-        data=json_dumps(log_data["data"])
+        data=json_dumps(log_data["data"]),
     )
 
     return jsonify({})
@@ -1134,11 +1185,7 @@ def create_job():
 
     data["job"] = job
 
-    return Response(
-        JobSchema().dumps(data),
-        status=202,
-        headers={'Location': job_url}
-    )
+    return Response(JobSchema().dumps(data), status=202, headers={"Location": job_url})
 
 
 @api.route("/jobs/<job_id>", methods=["GET"])
