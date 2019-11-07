@@ -20,7 +20,7 @@ from morphocluster.tree import Tree
 
 def _add_user(username, password):
     pwhash = generate_password_hash(
-        password, method='pbkdf2:sha256:10000', salt_length=12
+        password, method="pbkdf2:sha256:10000", salt_length=12
     )
 
     with database.engine.connect() as conn:
@@ -37,9 +37,7 @@ def init_app(app):
         Drop all tables and recreate.
         """
         print("Resetting the database.")
-        print(
-            "WARNING: This is a destructive operation and all data will be lost."
-        )
+        print("WARNING: This is a destructive operation and all data will be lost.")
 
         if input("Continue? (y/n) ") != "y":
             print("Canceled.")
@@ -74,9 +72,7 @@ def init_app(app):
         Delete all project-related data.
         """
         print("Clearing projects.")
-        print(
-            "WARNING: This is a destructive operation and all data will be lost."
-        )
+        print("WARNING: This is a destructive operation and all data will be lost.")
 
         if input("Continue? (y/n) ") != "y":
             print("Canceled.")
@@ -86,19 +82,17 @@ def init_app(app):
 
         print("Clearing project data...")
         with database.engine.begin() as txn:
-            affected_tables = [
-                models.nodes, models.projects, models.nodes_objects
-            ]
+            affected_tables = [models.nodes, models.projects, models.nodes_objects]
             database.metadata.drop_all(txn, tables=affected_tables)
             database.metadata.create_all(txn, tables=affected_tables)
 
     @app.cli.command()
-    @click.argument('collection_fn')
+    @click.argument("collection_fn")
     def load_object_locations(collection_fn):
         load_object_collection(collection_fn)
 
     @app.cli.command()
-    @click.argument('features_fns', nargs=-1)
+    @click.argument("features_fns", nargs=-1)
     def load_features(features_fns):
         """
         Load object features from an HDF5 file.
@@ -106,9 +100,9 @@ def init_app(app):
         load_object_features(features_fns)
 
     @app.cli.command()
-    @click.argument('tree_fn')
-    @click.argument('project_name', default=None)
-    @click.option('--consolidate/--no-consolidate', default=True)
+    @click.argument("tree_fn")
+    @click.argument("project_name", default=None)
+    @click.option("--consolidate/--no-consolidate", default=True)
     def load_project(tree_fn, project_name, consolidate):
         """
         Load a project from a saved tree.
@@ -133,8 +127,8 @@ def init_app(app):
             print("Project ID: {}".format(project_id))
 
     @app.cli.command()
-    @click.argument('root_id', type=int)
-    @click.argument('tree_fn')
+    @click.argument("root_id", type=int)
+    @click.argument("tree_fn")
     def export_tree(root_id, tree_fn):
         """
         Export the whole tree with its objects.
@@ -145,8 +139,8 @@ def init_app(app):
             tree.export_tree(root_id, tree_fn)
 
     @app.cli.command()
-    @click.argument('root_id', type=int, required=False)
-    @click.option('--log/--no-log', "log", default=False)
+    @click.argument("root_id", type=int, required=False)
+    @click.option("--log/--no-log", "log", default=False)
     def progress(root_id, log):
         """
         Report progress on a tree
@@ -169,7 +163,7 @@ def init_app(app):
                         print("{}: {}".format(k, prog[k]))
 
     @app.cli.command()
-    @click.argument('root_id', type=int)
+    @click.argument("root_id", type=int)
     def connect_supertree(root_id):
         with database.engine.connect() as conn:
             tree = Tree(conn)
@@ -186,14 +180,10 @@ def init_app(app):
         try:
             return int(value)
         except ValueError:
-            raise click.BadParameter(
-                'root_id can be "all", "visible" or an actual id.'
-            )
+            raise click.BadParameter('root_id can be "all", "visible" or an actual id.')
 
     @app.cli.command()
-    @click.argument(
-        'root_id', default="visible", callback=validate_consolidate_root_id
-    )
+    @click.argument("root_id", default="visible", callback=validate_consolidate_root_id)
     def consolidate(root_id):
         with database.engine.connect() as conn, Timer("Consolidate") as timer:
             tree = Tree(conn)
@@ -215,7 +205,7 @@ def init_app(app):
             print("Done.")
 
     @app.cli.command()
-    @click.argument('username')
+    @click.argument("username")
     def add_user(username):
         print("Adding user {}:".format(username))
         password = getpass("Password: ")
@@ -235,7 +225,7 @@ def init_app(app):
             print(e)
 
     @app.cli.command()
-    @click.argument('username')
+    @click.argument("username")
     def change_user(username):
         print("Changing user {}:".format(username))
         password = getpass("Password: ")
@@ -246,43 +236,37 @@ def init_app(app):
             return
 
         pwhash = generate_password_hash(
-            password, method='pbkdf2:sha256:10000', salt_length=12
+            password, method="pbkdf2:sha256:10000", salt_length=12
         )
 
         try:
             with database.engine.connect() as conn:
-                stmt = models.users.insert(
-                    {
-                        "username": username,
-                        "pwhash": pwhash
-                    }
-                )
+                stmt = models.users.insert({"username": username, "pwhash": pwhash})
                 conn.execute(stmt)
         except IntegrityError as e:
             print(e)
 
     @app.cli.command()
-    @click.argument('root_id')
-    @click.argument('classification_fn')
+    @click.argument("root_id")
+    @click.argument("classification_fn")
     def export_classifications(root_id, classification_fn):
         with database.engine.connect() as conn:
             tree = Tree(conn)
             tree.export_classifications(root_id, classification_fn)
 
     @app.cli.command()
-    @click.argument('node_id')
-    @click.argument('filename')
+    @click.argument("node_id")
+    @click.argument("filename")
     def export_direct_objects(node_id, filename):
         with database.engine.connect() as conn, open(filename, "w") as f:
             tree = Tree(conn)
 
             f.writelines(
-                "{}\n".format(o["object_id"])
-                for o in tree.get_objects(node_id)
+                "{}\n".format(o["object_id"]) for o in tree.get_objects(node_id)
             )
 
     @app.cli.command()
-    @click.argument('filename')
+    @click.argument("filename")
     def export_log(filename):
         with database.engine.connect() as conn:
             log = pd.read_sql_query(
@@ -290,7 +274,7 @@ def init_app(app):
                     models.log.outerjoin(models.nodes)
                 ),
                 conn,
-                index_col="log_id"
+                index_col="log_id",
             )
             log.to_csv(filename)
 
@@ -300,9 +284,7 @@ def init_app(app):
         Truncate the log.
         """
         print("Truncate log")
-        print(
-            "WARNING: This is a destructive operation and all data will be lost."
-        )
+        print("WARNING: This is a destructive operation and all data will be lost.")
 
         if input("Continue? (y/n) ") != "y":
             print("Canceled.")
