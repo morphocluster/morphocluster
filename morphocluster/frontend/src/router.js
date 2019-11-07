@@ -42,8 +42,13 @@ var router = new Router({
       props: (route) => ({ project_id: parseInt(route.params.project_id) }),
     },
     {
+      name: 'datasets',
+      path: '/datasets',
+      component: () => import(/* webpackChunkName: "project" */ './views/Datasets.vue'),
+    },
+    {
       path: '/',
-      redirect: '/p'
+      redirect: '/datasets'
     },
     { path: '*', component: NotFound }
   ]

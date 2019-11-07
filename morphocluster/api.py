@@ -27,6 +27,7 @@ from timer_cm import Timer
 
 from morphocluster import background, models
 from morphocluster.classifier import Classifier
+from morphocluster.dataset import Dataset
 from morphocluster.extensions import database, redis_lru, rq
 from morphocluster.helpers import keydefaultdict, seq2array
 from morphocluster.project import Project
@@ -1202,3 +1203,12 @@ def get_job(job_id):
     result = JobSchema().dump(data)
 
     return jsonify(result)
+
+
+## /datasets
+@api.route("/datasets", methods=["GET"])
+def get_datasets():
+
+    datasets = Dataset.get_all()
+
+    return jsonify(datasets)

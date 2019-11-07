@@ -1,5 +1,5 @@
 module.exports = {
-    baseUrl: "/frontend",
+    publicPath: "/frontend",
     devServer: {
         proxy: {
             '/labeling': {

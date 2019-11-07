@@ -7,13 +7,14 @@ import h5py
 import pandas as pd
 import tqdm
 from flask import current_app
+from sqlalchemy import select
+from sqlalchemy.engine import ResultProxy
 from sqlalchemy.sql.expression import bindparam
 
 from morphocluster import models
 from morphocluster.extensions import database
 from morphocluster.models import datasets
 from morphocluster.project import Project
-from sqlalchemy.engine import ResultProxy
 
 
 class Dataset:
@@ -43,6 +44,20 @@ class Dataset:
             result = connection.execute(stmt)
 
         return Dataset(dataset_id)
+
+    @staticmethod
+    def get_all(owner=None):
+        """Get a list of all datasets."""
+
+        stmt = select([datasets])
+
+        if owner is not None:
+            stmt = stmt.where(datasets.c.owner == owner)
+
+        connection = database.get_connection()
+        result = connection.execute(stmt).fetchall()
+
+        return [dict(r) for r in result]
 
     def __init__(self, dataset_id):
         self.dataset_id = dataset_id
