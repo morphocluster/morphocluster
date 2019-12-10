@@ -15,7 +15,7 @@ export function patchNode(node_id, data) {
 }
 
 export function getNextUnapprovedNode(node_id, leaf = false) {
-    return axios.get(`/api/nodes/${node_id}/next`, { params: { leaf } })
+    return axios.get(`/api/nodes/${node_id}/next_unapproved`, { params: { leaf } })
         .then(response => {
             return response.data;
         });
@@ -101,4 +101,13 @@ export function getUnfilledNodes(project_id) {
 export function log(action, node_id = null, reverse_action = null, data = null) {
     return axios.post(`/api/log`,
         { action, node_id, reverse_action, data });
+}
+
+// Dataset
+
+export function getDatasets() {
+    return axios.get(`/api/datasets`)
+        .then(response => {
+            return response.data;
+        });
 }

@@ -13,21 +13,22 @@ def seq2array(seq, length=None):
     if length is None:
         length = len(seq)
 
-    if length == 0:
-        return np.empty(0)
-
     seq = iter(seq)
     leading = []
     zero = None
 
     for x in seq:
         leading.append(x)
-        if x is not None:
+        if np.array(x).ndim > 0:
             zero = np.zeros_like(x)
             break
+        if x is not None and x is not 0:
+            raise ValueError("Unexpected scalar: {!r}".format(x))
+    else:
+        return np.empty(0)
 
     if zero is None:
-        raise ValueError("Empty sequence or only None")
+        raise ValueError("seq contained only scalars")
 
     array = np.empty((length,) + zero.shape, zero.dtype)
     for i, x in enumerate(chain(leading, seq)):

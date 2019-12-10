@@ -18,8 +18,13 @@ from morphocluster import processing
 from morphocluster.extensions import database
 from morphocluster.helpers import seq2array
 from morphocluster.member import MemberCollection
-from morphocluster.models import (nodes, nodes_objects, nodes_rejected_objects,
-                                  objects, projects)
+from morphocluster.models import (
+    nodes,
+    nodes_objects,
+    nodes_rejected_objects,
+    objects,
+    projects,
+)
 
 
 class ProjectError(Exception):
@@ -40,6 +45,12 @@ def commonprefix(paths):
 def is_scalar_na(v):
     if pandas.api.types.is_scalar(v):
         return pd.isna(v)
+    return False
+
+
+def is_scalar_zero(v):
+    if pandas.api.types.is_scalar(v):
+        return v == 0
     return False
 
 
@@ -426,9 +437,10 @@ class Project:
         if isinstance(object_ids_or_condition, ClauseElement):
             condition = object_ids_or_condition
         else:
-            if not object_ids_or_condition:
+            object_ids = list(object_ids_or_condition)
+            if not object_ids:
                 return
-            condition = nodes_objects.c.object_id.in_(object_ids_or_condition)
+            condition = nodes_objects.c.object_id.in_(object_ids)
 
         old_node_objects = nodes_objects.alias("old")
         updater = (
@@ -486,6 +498,7 @@ class Project:
             n_objects_own_=len(rows),
             vector_sum_own_=new_vector,
             type_objects_own_=None,
+            vector_mean_own_=None,
         )
 
         # Update new tree (this includes the new node)
@@ -495,6 +508,7 @@ class Project:
             n_objects_=len(rows),
             vector_sum_=new_vector,
             type_objects_=None,
+            vector_mean_=None,
         )
 
         # Update old
@@ -510,6 +524,7 @@ class Project:
                 n_objects_own_=old_count,
                 vector_sum_own_=old_vector,
                 type_objects_own_=None,
+                vector_mean_own_=None,
             )
 
             # Update old tree (this includes old node)
@@ -520,6 +535,7 @@ class Project:
                 n_objects_=old_count,
                 vector_sum_=old_vector,
                 type_objects_=None,
+                vector_mean_=None,
             )
 
         # Update flag summary in affected precursors
@@ -529,6 +545,7 @@ class Project:
             n_approved_objects_=None,
             n_filled_objects_=None,
             n_preferred_objects_=None,
+            vector_mean_=None,
         )
 
         return len(rows)
@@ -537,8 +554,9 @@ class Project:
         assert self._locked
 
         if op == "=":
-            # Invalidate iff some values are None
-            values["cache_valid"] = None in values.values()
+            # Cache is invalidated if None in values
+            if None in values.values():
+                values["cache_valid"] = False
             stmt = (
                 # pylint: disable=no-value-for-parameter
                 nodes.update()
@@ -563,25 +581,31 @@ class Project:
         )
         rows = self._connection.execute(stmt).fetchall()
 
+        if not rows:
+            return
+
         def _calc_new_value(row, k, v):
             if is_scalar_na(v):
                 # None means reset to None, regardless of old value
-                return v
+                return None
 
             if is_scalar_na(row[k]):
-                # NA: No previous value. This is allowed for vectors.
-                if k in ("vector_sum_", "vector_sum_own_"):
-                    return op(0, v)
-                raise ValueError("row[{}] is NA.".format(k))
+                # TODO
+                # # NA means vec(0) for vectors
+                # if k in ("vector_sum_", "vector_sum_own_"):
+                #     return op(0, v)
+                # raise ValueError("row[{}] is NA.".format(k))
+                # We can't update a NA
+                return None
 
             return op(row[k], v)
 
-        # TODO: Reset "vector_sum_", "vector_sum_own_" to None if n_objects[_own]_ is 0
         def _cleanup_vectors(row):
+            """Reset "vector_sum_", "vector_sum_own_" to 0 if n_objects[_own]_ is 0."""
             if "n_objects_own_" in row and row["n_objects_own_"] == 0:
-                row["vector_sum_own_"] = None
+                row["vector_sum_own_"] = 0
             if "n_objects_" in row and row["n_objects_"] == 0:
-                row["vector_sum_"] = None
+                row["vector_sum_"] = 0
             return row
 
         # Update values
@@ -605,6 +629,7 @@ class Project:
             .where(nodes.c.node_id == bindparam("_node_id"))
             .values({c: bindparam(c) for c in columns})
         )
+        # print("update_cached_values:rows:", rows)
         self._connection.execute(stmt, rows)
 
     def relocate_nodes(self, node_ids_or_condition, new_parent_id):
@@ -697,7 +722,6 @@ class Project:
         prefix = commonprefix(old_parent_paths + [new_parent_path])
         len_prefix = len(prefix)
 
-        # TODO:
         new_vector_sum = np.sum(old_vector_sums, axis=0)
         new_n_objects = sum(old_n_objectss)
         new_n_nodes = sum(old_n_nodess)
@@ -741,13 +765,13 @@ class Project:
             self.update_cached_values(
                 old_parent_path[len_prefix:],
                 "-",
-                n_nodes_=old_n_nodes,
+                n_nodes_=None,  # old_n_nodes, # Can not be reliably calculated.
                 n_objects_=old_n_objects,
                 vector_sum_=old_vector_sum,
                 type_objects_=None,
             )
 
-        # Update flag summary in affected precursors
+        # Update affected precursors (including self)
         print(
             "relocate_nodes: Resetting {} affected precursers...".format(
                 len(affected_precursers)
@@ -762,6 +786,7 @@ class Project:
             n_approved_nodes_=None,
             n_filled_nodes_=None,
             n_preferred_nodes_=None,
+            vector_mean_=None,
         )
 
         return len(rows)
@@ -775,8 +800,12 @@ class Project:
         n will be deleted.
 
         Returns:
-            tuple: (n_relocated_objects, n_relocated_nodes)
+            tuple: (n_relocated_objects, n_relocated_children)
         """
+
+        assert self._locked
+
+        node_path = self.get_path(node_id)
 
         # Relocate objects
         n_relocated_objects = self.relocate_objects(
@@ -784,7 +813,7 @@ class Project:
         )
 
         # Relocate children
-        n_relocated_nodes = self.relocate_nodes(
+        n_relocated_children = self.relocate_nodes(
             nodes.c.parent_id == node_id, dest_node_id
         )
 
@@ -794,7 +823,23 @@ class Project:
         )
         self._connection.execute(stmt)
 
-        return (n_relocated_objects, n_relocated_nodes)
+        # Update n_children_ of parent
+        self.update_cached_values([node_path[-2]], "-", n_children_=1)
+
+        # Update cached values of precursors
+        self.update_cached_values(
+            node_path[:-1],
+            "-",
+            n_nodes_=1,
+            n_approved_objects_=None,
+            n_filled_objects_=None,
+            n_preferred_objects_=None,
+            n_approved_nodes_=None,
+            n_filled_nodes_=None,
+            n_preferred_nodes_=None,
+        )
+
+        return (n_relocated_objects, n_relocated_children)
 
     def invalidate_nodes(self, nodes_to_invalidate, unapprove=False):
         """
@@ -1307,6 +1352,7 @@ class Project:
         Parameters:
             node_id: Root of the subtree that gets consolidated.
             depth: Ensure validity of cached values at least up to a certain depth.
+                -1 means full subtree.
             exact_vector (str, "exact"|"raise"|"approx"):
                 exact: Calculate vector as the sum of all objects.
                 raise: Do not recalculate vector and raise an exception instead.
@@ -1404,6 +1450,7 @@ class Project:
 
                     ## n_nodes_
                     if pd.isnull(n["n_nodes_"]):
+                        assert not pd.isna(children["n_nodes_"]).any()
                         n["n_nodes_"] = n["n_children_"] + children["n_nodes_"].sum()
                         updated_names.append("n_nodes_")
 
@@ -1435,34 +1482,47 @@ class Project:
                     objects_sample_vectors = objects_sample.vectors
 
                     ## vector_sum_own_
-                    if n["vector_sum_own_"] is None and n_objects_sample:
+                    if n["vector_sum_own_"] is None:
                         if exact_vector == "raise":
                             raise ProjectError("vector_sum_own_ is not set")
 
-                        n["vector_sum_own_"] = np.sum(objects_sample_vectors, axis=0)
-
-                        if n_objects_sample < n["n_objects_own_"]:
-                            # If the sample size is smaller than the actual number of objects, we need to account for that
-                            n["vector_sum_own_"] *= (
-                                n["n_objects_own_"] / n_objects_sample
+                        if n_objects_sample > 0:
+                            n["vector_sum_own_"] = np.sum(
+                                objects_sample_vectors, axis=0
                             )
+
+                            if n_objects_sample < n["n_objects_own_"]:
+                                # If the sample size is smaller than the actual number of objects, we need to account for that
+                                n["vector_sum_own_"] *= (
+                                    n["n_objects_own_"] / n_objects_sample
+                                )
+                        else:
+                            n["vector_sum_own_"] = 0
 
                         updated_names.append("vector_sum_own_")
 
                     ## vector_sum_
                     if n["vector_sum_"] is None:
-                        vector_sum_values = []
-                        for cv in children["vector_sum_"]:
-                            if cv is not None:
-                                vector_sum_values.append(cv)
-                        if n["vector_sum_own_"] is not None:
-                            vector_sum_values.append(n["vector_sum_own_"])
+                        if n["n_objects_"] > 0:
+                            n["vector_sum_"] = n["vector_sum_own_"] + np.sum(
+                                children["vector_sum_"], axis=0
+                            )
+                        else:
+                            n["vector_sum_"] = 0
 
-                        if vector_sum_values:
-                            n["vector_sum_"] = seq2array(
-                                vector_sum_values, len(vector_sum_values)
-                            ).sum(axis=0)
-                            updated_names.append("vector_sum_")
+                        updated_names.append("vector_sum_")
+
+                    ## vector_mean_own_
+                    if n["vector_mean_own_"] is None and n["n_objects_own_"] > 0:
+                        n["vector_mean_own_"] = (
+                            n["vector_sum_own_"] / n["n_objects_own_"]
+                        )
+                        updated_names.append("vector_mean_own_")
+
+                    ## vector_mean_
+                    if n["vector_mean_"] is None and n["n_objects_"] > 00:
+                        n["vector_mean_"] = n["vector_sum_"] / n["n_objects_"]
+                        updated_names.append("vector_mean_")
 
                     ## type_objects_own_
                     N_TYPE_OBJECTS = 9
@@ -1533,6 +1593,8 @@ class Project:
                 "n_objects_own_"
             ].astype(int)
 
+            invalid_subtree["n_nodes_"] = invalid_subtree["n_nodes_"].astype(int)
+
             # Flag all rows as valid
             invalid_subtree["cache_valid"] = True
 
@@ -1551,6 +1613,8 @@ class Project:
                     "n_objects_",
                     "vector_sum_own_",
                     "vector_sum_",
+                    "vector_mean_own_",
+                    "vector_mean_",
                     "type_objects_own_",
                     "type_objects_",
                     "n_approved_objects_",

@@ -15,7 +15,7 @@ RUN apt-get update --fix-missing && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY docker/run.sh docker/wait-for docker/environment.yml docker/activate ./
+COPY docker/run.sh docker/wait-for environment.yml docker/activate ./
 
 # Install all required packages at this stage to avoid reinstalling them later when the code changes
 RUN conda config --set notify_outdated_conda false && \

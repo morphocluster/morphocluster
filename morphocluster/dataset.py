@@ -7,21 +7,23 @@ import h5py
 import pandas as pd
 import tqdm
 from flask import current_app
+from sqlalchemy import select
+from sqlalchemy.engine import ResultProxy
 from sqlalchemy.sql.expression import bindparam
 
 from morphocluster import models
 from morphocluster.extensions import database
 from morphocluster.models import datasets
 from morphocluster.project import Project
-from sqlalchemy.engine import ResultProxy
 
 
 class Dataset:
     """An abstraction for a dataset."""
+
     path_fmt = "{data_dir}/{dataset_id:d}"
 
     @staticmethod
-    def create(name):
+    def create(name, owner):
         """Create a dataset.
 
         This creates a new row in datasets as well as a new partition objects_{dataset_id}.
@@ -30,19 +32,32 @@ class Dataset:
         connection = database.get_connection()
 
         with connection.begin():
-            stmt = datasets.insert({"name": name})
+            stmt = datasets.insert({"name": name, "owner": owner})
 
             result = connection.execute(stmt)
             dataset_id = result.inserted_primary_key[0]
 
             # Create partition for objects
-            stmt = (
-                "CREATE TABLE objects_{dataset_id} PARTITION OF objects FOR VALUES IN ({dataset_id})"
-                .format(dataset_id=dataset_id)
+            stmt = "CREATE TABLE objects_{dataset_id} PARTITION OF objects FOR VALUES IN ({dataset_id})".format(
+                dataset_id=dataset_id
             )
             result = connection.execute(stmt)
 
         return Dataset(dataset_id)
+
+    @staticmethod
+    def get_all(owner=None):
+        """Get a list of all datasets."""
+
+        stmt = select([datasets])
+
+        if owner is not None:
+            stmt = stmt.where(datasets.c.owner == owner)
+
+        connection = database.get_connection()
+        result = connection.execute(stmt).fetchall()
+
+        return [dict(r) for r in result]
 
     def __init__(self, dataset_id):
         self.dataset_id = dataset_id
@@ -62,22 +77,18 @@ class Dataset:
 
         print("Loading {}...".format(archive_fn))
         with conn.begin(), zipfile.ZipFile(archive_fn) as zf:
-            index = pd.read_csv(
-                zf.open("index.csv"),
-                usecols=["object_id", "path"],
-            )
+            index = pd.read_csv(zf.open("index.csv"), usecols=["object_id", "path"])
             index_iter = index.itertuples()
             progress = tqdm.tqdm(total=len(index))
             while True:
                 chunk = tuple(
-                    row._asdict()
-                    for row in itertools.islice(index_iter, batch_size)
+                    row._asdict() for row in itertools.islice(index_iter, batch_size)
                 )
                 if not chunk:
                     break
                 conn.execute(
                     models.objects.insert(),  # pylint: disable=no-value-for-parameter
-                    [dict(row, dataset_id=self.dataset_id) for row in chunk]
+                    [dict(row, dataset_id=self.dataset_id) for row in chunk],
                 )
 
                 for row in chunk:
@@ -103,9 +114,10 @@ class Dataset:
             stmt = (
                 models.objects.update()  # pylint: disable=no-value-for-parameter
                 .where(
-                    (models.objects.c.object_id == bindparam('_object_id'))
+                    (models.objects.c.object_id == bindparam("_object_id"))
                     & (models.objects.c.dataset_id == self.dataset_id)
-                ).values({'vector': bindparam('vector')})
+                )
+                .values({"vector": bindparam("vector")})
             )
 
             progress = tqdm.tqdm(total=len(object_ids))
@@ -115,12 +127,11 @@ class Dataset:
                 if not chunk:
                     break
                 result: ResultProxy = conn.execute(
-                    stmt, [
-                        {
-                            "_object_id": str(object_id),
-                            "vector": vector
-                        } for (object_id, vector) in chunk
-                    ]
+                    stmt,
+                    [
+                        {"_object_id": str(object_id), "vector": vector}
+                        for (object_id, vector) in chunk
+                    ],
                 )
 
                 progress.update(len(chunk))
@@ -137,10 +148,8 @@ class Dataset:
         with connection.begin():
 
             # Drop partition for objects
-            stmt = (
-                "DROP TABLE objects_{dataset_id} CASCADE".format(
-                    dataset_id=self.dataset_id
-                )
+            stmt = "DROP TABLE objects_{dataset_id} CASCADE".format(
+                dataset_id=self.dataset_id
             )
             connection.execute(stmt)
 
