@@ -235,4 +235,3 @@ class Job(db.Model):
     username = Column(
         None, ForeignKey("users.username", name="users_username_fkey"), nullable=False
     )
-
