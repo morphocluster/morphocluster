@@ -52,7 +52,7 @@ export default {
             var updateMembersUrl = false;
 
             if (!this.members_url) {
-                this.members_url = `/api/nodes/${this.node_id}/members?objects=true&arrange_by=interleaved`;
+                this.members_url = `/api/projects/${this.project_id}/nodes/${this.node_id}/members?objects=true&arrange_by=interleaved`;
                 this.page = 0;
                 updateMembersUrl = true;
             } else {
@@ -86,7 +86,7 @@ export default {
     mounted() {
         // Load node info
         axios
-            .get(`/api/nodes/${this.node_id}`)
+            .get(`/api/projects/${this.project_id}/nodes/${this.node_id}`)
             .then(response => {
                 this.node = response.data;
             })

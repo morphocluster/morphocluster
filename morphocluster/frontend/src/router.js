@@ -16,7 +16,7 @@ var router = new Router({
     },
     {
       name: 'bisect',
-      path: '/p/:project_id/bisect/:node_id?',
+      path: '/projects/:project_id/bisect/:node_id?',
       component: () => import(/* webpackChunkName: "bisect" */ './views/Bisect.vue'),
     },
     {
@@ -26,25 +26,31 @@ var router = new Router({
       props: (route) => ({ node_id: parseInt(route.params.node_id) }),
     },
     {
-      name: 'projects',
-      path: '/p',
-      component: () => import(/* webpackChunkName: "projects" */ './views/Projects.vue'),
-    },
-    {
       name: 'approve',
-      path: '/p/:project_id/approve/:node_id?',
+      path: '/projects/:project_id/approve/:node_id?',
       component: () => import(/* webpackChunkName: "approve" */ './views/Approve.vue'),
     },
     {
       name: 'project',
-      path: '/p/:project_id',
+      path: '/projects/:project_id',
       component: () => import(/* webpackChunkName: "project" */ './views/Project.vue'),
-      props: (route) => ({ project_id: parseInt(route.params.project_id) }),
+      props: (route) => ({ project_id: parseInt(route.params.project_id), dataset_id: parseInt(route.params.dataset_id) }),
     },
     {
       name: 'datasets',
       path: '/datasets',
-      component: () => import(/* webpackChunkName: "project" */ './views/Datasets.vue'),
+      component: () => import(/* webpackChunkName: "datasets" */ './views/Datasets.vue'),
+    },
+    {
+      name: 'datasets-add',
+      path: '/datasets/add',
+      component: () => import(/* webpackChunkName: "datasets-add" */ './views/DatasetsAdd.vue'),
+    },
+    {
+      name: 'dataset',
+      path: '/datasets/:dataset_id',
+      component: () => import(/* webpackChunkName: "dataset" */ './views/Dataset.vue'),
+      props: (route) => ({ dataset_id: parseInt(route.params.dataset_id) }),
     },
     {
       path: '/',

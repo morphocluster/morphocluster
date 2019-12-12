@@ -9,10 +9,8 @@
                     <li class="nav-item nav-link text-light" v-if="project">
                         {{ project.name }}
                     </li>
-                    <li class="nav-item nav-link  text-light">
-                        Approve
-                    </li>
-                    <li class="nav-item  nav-link text-light" v-if="node">
+                    <li class="nav-item nav-link text-light">Approve</li>
+                    <li class="nav-item nav-link text-light" v-if="node">
                         {{ node.name }}
                     </li>
                 </ul>
@@ -79,8 +77,8 @@
                 v-b-tooltip.hover.html
                 title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>"
             >
-                <i class="mdi mdi-check-all" /><i class="mdi mdi-flag" />
-                Approve + Flag
+                <i class="mdi mdi-check-all" />
+                <i class="mdi mdi-flag" /> Approve + Flag
             </b-button>
             <b-button
                 id="btn-approve"
@@ -113,7 +111,12 @@
                 Approval is done for this project.
             </div>
             <footer slot="modal-footer">
-                <b-button variant="primary" :to="{ name: 'projects' }"
+                <b-button
+                    variant="primary"
+                    :to="{
+                        name: 'dataset',
+                        params: { dataset_id: project.dataset_id }
+                    }"
                     >Back to projects</b-button
                 >
             </footer>
@@ -132,7 +135,6 @@ import * as api from "@/helpers/api.js";
 
 import MemberPreview from "@/components/MemberPreview.vue";
 import MessageLog from "@/components/MessageLog.vue";
-import NodeHeader from "@/components/NodeHeader.vue";
 
 export default {
     name: "approve",
@@ -165,7 +167,6 @@ export default {
     components: {
         MemberPreview,
         MessageLog,
-        NodeHeader,
         InfiniteLoading
     },
     mixins: [mixins],
@@ -206,7 +207,11 @@ export default {
                     }
                     // ... otherwise get the next node
                     return api
-                        .getNextUnapprovedNode(this.project.node_id, true)
+                        .getNextUnapprovedNode(
+                            this.project.project_id,
+                            this.project.node_id,
+                            true
+                        )
                         .then(node_id => {
                             if (node_id == null) {
                                 this.$refs.doneModal.show();
@@ -233,7 +238,7 @@ export default {
                         return;
                     }
                     console.log(`Loading node ${node_id}...`);
-                    return api.getNode(node_id).then(node => {
+                    return api.getNode(project_id, node_id).then(node => {
                         this.node = node;
                     });
                 })
@@ -251,7 +256,7 @@ export default {
 
             if (!this.members_url) {
                 const nodes = this.node.children;
-                this.members_url = `/api/nodes/${
+                this.members_url = `/api/projects/${this.project_id}/nodes/${
                     this.node.node_id
                 }/members?objects=${!nodes}&nodes=${nodes}&arrange_by=interleaved&`;
                 this.page = 0;
@@ -287,7 +292,7 @@ export default {
         },
         approve(preferred = false) {
             console.log("Approve");
-            api.patchNode(this.node.node_id, {
+            api.patchNode(this.node.project_id, this.node.node_id, {
                 approved: true,
                 preferred: preferred
             })
@@ -296,7 +301,11 @@ export default {
                     console.log(msg);
                     this.messages.unshift(msg);
                     // Update progress
-                    api.getNodeProgress(this.project.node_id, "approve")
+                    api.getNodeProgress(
+                        this.project.project_id,
+                        this.project.node_id,
+                        "approve"
+                    )
                         .then(progress => {
                             this.progress = progress;
                         })
@@ -319,12 +328,20 @@ export default {
         },
         merge() {
             // TODO
-            api.mergeNodeInto(this.node.node_id, this.node.parent_id)
+            api.mergeNodeInto(
+                this.node.project_id,
+                this.node.node_id,
+                this.node.parent_id
+            )
                 .then(() => {
                     this.messages.unshift(`Merged ${this.node.node_id}.`);
 
                     // Update progress
-                    api.getNodeProgress(this.project.node_id, "approve")
+                    api.getNodeProgress(
+                        this.project.project_id,
+                        this.project.node_id,
+                        "approve"
+                    )
                         .then(progress => {
                             this.progress = progress;
                         })
@@ -367,7 +384,9 @@ export default {
             console.log("Remove", this.getUniqueId(member));
 
             // TODO: Also reject members.
-            api.nodeAdoptMembers(this.node.parent_id, [member])
+            api.nodeAdoptMembers(this.node.project_id, this.node.parent_id, [
+                member
+            ])
                 .then(() => {
                     // Remove from current recommendations
                     var index = this.node_members.indexOf(member);

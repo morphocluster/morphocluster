@@ -15,3 +15,7 @@ html, body {
 	right: 1em;
 	/*color: gray;*/
 }
+
+nav .breadcrumb {
+	margin: 0;
+}

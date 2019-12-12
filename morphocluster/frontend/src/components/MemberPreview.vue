@@ -43,8 +43,8 @@ export default {
             };
         },
         image_urls: function() {
-            if ("object_id" in this.member) {
-                return [`/get_obj_image/${this.member.object_id}`];
+            if ("image_fn" in this.member) {
+                return [`/data/${this.member.image_fn}`];
             } else if ("type_objects" in this.member) {
                 return this.member.type_objects.map(
                     objid => `/get_obj_image/${objid}`
