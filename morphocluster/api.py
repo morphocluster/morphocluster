@@ -134,8 +134,8 @@ def _tree_root(project):
 def _tree_node(node):
     result = {
         "id": "{}:{}".format(node["project_id"], node["node_id"]),
-        "text": "{} ({})".format(node["name"] or node["node_id"], node["_n_children"]),
-        "children": node["_n_children"] > 0,
+        "text": "{} ({})".format(node["name"] or node["node_id"], node["n_children_"]),
+        "children": node["n_children_"] > 0,
         "icon": _node_icon(node),
     }
 
@@ -154,24 +154,38 @@ def get_subtree(id_: str):
     project_id, node_id = (int(x) for x in id_.split(":", maxsplit=1))
 
     with Project(project_id) as project:
-        children = project.get_children(node_id, order_by="_n_children DESC")
+        children = project.get_children(node_id, order_by="n_children_ DESC")
 
         result = [_tree_node(c) for c in children]
 
         return jsonify(result)
 
 
-# ===============================================================================
-# /projects
-# ===============================================================================
-@api.route("/projects", methods=["GET"])
-def get_projects():
+## /datasets
+@api.route("/datasets", methods=["GET"])
+def datasets_get_all():
+
+    datasets = Dataset.get_all_json()
+
+    return jsonify(datasets)
+
+
+@api.route("/datasets/<int:dataset_id>", methods=["GET"])
+def get_dataset(dataset_id):
+
+    dataset = Dataset(dataset_id)
+
+    return jsonify(dataset.get_json())
+
+
+@api.route("/datasets/<int:dataset_id>/projects", methods=["GET"])
+def dataset_get_projects(dataset_id):
 
     parser = reqparse.RequestParser()
     parser.add_argument("include_progress", type=strtobool, default=0)
     arguments = parser.parse_args(strict=True)
 
-    projects = Project.get_all()
+    projects = Project.get_all(dataset_id)
 
     if arguments["include_progress"]:
         for p in projects:
@@ -182,6 +196,9 @@ def get_projects():
     return jsonify(projects)
 
 
+# ===============================================================================
+# /projects
+# ===============================================================================
 @api.route("/projects/<int:project_id>", methods=["GET"])
 def get_project(project_id):
 
@@ -278,19 +295,19 @@ def _node(project, node, include_children=False):
         "id": node["node_id"],
         "path": [
             _node_id_frontend(project.project_id, nid)
-            for nid in project.get_path_ids(node["node_id"])
+            for nid in project.get_path(node["node_id"])
         ],
-        "text": "{} ({})".format(node["name"], node["_n_children"]),
+        "text": "{} ({})".format(node["name"], node["n_children_"]),
         "name": node["name"],
-        "children": node["_n_children"] > 0,
-        "n_children": node["_n_children"],
+        "children": node["n_children_"] > 0,
+        "n_children": node["n_children_"],
         "icon": _node_icon(node),
-        "type_objects": node["_type_objects"],
+        "type_objects": node["type_objects_"],
         "starred": node["starred"],
         "approved": node["approved"],
-        "own_type_objects": node["_own_type_objects"],
-        "n_objects_deep": node["_n_objects_deep"] or 0,
-        "n_objects": node["_n_objects"] or 0,
+        "type_objects_own": node["type_objects_own_"],
+        "n_objects": node["n_objects_"] or 0,
+        "n_objects_own": node["n_objects_own_"] or 0,
         "parent_id": node["parent_id"],
         "project_id": node["project_id"],
         "filled": node["filled"],
@@ -305,7 +322,7 @@ def _node(project, node, include_children=False):
 
 
 def _object(object_):
-    return {"object_id": object_["object_id"]}
+    return {"object_id": object_["object_id"], "image_fn": object_["path"]}
 
 
 def _arrange_by_sim(result):
@@ -320,7 +337,7 @@ def _arrange_by_sim(result):
 
     # Get vector values
     vectors = seq2array(
-        [m["_centroid"] if "_centroid" in m else m["vector"] for m in result],
+        [m["centroid_"] if "centroid_" in m else m["vector"] for m in result],
         len(result),
     )
 
@@ -346,7 +363,7 @@ def _arrange_by_sim(result):
 
 def _arrange_by_nleaves(result):
     n_leaves = np.array(
-        [len(m["_leaves"]) if "_leaves" in m else 0 for m in result], dtype=int
+        [len(m["leaves_"]) if "leaves_" in m else 0 for m in result], dtype=int
     )
 
     return np.argsort(n_leaves)[::-1]
@@ -514,10 +531,10 @@ def _arrange_by_starred_sim(result, starred):
     try:
         # Get vectors
         vectors = seq2array(
-            (m["_centroid"] if "_centroid" in m else m["vector"] for m in result),
+            (m["centroid_"] if "centroid_" in m else m["vector"] for m in result),
             len(result),
         )
-        starred_vectors = seq2array((m["_centroid"] for m in starred), len(starred))
+        starred_vectors = seq2array((m["centroid_"] for m in starred), len(starred))
     except ValueError as e:
         print(e)
         return ()
@@ -621,7 +638,7 @@ def _get_node_members(
 
 
 @api.route("/projects/<int:project_id>/nodes/<int:node_id>/members", methods=["GET"])
-def get_node_members(node_id):
+def get_node_members(project_id, node_id):
     """
     Provide a collection of objects and/or children.
 
@@ -651,7 +668,9 @@ def get_node_members(node_id):
     parser.add_argument("descending", type=strtobool, default=0)
     arguments = parser.parse_args(strict=True)
 
-    return _get_node_members(node_id=node_id, **arguments)
+    print(arguments)
+
+    return _get_node_members(project_id=project_id, node_id=node_id, **arguments)
 
 
 @api.route("/projects/<int:project_id>/nodes/<int:node_id>/progress", methods=["GET"])
@@ -700,7 +719,17 @@ def post_node_members(project_id, node_id):
     return "", 204
 
 
-@api.route("/projects/<int:project_id>/<int:node_id>", methods=["GET"])
+@api.route("/projects/<int:project_id>/nodes", methods=["GET"])
+def get_all_nodes(project_id):
+    with Project(project_id) as project:
+        nodes = project.get_all_nodes()
+
+        print(nodes)
+
+        return jsonify([_node(project, n) for n in nodes])
+
+
+@api.route("/projects/<int:project_id>/nodes/<int:node_id>", methods=["GET"])
 def get_node(project_id, node_id):
     with Project(project_id) as project:
 
@@ -1073,7 +1102,7 @@ def post_node_classify(project_id, node_id):
         for c in children:
             (starred if c["starred"] else unstarred).append(c)
 
-        starred_centroids = np.array([c["_centroid"] for c in starred])
+        starred_centroids = np.array([c["centroid_"] for c in starred])
 
         print("|starred_centroids|", np.linalg.norm(starred_centroids, axis=1))
 
@@ -1090,7 +1119,7 @@ def post_node_classify(project_id, node_id):
             target_nodes = keydefaultdict(lambda k: k)
 
         if flags["nodes"]:
-            unstarred_centroids = np.array([c["_centroid"] for c in unstarred])
+            unstarred_centroids = np.array([c["centroid_"] for c in unstarred])
             unstarred_ids = np.array([c["node_id"] for c in unstarred])
 
             # Predict unstarred children (if any)
@@ -1204,11 +1233,3 @@ def get_job(job_id):
 
     return jsonify(result)
 
-
-## /datasets
-@api.route("/datasets", methods=["GET"])
-def get_datasets():
-
-    datasets = Dataset.get_all()
-
-    return jsonify(datasets)

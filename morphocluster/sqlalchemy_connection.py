@@ -13,7 +13,7 @@ class SQLAlchemyConnection(flask_sqlalchemy.SQLAlchemy):
 
         @app.teardown_appcontext
         def _(exc):
-            connection = g.pop('sqlalchemy_connection', None)
+            connection = g.pop("sqlalchemy_connection", None)
 
             if connection is not None:
                 connection.close()
@@ -21,7 +21,7 @@ class SQLAlchemyConnection(flask_sqlalchemy.SQLAlchemy):
             return exc
 
     def get_connection(self) -> Connection:
-        if 'sqlalchemy_core_connection' not in g:
+        if "sqlalchemy_core_connection" not in g:
             g.sqlalchemy_core_connection = self.engine.connect()
 
         return g.sqlalchemy_core_connection

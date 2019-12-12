@@ -1,6 +1,6 @@
 <template>
     <div>
-        {{JSON.stringify(this.node)}}
+        {{ JSON.stringify(this.node) }}
     </div>
 </template>
 
@@ -8,8 +8,8 @@
 export default {
     name: "node-header",
     props: ["node"],
-    mounted () {
+    mounted() {
         console.log(this.node);
-    },
-}
+    }
+};
 </script>

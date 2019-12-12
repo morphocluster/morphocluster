@@ -142,8 +142,8 @@ class Project:
         return Project(project_id)
 
     @staticmethod
-    def get_all(visible_only=True):
-        """Get a list of all projects.
+    def get_all(dataset_id: int, visible_only=True):
+        """Get a list of all projects in a dataset.
         """
 
         qroots = (
@@ -151,10 +151,14 @@ class Project:
             .where(nodes.c.parent_id == None)
             .alias("roots")
         )
-        qprojects = select([projects, qroots.c.node_id]).select_from(
-            projects.join(
-                qroots, qroots.c.project_id == projects.c.project_id, isouter=True
+        qprojects = (
+            select([projects, qroots.c.node_id])
+            .select_from(
+                projects.join(
+                    qroots, qroots.c.project_id == projects.c.project_id, isouter=True
+                )
             )
+            .where(projects.c.dataset_id == dataset_id)
         )
 
         if visible_only:
@@ -408,17 +412,27 @@ class Project:
 
         assert self._locked
 
-        stmt = text(
-            """
-        SELECT p.*, n.node_id
-        FROM nodes AS n
-        JOIN projects AS p
-        ON p.project_id = n.project_id
-        WHERE n.parent_id IS NULL AND p.project_id = :project_id
-        """
+        qroots = (
+            select([nodes.c.project_id, nodes.c.node_id])
+            .where(nodes.c.parent_id == None)
+            .alias("roots")
+        )
+        qprojects = (
+            select([projects, qroots.c.node_id])
+            .select_from(
+                projects.join(
+                    qroots, qroots.c.project_id == projects.c.project_id, isouter=True
+                )
+            )
+            .where(projects.c.project_id == self.project_id)
+            .limit(1)
         )
 
-        result = self._connection.execute(stmt, project_id=self.project_id).fetchone()
+        print(qprojects)
+
+        result = self._connection.execute(qprojects).first()
+
+        assert result is not None
 
         return dict(result)
 
@@ -871,7 +885,7 @@ class Project:
             self.consolidate_node(node_id)
 
         stmt = select([nodes]).where(
-            nodes.c.node_id == node_id & nodes.c.project_id == self.project_id
+            (nodes.c.node_id == node_id) & (nodes.c.project_id == self.project_id)
         )
 
         result = self._connection.execute(stmt, node_id=node_id).fetchone()
@@ -880,6 +894,18 @@ class Project:
             raise ValueError("Node {} is unknown".format(node_id))
 
         return dict(result)
+
+    def get_all_nodes(self, require_valid=True):
+        root_id = self.get_root_id()
+
+        if require_valid:
+            subtree = self.consolidate_node(root_id, depth=-1, return_="raw")
+        else:
+            raise NotImplementedError()
+
+        subtree.replace({np.nan: None}, inplace=True)
+
+        return subtree.reset_index().to_dict(orient="records")
 
     def get_path(self, node_id: int):
         """
@@ -988,67 +1014,30 @@ class Project:
         if node_id is None:
             node_id = self.get_root_id()
 
-        subtree = self.consolidate_node(
-            node_id, depth="full", return_="raw", descend_approved=False
-        )
-
-        subtree["n_approved_objects"] = subtree["approved"] * subtree["n_objects_"]
-        subtree["n_filled_objects"] = subtree["filled"] * subtree["n_objects_"]
-        subtree["n_named_objects"] = pd.notna(subtree["name"]) * subtree["n_objects_"]
-        subtree["n_approved_nodes"] = subtree["approved"].astype(int)
-        subtree["n_filled_nodes"] = subtree["filled"].astype(int)
-        subtree["n_nodes"] = 1
+        subtree = self.consolidate_node(node_id, depth="full", return_="raw")
 
         fields = [
-            "n_objects_own_",
+            "n_nodes_",
             "n_objects_",
-            "n_filled_objects",
-            "n_approved_objects",
-            "n_named_objects",
-            "n_approved_nodes",
-            "n_filled_nodes",
-            "n_nodes",
+            "n_approved_objects_",
+            "n_approved_nodes_",
+            "n_filled_objects_",
+            "n_filled_nodes_",
+            "n_preferred_objects_",
+            "n_preferred_nodes_",
         ]
 
         # Leaves
-        leaves_mask = subtree["_n_children"] == 0
-        leaves_result = subtree.loc[leaves_mask, fields].sum(axis=0).to_dict()
+        leaves_mask = subtree["n_children_"] == 0
+        leaves = subtree.loc[leaves_mask, fields]
+        print(leaves)
+        leaves_result = leaves.sum(axis=0).to_dict()
         leaves_result = {
-            "leaves_{}".format(k.lstrip("_")): v for k, v in leaves_result.items()
+            "leaves_{}".format(k.rstrip("_")): v for k, v in leaves_result.items()
         }
 
-        # Compute deep values for root
-        # subtree is ordered deep-first
-        for nid in subtree.index:
-            child_selector = subtree["parent_id"] == nid
-
-            subtree.at[nid, "n_approved_objects"] = max(
-                subtree.at[nid, "n_approved_objects"],
-                subtree.loc[child_selector, "n_approved_objects"].sum(),
-            )
-
-            subtree.at[nid, "n_named_objects"] = max(
-                subtree.at[nid, "n_named_objects"],
-                subtree.loc[child_selector, "n_named_objects"].sum(),
-            )
-
-            subtree.at[nid, "n_approved_nodes"] = (
-                subtree.at[nid, "n_approved_nodes"]
-                + subtree.loc[child_selector, "n_approved_nodes"].sum()
-            )
-
-            subtree.at[nid, "n_filled_nodes"] = (
-                subtree.at[nid, "n_filled_nodes"]
-                + subtree.loc[child_selector, "n_filled_nodes"].sum()
-            )
-
-            subtree.at[nid, "n_nodes"] = (
-                subtree.at[nid, "n_nodes"]
-                + subtree.loc[child_selector, "n_nodes"].sum()
-            )
-
         deep_result = subtree.loc[node_id, fields].to_dict()
-        deep_result = {k.lstrip("_"): v for k, v in deep_result.items()}
+        deep_result = {k.rstrip("_"): v for k, v in deep_result.items()}
 
         return dict(**leaves_result, **deep_result)
 
@@ -1132,9 +1121,8 @@ class Project:
             rejected_object_ids = (
                 select([nodes_rejected_objects.c.object_id])
                 .where(
-                    nodes_rejected_objects.c.node_id
-                    == node_id & nodes_rejected_objects.c.project_id
-                    == self.project_id
+                    (nodes_rejected_objects.c.node_id == node_id)
+                    & (nodes_rejected_objects.c.project_id == self.project_id)
                 )
                 .alias("rejected_object_ids")
             )
@@ -1155,8 +1143,7 @@ class Project:
                         .where(
                             (nodes_objects.c.node_id == parent_id)
                             & (~objects.c.object_id.in_(rejected_object_ids))
-                            & nodes_objects.c.project_id
-                            == self.project_id
+                            & (nodes_objects.c.project_id == self.project_id)
                         )
                     )
 
@@ -1451,7 +1438,7 @@ class Project:
                     ## n_nodes_
                     if pd.isnull(n["n_nodes_"]):
                         assert not pd.isna(children["n_nodes_"]).any()
-                        n["n_nodes_"] = n["n_children_"] + children["n_nodes_"].sum()
+                        n["n_nodes_"] = 1 + children["n_nodes_"].sum()
                         updated_names.append("n_nodes_")
 
                     ## n_objects_own_
@@ -1754,3 +1741,10 @@ class Project:
                 "n_{}_objects_".format(flag_name): n_objects_,
             }
             self.update_cached_values(path, op, **values)
+
+    def consolidate(self):
+        assert self._locked
+
+        root_id = self.get_root_id()
+
+        self.consolidate_node(root_id, depth=-1, exact_vector="exact")

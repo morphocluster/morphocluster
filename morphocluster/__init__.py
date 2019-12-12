@@ -7,24 +7,26 @@ import os
 from flask import Flask
 
 from ._version import get_versions
-__version__ = get_versions()['version']
+
+__version__ = get_versions()["version"]
 del get_versions
 
 
 def create_app(test_config=None):
     """Create and configure an instance of the Flask application."""
 
-    from flask import (Response, abort, redirect, render_template, request,
-                       url_for)
+    from flask import Response, abort, redirect, render_template, request, url_for
+    from morphocluster.dataset import Dataset
 
     # Enable fault handler for meaningful stack traces when a worker is killed
     import faulthandler
+
     faulthandler.enable()
 
     app = Flask(__name__, instance_relative_config=True)
 
     # Load config
-    app.config.from_object('morphocluster.config_default')
+    app.config.from_object("morphocluster.config_default")
 
     settings_file = os.environ.get("MORPHOCLUSTER_SETTINGS")
     if settings_file:
@@ -33,8 +35,12 @@ def create_app(test_config=None):
     if test_config is not None:
         app.config.update(test_config)
 
+    if not os.path.isabs(app.config["DATA_DIR"]):
+        app.config["DATA_DIR"] = os.path.join(app.root_path, app.config["DATA_DIR"])
+
     # Register extensions
     from morphocluster.extensions import database, migrate, redis_lru, rq
+
     database.init_app(app)
     redis_lru.init_app(app)
     migrate.init_app(app, database)
@@ -42,10 +48,12 @@ def create_app(test_config=None):
 
     # Register cli
     from morphocluster import cli
+
     cli.init_app(app)
 
     # Custom JSON encoder
     from morphocluster.numpy_json_encoder import NumpyJSONEncoder
+
     app.json_encoder = NumpyJSONEncoder
 
     # Enable batch mode
@@ -55,14 +63,15 @@ def create_app(test_config=None):
     # apply the blueprints to the app
     from morphocluster.api import api
     from morphocluster.frontend import frontend
-    app.register_blueprint(api, url_prefix='/api')
-    app.register_blueprint(frontend, url_prefix='/frontend')
+
+    app.register_blueprint(api, url_prefix="/api")
+    app.register_blueprint(frontend, url_prefix="/frontend")
 
     # make url_for('index') == url_for('blog.index')
     # in another app, you might define a separate main index here with
     # app.route, while giving the blog blueprint a url_prefix, but for
     # the tutorial the blog will be the main index
-    app.add_url_rule('/', endpoint='index')
+    app.add_url_rule("/", endpoint="index")
 
     @app.route("/")
     def index():
@@ -70,7 +79,7 @@ def create_app(test_config=None):
 
     @app.route("/labeling")
     def labeling():
-        return render_template('pages/labeling.html')
+        return render_template("pages/labeling.html")
 
     from flask.helpers import send_from_directory
 
@@ -83,10 +92,18 @@ def create_app(test_config=None):
         if result is None:
             abort(404)
 
-        response = send_from_directory(app.config["DATASET_PATH"], result["path"],
-                                       conditional=True)
+        response = send_from_directory(
+            app.config["DATA_DIR"], result["path"], conditional=True
+        )
 
-        response.headers['Cache-Control'] += ", immutable"
+        response.headers["Cache-Control"] += ", immutable"
+
+        return response
+
+    @app.route("/data/<path:path>")
+    def get_data(path):
+        response = send_from_directory(app.config["DATA_DIR"], path, conditional=True)
+        response.headers["Cache-Control"] += ", immutable"
 
         return response
 
@@ -99,8 +116,7 @@ def create_app(test_config=None):
     def check_auth(username, password):
         # Retrieve entry from the database
         with database.engine.connect() as conn:
-            stmt = models.users.select(
-                models.users.c.username == username).limit(1)
+            stmt = models.users.select(models.users.c.username == username).limit(1)
             user = conn.execute(stmt).first()
 
             if user is None:
@@ -114,7 +130,7 @@ def create_app(test_config=None):
     def require_auth():
         # exclude 404 errors and static routes
         # uses split to handle blueprint static routes as well
-        if not request.endpoint or request.endpoint.rsplit('.', 1)[-1] == 'static':
+        if not request.endpoint or request.endpoint.rsplit(".", 1)[-1] == "static":
             return
 
         auth = request.authorization
@@ -128,8 +144,10 @@ def create_app(test_config=None):
 
             # Send a 401 response that enables basic auth
             return Response(
-                'Could not verify your access level.\n'
-                'You have to login with proper credentials', 401,
-                {'WWW-Authenticate': 'Basic realm="Login Required"'})
+                "Could not verify your access level.\n"
+                "You have to login with proper credentials",
+                401,
+                {"WWW-Authenticate": 'Basic realm="Login Required"'},
+            )
 
     return app

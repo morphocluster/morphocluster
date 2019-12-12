@@ -69,4 +69,3 @@ def combine_covariances(m1, m2, S1, S2, n1, n2):
 
     B = b * D1 * D2
     return 1 / (n1 + n2) * (A + B)
-

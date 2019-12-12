@@ -1,32 +1,27 @@
 <template>
-    <div class="container">
-         {{project}}
-    </div>
+    <div class="container">{{ project }}</div>
 </template>
 
 <script>
-import axios from "axios";
 import { EventBus } from "@/event-bus.js";
+import * as api from "@/helpers/api.js";
 
 export default {
     name: "project",
-    props: {"project_id": Number},
+    props: { project_id: Number },
     components: {},
     data() {
         return {
-            project: null,
+            project: null
         };
     },
-    methods: {
-
-    },
+    methods: {},
     mounted() {
         // Load node info
-        axios
-            .get(`/api/projects/${this.project_id}`)
-            .then(response => {
-                this.project = response.data;
-                console.log(response.data);
+        api.getProject(this.project_id)
+            .then(data => {
+                this.project = data;
+                console.log(data);
 
                 EventBus.$emit("set-title", this.project.name);
             })
@@ -37,6 +32,4 @@ export default {
 };
 </script>
 
-<style>
-
-</style>
+<style></style>

@@ -58,7 +58,7 @@ def init_app(app):
         with database.engine.begin() as txn:
             # Cached values are prefixed with an underscore
             cached_columns = list(
-                c for c in models.nodes.columns.keys() if c.startswith("_")
+                c for c in models.nodes.columns.keys() if c.endswith("_")
             )
             values = {c: None for c in cached_columns}
             values["cache_valid"] = False
@@ -87,20 +87,49 @@ def init_app(app):
             database.metadata.drop_all(txn, tables=affected_tables)
             database.metadata.create_all(txn, tables=affected_tables)
 
-    @app.cli.command()
-    @click.argument("collection_fn")
-    def load_object_locations(collection_fn):
-        load_object_collection(collection_fn)
+    ###
+    # dataset subcommand
+    ###
+    @app.cli.group()
+    def dataset():
+        pass
 
-    @app.cli.command()
+    @dataset.command()
+    @click.argument("dataset_id", type=int)
+    @click.argument("archive_fn")
+    def load_objects(dataset_id, archive_fn):
+        """Load objects from a .zip file."""
+        connection = database.get_connection()
+
+        with connection.begin():
+            dataset = Dataset(dataset_id)
+            dataset.load_objects(archive_fn)
+
+    @dataset.command()
+    @click.argument("dataset_id", type=int)
     @click.argument("features_fns", nargs=-1)
-    def load_features(features_fns):
-        """
-        Load object features from an HDF5 file.
-        """
-        load_object_features(features_fns)
+    def load_features(dataset_id, features_fns):
+        """Load object features from an HDF5 file."""
+        connection = database.get_connection()
 
-    @app.cli.command()
+        with connection.begin():
+            dataset = Dataset(dataset_id)
+
+            for feature_fn in features_fns:
+                dataset.load_object_features(features_fn)
+
+    @dataset.command()
+    @click.argument("dataset_id", type=int)
+    @click.confirmation_option(prompt="Are you sure you want to delete the dataset?")
+    def delete(dataset_id):
+        """Delete dataset."""
+        connection = database.get_connection()
+
+        with connection.begin():
+            dataset = Dataset(dataset_id)
+            dataset.remove()
+
+    @dataset.command("create")
     @click.argument("name")
     @click.argument("owner")
     @click.option("--objects", "objects_fn")
@@ -125,7 +154,14 @@ def init_app(app):
             )
         )
 
-    @app.cli.command()
+    ###
+    # project subcommand
+    ###
+    @app.cli.group()
+    def project():
+        pass
+
+    @project.command("create")
     @click.argument("name")
     @click.argument("dataset_id", type=int)
     @click.option("--tree", "tree_fn")
@@ -198,7 +234,7 @@ def init_app(app):
             tree = Tree(conn)
             tree.connect_supertree(root_id)
 
-    def validate_consolidate_root_id(ctx, param, value):
+    def _validate_consolidate_project_id(ctx, param, value):
         # We don't need these
         del ctx
         del param
@@ -209,28 +245,30 @@ def init_app(app):
         try:
             return int(value)
         except ValueError:
-            raise click.BadParameter('root_id can be "all", "visible" or an actual id.')
+            raise click.BadParameter(
+                'project_id can be "all", "visible" or an actual id.'
+            )
 
     @app.cli.command()
-    @click.argument("root_id", default="visible", callback=validate_consolidate_root_id)
-    def consolidate(root_id):
-        with database.engine.connect() as conn, Timer("Consolidate") as timer:
-            tree = Tree(conn)
-
-            if root_id == "all":
+    @click.argument(
+        "project_id", default="visible", callback=_validate_consolidate_project_id
+    )
+    def consolidate(project_id):
+        with Timer("Consolidate") as timer:
+            if project_id == "all":
                 print("Consolidating all projects...")
-                root_ids = [p["node_id"] for p in tree.get_projects()]
-            elif root_id == "visible":
+                # root_ids = [p["node_id"] for p in tree.get_projects()]
+            elif project_id == "visible":
                 print("Consolidating visible projects...")
-                root_ids = [p["node_id"] for p in tree.get_projects(True)]
+                # root_ids = [p["node_id"] for p in tree.get_projects(True)]
             else:
-                print("Consolidating {}...".format(root_id))
-                root_ids = [root_id]
+                project_id = [project_id]
 
-            for rid in root_ids:
-                with timer.child(str(rid)):
-                    print("Consolidating {}...".format(rid))
-                    tree.consolidate_node(rid)
+            for pid in project_id:
+                with timer.child(str(pid)):
+                    print(f"Consolidating project {pid}...")
+                    with Project(pid) as project:
+                        project.consolidate()
             print("Done.")
 
     @app.cli.command()

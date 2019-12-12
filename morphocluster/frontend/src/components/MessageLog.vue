@@ -1,6 +1,6 @@
 <template>
     <div class="message-log">
-        <p v-for="m in messages" :key="m">{{m}}</p>
+        <p v-for="m in messages" :key="m">{{ m }}</p>
     </div>
 </template>
 
@@ -10,10 +10,10 @@
 export default {
     name: "message-log",
     props: ["messages"],
-    mounted () {
+    mounted() {
         //console.log("MessageLog mounted.");
     }
-}
+};
 </script>
 
 <style>

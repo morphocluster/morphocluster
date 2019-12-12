@@ -2,16 +2,14 @@
 REDIS_LRU_URL = "redis://:@localhost:6380/0"
 
 # Redis for rq
-RQ_REDIS_URL = 'redis://localhost:6379/0'
+RQ_REDIS_URL = "redis://localhost:6379/0"
 
 # Database
-SQLALCHEMY_DATABASE_URI = "postgresql://morphocluster:morphocluster@localhost/morphocluster"
+SQLALCHEMY_DATABASE_URI = (
+    "postgresql://morphocluster:morphocluster@localhost/morphocluster"
+)
 SQLALCHEMY_TRACK_MODIFICATIONS = False
-SQLALCHEMY_DATABASE_OPTIONS = {
-    'connect_args': {
-        "options": "-c statement_timeout=240s"
-    }
-}
+SQLALCHEMY_DATABASE_OPTIONS = {"connect_args": {"options": "-c statement_timeout=240s"}}
 
 # Project export directory
 PROJECT_EXPORT_DIR = "/tmp"
@@ -25,5 +23,5 @@ RECLUSTER_FEATURES = [
 # to enable the calculation of scores like average precision
 SAVE_RECOMMENDATION_STATS = False
 
-# Directory where the data will be stored
+# Directory where the data will be stored (absolute or relative to app.root_path)
 DATA_DIR = ""

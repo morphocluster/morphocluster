@@ -1,8 +1,8 @@
-'''
+"""
 Created on 23.05.2018
 
 @author: mschroeder
-'''
+"""
 
 from morphocluster.sqlalchemy_connection import SQLAlchemyConnection
 from flask_redis import FlaskRedis

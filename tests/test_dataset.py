@@ -28,10 +28,10 @@ def _dataset(flask_app, datadir):
 
     yield dataset
 
-    dataset_path = dataset.path
+    dataset_root = dataset.root
     dataset.remove()
 
-    assert not os.path.isdir(dataset_path)
+    assert not os.path.isdir(dataset_root)
 
 
 @pytest.fixture(name="project")

@@ -1,10 +1,10 @@
 <template>
     <div id="datasets">
         <nav class="navbar navbar-expand-lg navbar-light bg-dark">
-            <router-link class="navbar-brand text-light" to="/">MorphoCluster</router-link>
-            <ul class="navbar-nav mr-auto">
-                <li class="nav-item active text-light">Datasets</li>
-            </ul>
+            <router-link class="navbar-brand text-light" to="/"
+                >MorphoCluster</router-link
+            >
+            <b-breadcrumb :items="breadcrumb"></b-breadcrumb>
         </nav>
         <div class="scrollable">
             <div class="container">
@@ -15,8 +15,10 @@
                         dismissible
                         show
                         :variant="a.variant"
-                    >{{a.message}}</b-alert>
+                        >{{ a.message }}</b-alert
+                    >
                 </div>
+                <h1>Datasets</h1>
                 <b-table
                     id="datasets_table"
                     striped
@@ -25,25 +27,34 @@
                     :fields="fields"
                     showEmpty
                 >
-                    <template slot="table-colgroup">
-                        <col class="col-wide" />
-                        <col class="col-narrow" />
-                    </template>
-                    <template slot="name" slot-scope="data">
+                    <template v-slot:cell(name)="data">
                         <router-link
-                            :to="{name: 'dataset', params: {dataset_id: data.item.dataset_id}}"
-                        >{{data.item.name}}</router-link>
+                            :to="{
+                                name: 'dataset',
+                                params: { dataset_id: data.item.dataset_id }
+                            }"
+                            >{{ data.item.name }}</router-link
+                        >
                     </template>
                     <template slot="empty">
                         <div class="text-center">No datasets available.</div>
                     </template>
                 </b-table>
+                <!--<b-button
+                    size="sm"
+                    variant="success"
+                    class="mr-2 float-right"
+                    :to="{name: 'datasets-add'}"
+                >
+                    <i class="mdi mdi-plus" /> Add dataset
+                </b-button>-->
             </div>
         </div>
     </div>
 </template>
 
 <script>
+import "@mdi/font/css/materialdesignicons.css";
 import * as api from "@/helpers/api.js";
 
 export default {
@@ -57,12 +68,17 @@ export default {
                 //"action"
             ],
             datasets: [],
-            alerts: []
+            alerts: [],
+            breadcrumb: [
+                {
+                    text: "Datasets"
+                }
+            ]
         };
     },
     methods: {},
     mounted() {
-        api.getDatasets()
+        api.datasetsGetAll()
             .then(datasets => {
                 this.datasets = datasets;
             })
