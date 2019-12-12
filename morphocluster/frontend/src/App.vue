@@ -1,35 +1,34 @@
 <template>
-  <div id="app">
-    <router-view />
-  </div>
+    <div id="app">
+        <router-view />
+    </div>
 </template>
 
 <script>
-import { EventBus } from '@/event-bus.js';
+import { EventBus } from "@/event-bus.js";
 
 export default {
-  data() {
-    return {
-      title: undefined,
+    data() {
+        return {
+            title: undefined
+        };
+    },
+    mounted() {
+        EventBus.$on("set-title", title => {
+            this.title = title;
+        });
     }
-  },
-  mounted () {
-    EventBus.$on('set-title', title => {
-      this.title = title;
-    });
-  }
-}
+};
 </script>
 
-
 <style>
-#app{
-  height: 100%;
+#app {
+    height: 100%;
 
-  display: flex;
-  flex-direction: column;
-  /*align-items: stretch;*/
+    display: flex;
+    flex-direction: column;
+    /*align-items: stretch;*/
 
-  overflow: hidden;
+    overflow: hidden;
 }
 </style>

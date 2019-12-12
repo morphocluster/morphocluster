@@ -1,57 +1,121 @@
 <template>
     <div id="approve">
         <nav class="navbar navbar-expand-lg navbar-light bg-dark">
-            <router-link class="navbar-brand text-light" to="/">MorphoCluster</router-link>
+            <router-link class="navbar-brand text-light" to="/"
+                >MorphoCluster</router-link
+            >
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav mr-auto">
                     <li class="nav-item nav-link text-light" v-if="project">
-                        {{project.name}}
+                        {{ project.name }}
                     </li>
                     <li class="nav-item nav-link  text-light">
                         Approve
                     </li>
                     <li class="nav-item  nav-link text-light" v-if="node">
-                        {{node.name}}
+                        {{ node.name }}
                     </li>
                 </ul>
             </div>
         </nav>
         <div v-if="loading">Loading...</div>
         <div id="node-info">
-            <div class="info-hint mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html title="All members of this node, most extreme appearance first."/>
+            <div
+                class="info-hint mdi mdi-dark mdi-information-outline"
+                v-b-tooltip.hover.html
+                title="All members of this node, most extreme appearance first."
+            />
             <!--<node-header :node="node" v-if="node" />-->
 
             <div class="row" v-if="node_members">
-                <div v-for="m of node_members" :key="getUniqueId(m)" class="col col-2">
-                    <member-preview :member="m" :controls="member_controls" v-on:moveup="moveupMember" />
+                <div
+                    v-for="m of node_members"
+                    :key="getUniqueId(m)"
+                    class="col col-2"
+                >
+                    <member-preview
+                        :member="m"
+                        :controls="member_controls"
+                        v-on:moveup="moveupMember"
+                    />
                 </div>
             </div>
-            <infinite-loading v-if="node" @infinite="updateMembers" spinner="circles">
+            <infinite-loading
+                v-if="node"
+                @infinite="updateMembers"
+                spinner="circles"
+            >
                 <div slot="no-more" />
             </infinite-loading>
         </div>
-        <div id="progress" v-if="progress" v-b-tooltip.hover :title="progress.leaves_n_approved_objects.toLocaleString('en-US') + ' / ' + progress.leaves_n_objects.toLocaleString('en-US')">
-            <div :style="{flexGrow: progress.leaves_n_approved_objects}" class="bg-success" />
-            <div :style="{flexGrow: progress.leaves_n_objects - progress.leaves_n_approved_objects}" class="bg-danger" />
+        <div
+            id="progress"
+            v-if="progress"
+            v-b-tooltip.hover
+            :title="
+                progress.leaves_n_approved_objects.toLocaleString('en-US') +
+                    ' / ' +
+                    progress.leaves_n_objects.toLocaleString('en-US')
+            "
+        >
+            <div
+                :style="{ flexGrow: progress.leaves_n_approved_objects }"
+                class="bg-success"
+            />
+            <div
+                :style="{
+                    flexGrow:
+                        progress.leaves_n_objects -
+                        progress.leaves_n_approved_objects
+                }"
+                class="bg-danger"
+            />
         </div>
         <div id="decision">
-            <b-button id="btn-approve" variant="success" @click.prevent="approve(true)" v-b-tooltip.hover.html title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>">
-                <i class="mdi mdi-check-all" /><i class="mdi mdi-flag" /> Approve + Flag
+            <b-button
+                id="btn-approve"
+                variant="success"
+                @click.prevent="approve(true)"
+                v-b-tooltip.hover.html
+                title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>"
+            >
+                <i class="mdi mdi-check-all" /><i class="mdi mdi-flag" />
+                Approve + Flag
             </b-button>
-            <b-button id="btn-approve" variant="success" @click.prevent="approve(false)" v-b-tooltip.hover.html title="All members look alike. Approve. <kbd>A</kbd>">
+            <b-button
+                id="btn-approve"
+                variant="success"
+                @click.prevent="approve(false)"
+                v-b-tooltip.hover.html
+                title="All members look alike. Approve. <kbd>A</kbd>"
+            >
                 <i class="mdi mdi-check-all" /> Approve
             </b-button>
-            <b-button id="btn-merge" variant="danger" @click.prevent="merge" v-b-tooltip.hover.html title="Members are too dissimilar. Merge into parent. <kbd>M</kbd>">
+            <b-button
+                id="btn-merge"
+                variant="danger"
+                @click.prevent="merge"
+                v-b-tooltip.hover.html
+                title="Members are too dissimilar. Merge into parent. <kbd>M</kbd>"
+            >
                 <i class="mdi mdi-call-merge" /> Merge into parent
             </b-button>
         </div>
         <message-log class="bg-light" :messages="messages" />
-        <b-modal ref="doneModal" centered no-fade header-bg-variant="success" title="Approval done">
+        <b-modal
+            ref="doneModal"
+            centered
+            no-fade
+            header-bg-variant="success"
+            title="Approval done"
+        >
             <div class="d-block text-center">
                 Approval is done for this project.
             </div>
             <footer slot="modal-footer">
-                <b-button variant="primary" :to="{name: 'projects'}">Back to projects</b-button>
+                <b-button variant="primary" :to="{ name: 'projects' }"
+                    >Back to projects</b-button
+                >
             </footer>
         </b-modal>
     </div>
@@ -221,9 +285,12 @@ export default {
                     this.axiosErrorHandler(e);
                 });
         },
-        approve(preferred=false) {
+        approve(preferred = false) {
             console.log("Approve");
-            api.patchNode(this.node.node_id, { approved: true, preferred: preferred })
+            api.patchNode(this.node.node_id, {
+                approved: true,
+                preferred: preferred
+            })
                 .then(() => {
                     const msg = `Approved ${this.node.node_id}.`;
                     console.log(msg);
@@ -307,7 +374,8 @@ export default {
                     if (index > -1) {
                         this.node_members.splice(index, 1);
                     }
-                }).catch(e => {
+                })
+                .catch(e => {
                     this.axiosErrorHandler(e);
                 });
         }

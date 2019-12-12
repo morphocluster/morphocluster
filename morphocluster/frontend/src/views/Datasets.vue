@@ -1,7 +1,9 @@
 <template>
     <div id="datasets">
         <nav class="navbar navbar-expand-lg navbar-light bg-dark">
-            <router-link class="navbar-brand text-light" to="/">MorphoCluster</router-link>
+            <router-link class="navbar-brand text-light" to="/"
+                >MorphoCluster</router-link
+            >
             <ul class="navbar-nav mr-auto">
                 <li class="nav-item active text-light">Datasets</li>
             </ul>
@@ -15,7 +17,8 @@
                         dismissible
                         show
                         :variant="a.variant"
-                    >{{a.message}}</b-alert>
+                        >{{ a.message }}</b-alert
+                    >
                 </div>
                 <b-table
                     id="datasets_table"
@@ -31,8 +34,12 @@
                     </template>
                     <template slot="name" slot-scope="data">
                         <router-link
-                            :to="{name: 'dataset', params: {dataset_id: data.item.dataset_id}}"
-                        >{{data.item.name}}</router-link>
+                            :to="{
+                                name: 'dataset',
+                                params: { dataset_id: data.item.dataset_id }
+                            }"
+                            >{{ data.item.name }}</router-link
+                        >
                     </template>
                     <template slot="empty">
                         <div class="text-center">No datasets available.</div>

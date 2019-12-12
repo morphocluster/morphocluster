@@ -1,6 +1,6 @@
 <template>
     <div class="container">
-         {{project}}
+        {{ project }}
     </div>
 </template>
 
@@ -10,16 +10,14 @@ import { EventBus } from "@/event-bus.js";
 
 export default {
     name: "project",
-    props: {"project_id": Number},
+    props: { project_id: Number },
     components: {},
     data() {
         return {
-            project: null,
+            project: null
         };
     },
-    methods: {
-
-    },
+    methods: {},
     mounted() {
         // Load node info
         axios
@@ -37,6 +35,4 @@ export default {
 };
 </script>
 
-<style>
-
-</style>
+<style></style>

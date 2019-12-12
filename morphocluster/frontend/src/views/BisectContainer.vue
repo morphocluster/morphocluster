@@ -1,11 +1,13 @@
 <template>
     <div id="bisect-container">
         <nav class="navbar navbar-expand-lg navbar-light bg-dark">
-            <router-link class="navbar-brand text-light" to="/">MorphoCluster</router-link>
+            <router-link class="navbar-brand text-light" to="/"
+                >MorphoCluster</router-link
+            >
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav mr-auto">
                     <li class="nav-item nav-link text-light" v-if="project">
-                        {{project.name}}
+                        {{ project.name }}
                     </li>
                     <li class="nav-item nav-link  text-light">
                         Bisect
@@ -17,16 +19,30 @@
             </div>
         </nav>
         <!-- The core component -->
-        <DummyComponent class="core-component" v-if="current_data" :key="current_key" :data="current_data" />
+        <DummyComponent
+            class="core-component"
+            v-if="current_data"
+            :key="current_key"
+            :data="current_data"
+        />
         <div class="spinner-container" v-else>
             <spinner></spinner>
         </div>
-        <b-modal ref="doneModal" lazy centered no-fade header-bg-variant="success" title="Bisection done">
+        <b-modal
+            ref="doneModal"
+            lazy
+            centered
+            no-fade
+            header-bg-variant="success"
+            title="Bisection done"
+        >
             <div class="d-block text-center">
                 Bisection is done for this project.
             </div>
             <footer slot="modal-footer">
-                <b-button variant="primary" :to="{name: 'projects'}">Back to projects</b-button>
+                <b-button variant="primary" :to="{ name: 'projects' }"
+                    >Back to projects</b-button
+                >
             </footer>
         </b-modal>
     </div>

@@ -5,23 +5,23 @@
 <script>
 export default {
     name: "dummy-component",
-    mounted () {
+    mounted() {
         console.log("mounted dummy-component");
     },
-    created () {
+    created() {
         console.log("created dummy-component");
     },
-    inistialized () {
+    inistialized() {
         console.log("inistialized dummy-component");
     },
-    updated () {
+    updated() {
         console.log("updated dummy-component");
     },
-    activated () {
+    activated() {
         console.log("activated dummy-component");
     },
-    destroyed () {
+    destroyed() {
         console.log("destroyed dummy-component");
-    },
-}
+    }
+};
 </script>
