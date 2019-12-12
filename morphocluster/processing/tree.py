@@ -31,16 +31,18 @@ class Tree(object):
     """
 
     @staticmethod
-    def from_collection(collection_fn, unlabeled_collection_fn=None) -> 'Tree':
+    def from_collection(collection_fn, unlabeled_collection_fn=None) -> "Tree":
         """
         Read a collection of objects.
         """
-        collection = pd.read_csv(collection_fn,
-                                 header=None,
-                                 names=("objid", "path", "label"),
-                                 index_col=False,
-                                 usecols=("objid", "label",),
-                                 dtype=str)
+        collection = pd.read_csv(
+            collection_fn,
+            header=None,
+            names=("objid", "path", "label"),
+            index_col=False,
+            usecols=("objid", "label"),
+            dtype=str,
+        )
 
         grouped = collection.groupby("label")
 
@@ -53,32 +55,33 @@ class Tree(object):
 
         for i, (label, group) in enumerate(grouped):
             nodes.append({"node_id": i, "name": label, "parent_id": root_id})
-            objects.extend({"object_id": objid, "node_id": i}
-                           for objid in group["objid"])
+            objects.extend(
+                {"object_id": objid, "node_id": i} for objid in group["objid"]
+            )
 
         nodes = pd.DataFrame(nodes)
 
         objects = pd.DataFrame(objects)
 
         if unlabeled_collection_fn is not None:
-            unlabeled_collection = pd.read_csv(unlabeled_collection_fn,
-                                               header=None,
-                                               names=(
-                                                   "object_id", "path", "label"),
-                                               index_col=False,
-                                               usecols=("object_id",),
-                                               dtype=str)
+            unlabeled_collection = pd.read_csv(
+                unlabeled_collection_fn,
+                header=None,
+                names=("object_id", "path", "label"),
+                index_col=False,
+                usecols=("object_id",),
+                dtype=str,
+            )
 
             # TODO: We blindly assume that collection and unlabeled collection are distinct
             unlabeled_collection["node_id"] = root_id
 
-            objects = pd.concat(
-                [objects, unlabeled_collection], ignore_index=True)
+            objects = pd.concat([objects, unlabeled_collection], ignore_index=True)
 
         return Tree(nodes, objects)
 
     @staticmethod
-    def from_saved(tree_fn) -> 'Tree':
+    def from_saved(tree_fn) -> "Tree":
         """
         Read a saved tree.
         """
@@ -86,12 +89,11 @@ class Tree(object):
             with archive.open("nodes.csv", "r") as nodes_f:
                 nodes = pd.read_csv(nodes_f)
             with archive.open("objects.csv", "r") as objects_f:
-                objects = pd.read_csv(objects_f, dtype={'object_id': str})
+                objects = pd.read_csv(objects_f, dtype={"object_id": str})
 
             try:
                 with archive.open("rejected_objects.csv", "r") as objects_f:
-                    rejected_objects = pd.read_csv(
-                        objects_f, dtype={'object_id': str})
+                    rejected_objects = pd.read_csv(objects_f, dtype={"object_id": str})
             except KeyError:
                 # No such member
                 rejected_objects = None
@@ -99,7 +101,7 @@ class Tree(object):
         return Tree(nodes, objects, rejected_objects)
 
     @staticmethod
-    def from_HDBSCAN(path, root_first=True) -> 'Tree':
+    def from_HDBSCAN(path, root_first=True) -> "Tree":
         """
         Read the tree from a HDBSCAN clustering.
         tree.csv is the condensed tree.
@@ -109,46 +111,48 @@ class Tree(object):
         tree_fn = os.path.join(path, "tree.csv")
         objids_fn = os.path.join(path, "objids.csv")
 
-        raw_tree = pd.read_csv(tree_fn,
-                               index_col=False,
-                               dtype={
-                                   "parent": np.uint64,
-                                   "child": np.uint64,
-                                   "lambda_val": np.float64,
-                                   "child_size": np.uint64,
-                                   "name": str
-                               })
+        raw_tree = pd.read_csv(
+            tree_fn,
+            index_col=False,
+            dtype={
+                "parent": np.uint64,
+                "child": np.uint64,
+                "lambda_val": np.float64,
+                "child_size": np.uint64,
+                "name": str,
+            },
+        )
 
-        objects = pd.read_csv(objids_fn, index_col=False, names=[
-            "object_id"], header=None)
+        objects = pd.read_csv(
+            objids_fn, index_col=False, names=["object_id"], header=None
+        )
 
         raw_tree_nodes = raw_tree[raw_tree["child_size"] > 1].sort_values(
-            "parent", ascending=root_first)
+            "parent", ascending=root_first
+        )
         raw_tree_objects = raw_tree[raw_tree["child_size"] == 1]
 
         root_id = raw_tree_nodes["parent"].iloc[0]
 
         # Get object ids for the root
-        object_idxs = raw_tree_objects[raw_tree_objects["parent"]
-                                       == root_id]["child"]
+        object_idxs = raw_tree_objects[raw_tree_objects["parent"] == root_id]["child"]
         root_objects = objects[object_idxs]
         root_objects["node_id"] = root_id
 
-        nodes = raw_tree_nodes.rename(columns={"parent": "parent_id",
-                                               "child": "node_id"})
+        nodes = raw_tree_nodes.rename(
+            columns={"parent": "parent_id", "child": "node_id"}
+        )
         nodes = nodes.append({"node_id": root_id}, ignore_index=True)
 
-        objects = pd.merge(objects, raw_tree_objects,
-                           left_index=True, right_on="child")
-        objects = objects[["object_id", "parent"]].rename(
-            columns={"parent": "node_id"})
+        objects = pd.merge(objects, raw_tree_objects, left_index=True, right_on="child")
+        objects = objects[["object_id", "parent"]].rename(columns={"parent": "node_id"})
 
         objects = pd.concat([objects, root_objects], ignore_index=True)
 
         return Tree(nodes, objects)
 
     @staticmethod
-    def from_labels(labels, object_ids) -> 'Tree':
+    def from_labels(labels, object_ids) -> "Tree":
         """
         Construct a tree from a label vector and a vector of object_ids.
 
@@ -162,22 +166,24 @@ class Tree(object):
         root_id = unique_labels.max() + 1
 
         # Compose nodes out of unique_labels (except -1)
-        nodes = [{"node_id": node_id, "parent_id": root_id}
-                 for node_id in unique_labels if node_id != -1]
+        nodes = [
+            {"node_id": node_id, "parent_id": root_id}
+            for node_id in unique_labels
+            if node_id != -1
+        ]
         # Add root node
         nodes.append({"node_id": root_id})
         nodes = pd.DataFrame(nodes)
 
         # Compose objects
-        objects = pd.concat(
-            {"node_id": labels, "object_id": object_ids}, axis=1)
+        objects = pd.concat({"node_id": labels, "object_id": object_ids}, axis=1)
         # Mount unlabeled objects (-1) to root
         objects.loc[objects["node_id"] == -1, "node_id"] = root_id
 
         return Tree(nodes, objects)
 
     @staticmethod
-    def from_cluster_labels(cluster_labels_fn, object_ids_fn=None) -> 'Tree':
+    def from_cluster_labels(cluster_labels_fn, object_ids_fn=None) -> "Tree":
         """
         Construct tree from a cluster_labels file.
 
@@ -189,18 +195,21 @@ class Tree(object):
 
         root_id = unique_labels.max() + 1
 
-        nodes = [{"node_id": node_id, "parent_id": root_id}
-                 for node_id in unique_labels]
+        nodes = [
+            {"node_id": node_id, "parent_id": root_id} for node_id in unique_labels
+        ]
         nodes.append({"node_id": root_id})
 
         nodes = pd.DataFrame(nodes)
 
         objects = cluster_labels.rename(
-            columns={"objid": "object_id", "label": "node_id"})
+            columns={"objid": "object_id", "label": "node_id"}
+        )
 
         if object_ids_fn is not None:
-            all_objects = pd.read_csv(object_ids_fn, index_col=False, names=[
-                                      "object_id"], header=None)
+            all_objects = pd.read_csv(
+                object_ids_fn, index_col=False, names=["object_id"], header=None
+            )
 
             # Select all rows where an object_id is not in objects["object_id"]
             selector = ~all_objects["object_id"].isin(objects["object_id"])
@@ -235,8 +244,7 @@ class Tree(object):
                 rejected_objects = pd.DataFrame(rejected_objects)
 
             if not "object_id" in rejected_objects.columns:
-                raise ValueError(
-                    "'rejected_objects' lacks column 'object_id'.")
+                raise ValueError("'rejected_objects' lacks column 'object_id'.")
             if not "node_id" in rejected_objects.columns:
                 raise ValueError("'rejected_objects' lacks column 'node_id'.")
 
@@ -296,8 +304,7 @@ class Tree(object):
             node_selector = self.nodes["node_id"] == node_id
 
             if not node_selector.any():
-                raise ValueError(
-                    "No matching row for node_id={}".format(node_id))
+                raise ValueError("No matching row for node_id={}".format(node_id))
 
             node_idx = node_selector.idxmax()
 
@@ -321,8 +328,7 @@ class Tree(object):
             child_selector = self.nodes["parent_id"] == path[-1]
 
             if child_selector.any():
-                child_node_ids = list(
-                    self.nodes.loc[child_selector, "node_id"])
+                child_node_ids = list(self.nodes.loc[child_selector, "node_id"])
 
                 yield (path, child_node_ids)
 
@@ -386,21 +392,22 @@ class Tree(object):
 
         # Delete other.root and relocate children and objects to self.root
         other_nodes = other_nodes[other_nodes["node_id"] != other_root]
-        other_nodes.loc[other_nodes["parent_id"]
-                        == other_root, "parent_id"] = self_root
-        other_objects.loc[other_objects["node_id"]
-                          == other_root, "node_id"] = self_root
+        other_nodes.loc[other_nodes["parent_id"] == other_root, "parent_id"] = self_root
+        other_objects.loc[other_objects["node_id"] == other_root, "node_id"] = self_root
 
         duplicate_objects_mask = self.objects["object_id"].isin(
-            other_objects["object_id"])
+            other_objects["object_id"]
+        )
         if duplicate_objects_mask.any():
-            print("Objects present in both trees: {:,d}. Keeping assignments from `other`.".format(
-                duplicate_objects_mask.sum()))
+            print(
+                "Objects present in both trees: {:,d}. Keeping assignments from `other`.".format(
+                    duplicate_objects_mask.sum()
+                )
+            )
         self_objects = self.objects[~duplicate_objects_mask]
 
         self.nodes = pd.concat((self.nodes, other_nodes), ignore_index=True)
-        self.objects = pd.concat(
-            (self_objects, other_objects), ignore_index=True)
+        self.objects = pd.concat((self_objects, other_objects), ignore_index=True)
 
     def to_networkx(self):
         """
@@ -410,7 +417,8 @@ class Tree(object):
             from networkx import DiGraph
         except ImportError:
             raise ImportError(
-                'You must have networkx installed to export networkx graphs')
+                "You must have networkx installed to export networkx graphs"
+            )
 
         result = DiGraph()
         for row in self.nodes[["parent_id", "node_id"]].values:
@@ -426,7 +434,8 @@ class Tree(object):
             from ete3 import Tree as ETETree
         except ImportError as exc:
             raise ImportError(
-                'You must have ete3 installed to export ETE trees') from exc
+                "You must have ete3 installed to export ETE trees"
+            ) from exc
 
         tree = ETETree()
 
@@ -485,9 +494,7 @@ class Tree(object):
         node_idx = pd.Index(self.nodes["node_id"])
 
         def _get_nodes(node_ids):
-            return [
-                self.nodes.loc[node_idx.get_loc(node_id)]
-                for node_id in node_ids]
+            return [self.nodes.loc[node_idx.get_loc(node_id)] for node_id in node_ids]
 
         def _clean_path_name(path):
             result = ""
@@ -515,16 +522,14 @@ class Tree(object):
             path_nodes = _get_nodes(path[1:])
 
             if clean_name:
-                path_name = _clean_path_name(
-                    str(node["name"]) for node in path_nodes)
+                path_name = _clean_path_name(str(node["name"]) for node in path_nodes)
             else:
-                path_name = '/'.join(str(node["name"]) for node in path_nodes)
+                path_name = "/".join(str(node["name"]) for node in path_nodes)
 
             nodes = _get_nodes(node_ids)
 
             # Do not descend into unnamed nodes
-            node_ids[:] = [n["node_id"]
-                           for n in nodes if not pd.isnull(n["name"])]
+            node_ids[:] = [n["node_id"] for n in nodes if not pd.isnull(n["name"])]
 
             for node in nodes:
                 if node["node_id"] == root_id:
@@ -533,7 +538,8 @@ class Tree(object):
                 if pd.isnull(node["name"]):
                     # This node has no name, append all objects below to the parent node
                     subtree = sum(
-                        (node_ids for _, node_ids in self.walk([node["node_id"]])), [])
+                        (node_ids for _, node_ids in self.walk([node["node_id"]])), []
+                    )
 
                     object_selector = objects["node_id"].isin(subtree)
                     objects.loc[object_selector, "label"] = path_name
@@ -541,10 +547,9 @@ class Tree(object):
                     node_name = str(node["name"])
 
                     if clean_name:
-                        canonical_name = _clean_path_name(
-                            (path_name, node_name))
+                        canonical_name = _clean_path_name((path_name, node_name))
                     else:
-                        canonical_name = '/'.join((path_name, node_name))
+                        canonical_name = "/".join((path_name, node_name))
 
                     print(" {}".format(canonical_name))
 
