@@ -20,7 +20,7 @@ from morphocluster.project import Project
 class Dataset:
     """An abstraction for a dataset."""
 
-    path_fmt = "{data_dir}/{dataset_id:d}"
+    _path_fmt = "{data_dir}/datasets/{dataset_id:d}"
 
     @staticmethod
     def create(name, owner):
@@ -46,7 +46,7 @@ class Dataset:
         return Dataset(dataset_id)
 
     @staticmethod
-    def get_all(owner=None):
+    def get_all_json(owner=None):
         """Get a list of all datasets."""
 
         stmt = select([datasets])
@@ -62,10 +62,31 @@ class Dataset:
     def __init__(self, dataset_id):
         self.dataset_id = dataset_id
 
+    def get_json(self):
+        """Get a dataset properties as dict."""
+
+        stmt = select([datasets]).where(datasets.c.dataset_id == self.dataset_id)
+
+        connection = database.get_connection()
+        result = connection.execute(stmt).first()
+
+        if result is None:
+            raise KeyError(self.dataset_id)
+
+        return dict(result)
+
     @property
-    def path(self):
-        return self.path_fmt.format(
-            data_dir=current_app.config["DATA_DIR"], dataset_id=self.dataset_id
+    def root(self):
+        return Dataset.format_root(self.dataset_id)
+
+    @staticmethod
+    def format_root(dataset_id):
+        data_dir = current_app.config["DATA_DIR"]
+        if not data_dir:
+            raise ValueError("DATA_DIR is empty")
+
+        return os.path.normpath(
+            Dataset._path_fmt.format(data_dir=data_dir, dataset_id=dataset_id)
         )
 
     def load_objects(self, archive_fn, batch_size=1000):
@@ -73,9 +94,10 @@ class Dataset:
 
         conn = database.get_connection()
 
-        dst_root = self.path
+        dst_root = self.root
+        rel_dst_root = os.path.relpath(dst_root, current_app.config["DATA_DIR"])
 
-        print("Loading {}...".format(archive_fn))
+        print(f"Loading {archive_fn} into {dst_root}...")
         with conn.begin(), zipfile.ZipFile(archive_fn) as zf:
             index = pd.read_csv(zf.open("index.csv"), usecols=["object_id", "path"])
             index_iter = index.itertuples()
@@ -88,14 +110,18 @@ class Dataset:
                     break
                 conn.execute(
                     models.objects.insert(),  # pylint: disable=no-value-for-parameter
-                    [dict(row, dataset_id=self.dataset_id) for row in chunk],
+                    [
+                        dict(
+                            row,
+                            dataset_id=self.dataset_id,
+                            path=os.path.join(rel_dst_root, row["path"]),
+                        )
+                        for row in chunk
+                    ],
                 )
 
                 for row in chunk:
-                    dst_fn = os.path.join(dst_root, row["path"])
-                    dst_dir = os.path.dirname(dst_fn)
-                    os.makedirs(dst_dir, exist_ok=True)
-                    zf.extract(row["path"], dst_fn)
+                    zf.extract(row["path"], dst_root)
 
                 progress.update(len(chunk))
             progress.close()
@@ -158,6 +184,9 @@ class Dataset:
             connection.execute(stmt)
 
             # Delete filesystem data
-            shutil.rmtree(self.path)
+            try:
+                shutil.rmtree(self.root)
+            except OSError:
+                print(f"Could not delete data under {self.path}")
 
         self.dataset_id = None

@@ -46,7 +46,7 @@ objects = Table(
     "objects",
     metadata,
     Column("object_id", String, nullable=False),
-    Column("path", String, nullable=False),
+    Column("path", String, nullable=False),  # TODO: image_fn
     Column("vector", PickleType, nullable=True),
     # rand is for quasi-random samples (e.g. type object calculation)
     Column("rand", Float, server_default=func.random(), nullable=False),

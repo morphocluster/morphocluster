@@ -16,6 +16,7 @@ def create_app(test_config=None):
     """Create and configure an instance of the Flask application."""
 
     from flask import Response, abort, redirect, render_template, request, url_for
+    from morphocluster.dataset import Dataset
 
     # Enable fault handler for meaningful stack traces when a worker is killed
     import faulthandler
@@ -33,6 +34,9 @@ def create_app(test_config=None):
 
     if test_config is not None:
         app.config.update(test_config)
+
+    if not os.path.isabs(app.config["DATA_DIR"]):
+        app.config["DATA_DIR"] = os.path.join(app.root_path, app.config["DATA_DIR"])
 
     # Register extensions
     from morphocluster.extensions import database, migrate, redis_lru, rq
@@ -89,9 +93,16 @@ def create_app(test_config=None):
             abort(404)
 
         response = send_from_directory(
-            app.config["DATASET_PATH"], result["path"], conditional=True
+            app.config["DATA_DIR"], result["path"], conditional=True
         )
 
+        response.headers["Cache-Control"] += ", immutable"
+
+        return response
+
+    @app.route("/data/<path:path>")
+    def get_data(path):
+        response = send_from_directory(app.config["DATA_DIR"], path, conditional=True)
         response.headers["Cache-Control"] += ", immutable"
 
         return response

@@ -23,5 +23,5 @@ RECLUSTER_FEATURES = [
 # to enable the calculation of scores like average precision
 SAVE_RECOMMENDATION_STATS = False
 
-# Directory where the data will be stored
+# Directory where the data will be stored (absolute or relative to app.root_path)
 DATA_DIR = ""
