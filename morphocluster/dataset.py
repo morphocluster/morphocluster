@@ -43,7 +43,11 @@ class Dataset:
             )
             result = connection.execute(stmt)
 
-        return Dataset(dataset_id)
+            dataset = Dataset(dataset_id)
+
+            os.makedirs(dataset.root, exist_ok=False)
+
+            return dataset
 
     @staticmethod
     def get_all_json(owner=None):

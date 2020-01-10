@@ -7,6 +7,7 @@ import flask_migrate
 import psycopg2
 import pytest
 import redis
+import sqlalchemy.exc
 
 from morphocluster import create_app
 from morphocluster.cli import _add_user
@@ -81,7 +82,14 @@ def flask_app(docker_postgres, docker_redis_persistent, session_tmp_path: pathli
     with app.app_context():
         flask_migrate.upgrade()
 
-        _add_user("test_user", "test_user")
+        connection = database.get_connection()
+
+        try:
+            with connection.begin():
+                _add_user("test_user", "test_user")
+        except sqlalchemy.exc.IntegrityError:
+            # The user exists already
+            pass
 
         yield app
 
