@@ -23,8 +23,8 @@ from sqlalchemy.types import (
     Text,
 )
 
-from morphocluster.extensions import database as db
 from morphocluster.cube import Cube
+from morphocluster.extensions import database as db
 
 metadata = db.metadata
 
@@ -46,7 +46,7 @@ objects = Table(
     "objects",
     metadata,
     Column("object_id", String, nullable=False),
-    Column("path", String, nullable=False),  # TODO: image_fn
+    Column("image_fn", String, nullable=False),
     Column("vector", PickleType, nullable=True),
     # rand is for quasi-random samples (e.g. type object calculation)
     Column("rand", Float, server_default=func.random(), nullable=False),
@@ -61,6 +61,7 @@ objects = Table(
     PrimaryKeyConstraint("dataset_id", "object_id", name="objects_pk"),
     postgresql_partition_by="LIST(dataset_id)",
 )
+
 
 #: :type projects: sqlalchemy.sql.schema.Table
 projects = Table(

@@ -16,7 +16,6 @@ def create_app(test_config=None):
     """Create and configure an instance of the Flask application."""
 
     from flask import Response, abort, redirect, render_template, request, url_for
-    from morphocluster.dataset import Dataset
 
     # Enable fault handler for meaningful stack traces when a worker is killed
     import faulthandler
@@ -93,7 +92,7 @@ def create_app(test_config=None):
             abort(404)
 
         response = send_from_directory(
-            app.config["DATA_DIR"], result["path"], conditional=True
+            app.config["DATA_DIR"], result["image_fn"], conditional=True
         )
 
         response.headers["Cache-Control"] += ", immutable"

@@ -153,7 +153,7 @@ def get_subtree(id_: str):
 
     project_id, node_id = (int(x) for x in id_.split(":", maxsplit=1))
 
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
         children = project.get_children(node_id, order_by="n_children_ DESC")
 
         result = [_tree_node(c) for c in children]
@@ -206,7 +206,7 @@ def get_project(project_id):
     parser.add_argument("include_progress", type=strtobool, default=0)
     arguments = parser.parse_args(strict=True)
 
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
         result = project.to_dict()
         if arguments["include_progress"]:
             progress = project.calculate_progress()
@@ -221,7 +221,7 @@ def save_project(project_id):
     Save the project at PROJECT_EXPORT_DIR.
     """
 
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
         p_dict = project.to_dict()
 
         tree_fn = os.path.join(
@@ -252,7 +252,7 @@ def create_node(project_id):
         starred
     """
 
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
         data = request.get_json()
 
         object_ids = [m["object_id"] for m in data["members"] if "object_id" in m]
@@ -322,7 +322,7 @@ def _node(project, node, include_children=False):
 
 
 def _object(object_):
-    return {"object_id": object_["object_id"], "image_fn": object_["path"]}
+    return {"object_id": object_["object_id"], "image_fn": object_["image_fn"]}
 
 
 def _arrange_by_sim(result):
@@ -567,7 +567,7 @@ def _get_node_members(
     starred_first=False,
     descending=False,
 ):
-    with Project(project_id) as project, Timer("_get_node_members") as timer:
+    with Project(project_id).lock() as project, Timer("_get_node_members") as timer:
 
         sorted_nodes_include = "unstarred" if starred_first else None
 
@@ -692,7 +692,7 @@ def get_node_stats(project_id, node_id):
     parser.add_argument("log", default=None)
     arguments = parser.parse_args(strict=True)
 
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
         progress = project.calculate_progress(node_id)
 
         if arguments["log"] is not None:
@@ -712,7 +712,7 @@ def post_node_members(project_id, node_id):
     object_ids = [d["object_id"] for d in data if "object_id" in d]
     node_ids = [d["node_id"] for d in data if "node_id" in d]
 
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
         project.relocate_nodes(node_ids, node_id)
         project.relocate_objects(object_ids, node_id)
 
@@ -721,7 +721,7 @@ def post_node_members(project_id, node_id):
 
 @api.route("/projects/<int:project_id>/nodes", methods=["GET"])
 def get_all_nodes(project_id):
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
         nodes = project.get_all_nodes()
 
         print(nodes)
@@ -731,7 +731,7 @@ def get_all_nodes(project_id):
 
 @api.route("/projects/<int:project_id>/nodes/<int:node_id>", methods=["GET"])
 def get_node(project_id, node_id):
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
 
         flags = {k: request.args.get(k, 0, strtobool) for k in ("include_children",)}
 
@@ -746,7 +746,7 @@ def get_node(project_id, node_id):
 
 @api.route("/projects/<int:project_id>/nodes/<int:node_id>", methods=["PATCH"])
 def patch_node(project_id, node_id):
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
 
         data = request.get_json()
         flags = {k: request.args.get(k, 0, strtobool) for k in ("include_children",)}
@@ -782,7 +782,7 @@ def node_adopt_members(project_id, parent_id):
     Returns:
         Nothing.
     """
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
 
         members = request.get_json()["members"]
 
@@ -886,7 +886,7 @@ def accept_recommended_objects(project_id, node_id):
                 )
             )
 
-        with Project(project_id) as project, t.child(
+        with Project(project_id).lock() as project, t.child(
             "save accepted/rejected to database"
         ):
             project.relocate_objects(object_ids, node_id)
@@ -907,7 +907,7 @@ def accept_recommended_objects(project_id, node_id):
 
 @cache_serialize_page(".node_get_recommended_children", page_size=20)
 def _node_get_recommended_children(project_id, node_id, max_n):
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
         result = [
             _node(project, c) for c in project.recommend_children(node_id, max_n=max_n)
         ]
@@ -945,7 +945,7 @@ def node_get_recommended_children(project_id, node_id):
 
 @cache_serialize_page(".node_get_recommended_objects", page_size=50)
 def _node_get_recommended_objects(project_id=None, node_id=None, max_n=None):
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
 
         result = [_object(o) for o in project.recommend_objects(node_id, max_n)]
 
@@ -992,7 +992,7 @@ def node_get_next(project_id, node_id):
 
     print(arguments)
 
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
 
         # Descend if the successor is not approved
         # Rationale: Approval is for a whole subtree.
@@ -1021,7 +1021,7 @@ def node_get_next_unfilled(project_id, node_id):
 
     print(arguments)
 
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
 
         # Filter descendants that are approved and unfilled
         def filter(subtree):
@@ -1050,7 +1050,7 @@ def post_node_merge_into(project_id, node_id):
     Request parameters (body):
         dest_node_id: Node that absorbs the children and objects.
     """
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
 
         data = request.get_json()
 
@@ -1092,7 +1092,7 @@ def post_node_classify(project_id, node_id):
     n_predicted_children = 0
     n_predicted_objects = 0
 
-    with Project(project_id) as project:
+    with Project(project_id).lock() as project:
 
         # Split children into starred and unstarred
         children = project.get_children(node_id)

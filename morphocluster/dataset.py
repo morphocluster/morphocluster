@@ -118,7 +118,7 @@ class Dataset:
                         dict(
                             row,
                             dataset_id=self.dataset_id,
-                            path=os.path.join(rel_dst_root, row["path"]),
+                            image_fn=os.path.join(rel_dst_root, row["path"]),
                         )
                         for row in chunk
                     ],
@@ -191,6 +191,6 @@ class Dataset:
             try:
                 shutil.rmtree(self.root)
             except OSError:
-                print(f"Could not delete data under {self.path}")
+                print(f"Could not delete data under {self.root}")
 
         self.dataset_id = None
