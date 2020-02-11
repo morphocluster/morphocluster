@@ -162,7 +162,7 @@ def init_app(app):
                         )
 
         print(
-            "Created project: {} (id {:d}) in {}.".format(
+            "Created project {} (id {:d}) in dataset {}.".format(
                 name, project.project_id, dataset_id
             )
         )
@@ -242,19 +242,21 @@ def init_app(app):
                         project.consolidate()
             print("Done.")
 
-    @app.cli.command()
+    ###
+    # user subcommand
+    ###
+    @app.cli.group()
+    def user():
+        pass
+
+    @user.command("add")
     @click.argument("username")
-    def add_user(username):
+    @click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True)
+    def user_add(username, password):
         print("Adding user {}:".format(username))
-        password = getpass("Password: ")
-        password_repeat = getpass("Retype Password: ")
 
         if not password:
             print("Password must not be empty!")
-            return
-
-        if password != password_repeat:
-            print("Passwords do not match!")
             return
 
         try:
