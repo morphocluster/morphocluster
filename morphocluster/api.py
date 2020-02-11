@@ -985,12 +985,11 @@ def node_get_recommended_objects(project_id, node_id):
 @api.route(
     "/projects/<int:project_id>/nodes/<int:node_id>/next_unapproved", methods=["GET"]
 )
-def node_get_next(project_id, node_id):
+@api.route("/projects/<int:project_id>/next_unapproved", methods=["GET"])
+def node_get_next_unapproved(project_id, node_id=None):
     parser = reqparse.RequestParser()
     parser.add_argument("leaf", type=strtobool, default=False)
     arguments = parser.parse_args(strict=True)
-
-    print(arguments)
 
     with Project(project_id).lock() as project:
 

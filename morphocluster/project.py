@@ -1167,7 +1167,7 @@ class _LockedProject:
                 return objects_[order].tolist()
 
     def get_next_node(
-        self, node_id, leaf=False, recurse_cb=None, filter=None, preferred_first=False
+        self, node_id=None, leaf=False, recurse_cb=None, filter=None, preferred_first=False
     ):
         """
         Get the id of the next unapproved node.
@@ -1180,6 +1180,9 @@ class _LockedProject:
             node_id
             leaf: Only return leaves.
         """
+
+        if node_id is None:
+            node_id = self.get_root_id()
 
         # First try if there are candidates below this node
         subtree = _rquery_subtree(self.project_id, node_id, recurse_cb)
@@ -1683,14 +1686,18 @@ class _LockedProject:
                 & (old_nodes.c.node_id == nodes.c.node_id)
             )
             .returning(old_nodes)
-            .limit(1)
         )
 
-        old_data = self._connection.execute(stmt).fetchone()
+        result = self._connection.execute(stmt)
+
+        old_data = result.fetchone()
+
+        # Make sure we only got one row
+        assert result.fetchone() is None
 
         n_objects_ = old_data[old_nodes.c.n_objects_]
 
-        for flag_name in ("approved", "filled", "preferred"):
+        for flag_name in set(("approved", "filled", "preferred")).intersection(data.keys()):
             direction = data[flag_name] - old_data[flag_name]
             if direction == 0:
                 # No change
