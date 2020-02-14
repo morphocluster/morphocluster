@@ -1,7 +1,7 @@
 html, body {
 	height: 100%;
 	margin: 0;
-	overflow: hidden;
+	overflow: hidden !important;
 }
 
 .tooltip kbd {
@@ -16,6 +16,19 @@ html, body {
 	/*color: gray;*/
 }
 
-nav .breadcrumb {
-	margin: 0;
+.view {
+	padding: 64px 0 0 0;
+}
+
+.v-application {
+	height: 100%;
+}
+
+main {
+	height: calc(100% - 56px - 36px);
+}
+
+.container {
+	height: 100%;
+	overflow: auto;
 }
