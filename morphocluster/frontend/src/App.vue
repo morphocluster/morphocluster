@@ -25,7 +25,7 @@
                 <template v-slot:activator="{ on }">
                     <v-progress-linear
                         v-on="on"
-                        :active="globalState.loading.length"
+                        :active="globalState.loading.length > 0"
                         absolute
                         indeterminate
                     />
