@@ -1,11 +1,5 @@
 <template>
-    <div id="datasets">
-        <nav class="navbar navbar-expand-lg navbar-light bg-dark">
-            <router-link class="navbar-brand text-light" to="/"
-                >MorphoCluster</router-link
-            >
-            <b-breadcrumb :items="breadcrumb"></b-breadcrumb>
-        </nav>
+    <div id="datasets" class="view">
         <div class="scrollable">
             <div class="container">
                 <div class="alerts" v-if="alerts.length">
@@ -15,31 +9,32 @@
                         dismissible
                         show
                         :variant="a.variant"
-                        >{{ a.message }}</b-alert
-                    >
+                    >{{ a.message }}</b-alert>
                 </div>
                 <h1>Datasets</h1>
-                <b-table
+                <v-data-table
                     id="datasets_table"
-                    striped
                     sort-by="name"
                     :items="datasets"
-                    :fields="fields"
-                    showEmpty
+                    :headers="headers"
+                    disable-filtering
+                    disable-pagination
+                    hide-default-footer
                 >
-                    <template v-slot:cell(name)="data">
+                    <template v-slot:no-data>No datasets.</template>
+                    <template v-slot:item.name="{ item }">
                         <router-link
                             :to="{
                                 name: 'dataset',
-                                params: { dataset_id: data.item.dataset_id }
+                                params: { dataset_id: item.dataset_id }
                             }"
-                            >{{ data.item.name }}</router-link
-                        >
+                        >{{ item.name }}</router-link>
                     </template>
                     <template slot="empty">
                         <div class="text-center">No datasets available.</div>
                     </template>
-                </b-table>
+                </v-data-table>
+                <!-- <v-btn>Add dataset</v-btn> -->
                 <!--<b-button
                     size="sm"
                     variant="success"
@@ -54,33 +49,32 @@
 </template>
 
 <script>
-import "@mdi/font/css/materialdesignicons.css";
 import * as api from "@/helpers/api.js";
+import mixins from "@/mixins.js";
 
 export default {
     name: "datasets",
     props: {},
     components: {},
+    mixins: [mixins],
     data() {
         return {
-            fields: [
-                { key: "name", sortable: true }
+            headers: [
+                { value: "name", text: "Name", sortable: true }
                 //"action"
             ],
             datasets: [],
-            alerts: [],
-            breadcrumb: [
-                {
-                    text: "Datasets"
-                }
-            ]
+            alerts: []
         };
     },
     methods: {},
-    mounted() {
+    created() {
+        this.setLoading("datasets");
         api.datasetsGetAll()
             .then(datasets => {
                 this.datasets = datasets;
+                // Update breadcrumb
+                this.setBreadcrumbs([{ text: "Datasets" }]);
             })
             .catch(e => {
                 console.log(e);
@@ -88,6 +82,9 @@ export default {
                     message: e.message,
                     variant: "danger"
                 });
+            })
+            .finally(() => {
+                this.unsetLoading("datasets");
             });
     }
 };
