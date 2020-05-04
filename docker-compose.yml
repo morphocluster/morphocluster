@@ -22,6 +22,10 @@ services:
     # volumes:
     #   - morphocluster-pgsql:/var/lib/postgresql/data
     build: docker/postgresql
+  redis-persistent:
+    image: "redis:5-alpine"
+    ports:
+      - "6379"
 
 # volumes:
 #   morphocluster-data:

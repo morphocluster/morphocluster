@@ -8,6 +8,10 @@ export default new Vue({
         setBreadcrumbs(breadcrumbs) {
             console.log("setBreadcrumbs", breadcrumbs);
             this.breadcrumbs = breadcrumbs;
+
+            const titles = breadcrumbs.map(b => b.text);
+
+            document.title = "MorphoCluster - " + titles.join(" / ");
         },
         setLoading(name) {
             if (Vue.config.debug) {
@@ -17,7 +21,7 @@ export default new Vue({
         },
         unsetLoading(name) {
             if (Vue.config.debug) {
-                console.log(`Done loading ${name}...`);
+                console.log(`Done loading ${name}.`);
             }
             this.loading = this.loading.filter(item => item !== name);
         }

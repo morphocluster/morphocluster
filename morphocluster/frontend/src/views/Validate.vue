@@ -1,168 +1,173 @@
 <template>
-    <div id="approve">
-        <nav class="navbar navbar-expand-lg navbar-light bg-dark">
-            <router-link class="navbar-brand text-light" to="/"
-                >MorphoCluster</router-link
-            >
-            <div class="collapse navbar-collapse">
-                <ul class="navbar-nav mr-auto">
-                    <li class="nav-item nav-link text-light" v-if="project">
-                        {{ project.name }}
-                    </li>
-                    <li class="nav-item nav-link text-light">Approve</li>
-                    <li class="nav-item nav-link text-light" v-if="node">
-                        {{ node.name }}
-                    </li>
-                </ul>
-            </div>
-        </nav>
-        <div v-if="loading">Loading...</div>
-        <div id="node-info">
-            <div
-                class="info-hint mdi mdi-dark mdi-information-outline"
-                v-b-tooltip.hover.html
-                title="All members of this node, most extreme appearance first."
-            />
-            <!--<node-header :node="node" v-if="node" />-->
+    <div id="validate">
+        <template v-if="node">
+            <div id="node-info">
+                <v-tooltip>
+                    <template v-slot:activator="{ on }">
+                        <div v-on="on" class="info-hint mdi mdi-dark mdi-information-outline" />
+                    </template>
+                    <span>All members of this node, most extreme appearance first.</span>
+                </v-tooltip>
+                <!--<node-header :node="node" v-if="node" />-->
 
-            <div class="row" v-if="node_members">
-                <div
-                    v-for="m of node_members"
-                    :key="getUniqueId(m)"
-                    class="col col-2"
-                >
-                    <member-preview
-                        :member="m"
-                        :controls="member_controls"
-                        v-on:moveup="moveupMember"
-                    />
+                <div class="row" v-if="node_members">
+                    <div v-for="m of node_members" :key="getUniqueId(m)" class="col col-2">
+                        <member-preview
+                            :member="m"
+                            :controls="member_controls"
+                            v-on:moveup="moveupMember"
+                        />
+                    </div>
                 </div>
+                <infinite-loading
+                    v-if="node"
+                    @infinite="updateMembers"
+                    spinner="circles"
+                    ref="InfiniteLoading"
+                >
+                    <div slot="no-more" />
+                </infinite-loading>
             </div>
-            <infinite-loading
-                v-if="node"
-                @infinite="updateMembers"
-                spinner="circles"
-            >
-                <div slot="no-more" />
-            </infinite-loading>
-        </div>
-        <div
-            id="progress"
-            v-if="progress"
-            v-b-tooltip.hover
-            :title="
-                progress.leaves_n_approved_objects.toLocaleString('en-US') +
-                    ' / ' +
-                    progress.leaves_n_objects.toLocaleString('en-US')
-            "
-        >
-            <div
-                :style="{ flexGrow: progress.leaves_n_approved_objects }"
-                class="bg-success"
-            />
-            <div
-                :style="{
-                    flexGrow:
-                        progress.leaves_n_objects -
-                        progress.leaves_n_approved_objects
-                }"
-                class="bg-danger"
-            />
-        </div>
-        <div id="decision">
-            <b-button
-                id="btn-approve"
-                variant="success"
-                @click.prevent="approve(true)"
-                v-b-tooltip.hover.html
-                title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>"
-            >
-                <i class="mdi mdi-check-all" />
-                <i class="mdi mdi-flag" /> Approve + Flag
-            </b-button>
-            <b-button
-                id="btn-approve"
-                variant="success"
-                @click.prevent="approve(false)"
-                v-b-tooltip.hover.html
-                title="All members look alike. Approve. <kbd>A</kbd>"
-            >
-                <i class="mdi mdi-check-all" /> Approve
-            </b-button>
-            <b-button
-                id="btn-merge"
-                variant="danger"
-                @click.prevent="merge"
-                v-b-tooltip.hover.html
-                title="Members are too dissimilar. Merge into parent. <kbd>M</kbd>"
-            >
-                <i class="mdi mdi-call-merge" /> Merge into parent
-            </b-button>
-        </div>
+            <v-tooltip top>
+                <template v-slot:activator="{ on }">
+                    <v-progress-linear
+                        class="d-block my-2"
+                        rounded
+                        color="success"
+                        :value="project.progress.leaves_n_approved_objects / project.progress.leaves_n_objects * 100"
+                        v-on="on"
+                    />
+                </template>
+                <span>{{project.progress.leaves_n_approved_objects}} / {{project.progress.leaves_n_objects}} approved</span>
+            </v-tooltip>
+
+            <div id="decision">
+                <v-tooltip top>
+                    <template v-slot:activator="{ on }">
+                        <v-btn
+                            id="btn-validate"
+                            color="success"
+                            @click.prevent="validate(true)"
+                            v-on="on"
+                        >
+                            <i class="mdi mdi-check-all" />
+                            <i class="mdi mdi-flag" /> Validate + Flag
+                        </v-btn>
+                    </template>
+                    <span>
+                        All members look alike and this cluster is exceptional. Validate and flag for preferred treatment.
+                        <kbd>F</kbd>
+                    </span>
+                </v-tooltip>
+                <v-tooltip top>
+                    <template v-slot:activator="{ on }">
+                        <v-btn
+                            id="btn-validate"
+                            color="success"
+                            @click.prevent="validate(false)"
+                            v-on="on"
+                        >
+                            <i class="mdi mdi-check-all" /> Validate
+                        </v-btn>
+                    </template>
+                    <span>
+                        All members look alike. Validate.
+                        <kbd>V</kbd>
+                    </span>
+                </v-tooltip>
+                <v-tooltip top>
+                    <template v-slot:activator="{ on }">
+                        <v-btn id="btn-merge" color="error" @click.prevent="merge" v-on="on">
+                            <i class="mdi mdi-call-merge" /> Merge into parent
+                        </v-btn>
+                    </template>
+                    <span>
+                        Members are too dissimilar. Merge into parent.
+                        <kbd>M</kbd>
+                    </span>
+                </v-tooltip>
+            </div>
+        </template>
         <message-log class="bg-light" :messages="messages" />
-        <b-modal
-            ref="doneModal"
-            centered
-            no-fade
-            header-bg-variant="success"
-            title="Approval done"
-        >
-            <div class="d-block text-center">
-                Approval is done for this project.
-            </div>
-            <footer slot="modal-footer">
-                <b-button
-                    variant="primary"
-                    :to="{
+        <v-dialog persistent v-model="done">
+            <v-card>
+                <v-card-title>
+                    <span class="headline">All nodes are validated in this project.</span>
+                </v-card-title>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn
+                        v-if="project"
+                        variant="primary"
+                        :to="{
                         name: 'dataset',
                         params: { dataset_id: project.dataset_id }
                     }"
-                    >Back to projects</b-button
-                >
-            </footer>
-        </b-modal>
+                    >Back to dataset</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
 <script>
+// Libraries
 import axios from "axios";
-
 import InfiniteLoading from "vue-infinite-loading";
 
-import mixins from "@/mixins.js";
-
+// Internals
 import * as api from "@/helpers/api.js";
+import mixins from "@/mixins.js";
+import globalState from "@/globalState.js";
+import exceptions from "@/exceptions.js";
 
+// Components
 import MemberPreview from "@/components/MemberPreview.vue";
 import MessageLog from "@/components/MessageLog.vue";
 
 export default {
-    name: "approve",
+    name: "validate",
     data() {
         return {
-            loading: false,
             project: null,
             node: null,
             node_members: [],
             members_url: null,
-            progress: null,
             member_controls: [
                 {
                     event: "moveup",
                     icon: "mdi-arrow-up",
                     title: "Move this member to the parent node."
                 }
-            ]
+            ],
+            error: null,
+            done: false,
+            view_valid: false
         };
     },
-    created() {
-        this.initialize();
-    },
     mounted() {
+        console.log("mounted");
+
         window.addEventListener("keypress", this.keypress);
     },
     beforeDestroy() {
         window.removeEventListener("keypress", this.keypress);
+    },
+    beforeRouteEnter(to, from, next) {
+        // When component is created
+        console.log("Validate.beforeRouteEnter");
+
+        next(vm => {
+            vm.updateView(to.params.project_id, to.params.node_id);
+        });
+    },
+    beforeRouteUpdate(to, from, next) {
+        // When component is updated
+        console.log("Validate.beforeRouteUpdate");
+
+        this.updateView(to.params.project_id, to.params.node_id);
+
+        next();
     },
     components: {
         MemberPreview,
@@ -170,93 +175,122 @@ export default {
         InfiniteLoading
     },
     mixins: [mixins],
-    watch: {
-        $route: "initialize"
-    },
     methods: {
-        initialize() {
-            this.loading = true;
-            this.node = null;
+        setData(project, node, error) {
+            this.project = project;
+            this.node = node;
+
+            this.done = false;
+            if (error instanceof exceptions.NoNextNodeException) {
+                this.done = true;
+            } else {
+                this.error = error;
+            }
+
+            if (!error) {
+                this.view_valid = true;
+            }
+
             this.node_members = [];
             this.members_url = null;
 
-            const project_id = parseInt(this.$route.params.project_id);
+            // Reset infinite-loading
+            if (this.$refs.InfiniteLoading) {
+                this.$refs.InfiniteLoading.stateChanger.reset();
+            }
 
-            var projectLoaded = new Promise(resolve => {
-                if (this.project && this.project.project_id == project_id) {
-                    console.log("Project was already loaded.");
-                    resolve();
-                } else {
-                    console.log("Loading project.");
-                    this.project = null;
-                    this.progress = null;
-                    api.getProject(project_id, true).then(project => {
-                        this.project = project;
-                        console.log(project);
-                        this.progress = project.progress;
-                        resolve();
-                    });
+            // Update address bar
+            var { href } = this.$router.resolve({
+                name: "validate",
+                params: {
+                    project_id: project.project_id,
+                    node_id: node.node_id
                 }
             });
+            window.history.replaceState({}, document.title, href);
 
-            projectLoaded
-                .then(() => {
-                    // If we already have a node_id, return it
-                    if (this.$route.params.node_id) {
-                        return parseInt(this.$route.params.node_id);
+            // Update breadcrumb
+            this.setBreadcrumbs([
+                {
+                    text: this.project.dataset.name,
+                    to: {
+                        name: "dataset",
+                        params: { dataset_id: this.project.dataset.dataset_id }
+                    },
+                    exact: true
+                },
+                {
+                    text: this.project.name,
+                    to: {
+                        name: "project",
+                        params: { project_id: this.project.project_id }
+                    },
+                    exact: true
+                },
+                {
+                    text: "Validate"
+                },
+                {
+                    text: this.node.name,
+                    to: {
+                        name: "validate",
+                        params: {
+                            project_id: this.project.project_id,
+                            node_id: this.node.node_id
+                        }
                     }
-                    // ... otherwise get the next node
-                    return api
-                        .getNextUnapprovedNode(
-                            this.project.project_id,
-                            this.project.node_id,
-                            true
-                        )
-                        .then(node_id => {
-                            if (node_id == null) {
-                                this.$refs.doneModal.show();
-                                return null;
-                            }
-                            const to = {
-                                name: "approve",
-                                params: {
-                                    project_id: project_id,
-                                    node_id: node_id
-                                }
-                            };
+                }
+            ]);
+        },
+        updateView(project_id, node_id) {
+            globalState.setLoading("validation");
 
-                            this.$router.replace(to);
-                            return node_id;
-                        });
-                })
-                .then(node_id => {
-                    if (node_id == null) {
-                        return;
-                    }
-                    // Avoid double-load by $router.replace(to) -trigger-> initialize
-                    if (this.node && this.node.node_id == node_id) {
-                        return;
-                    }
-                    console.log(`Loading node ${node_id}...`);
-                    return api.getNode(project_id, node_id).then(node => {
-                        this.node = node;
-                    });
-                })
-                .then(() => {
-                    this.loading = false;
+            // Get project every time to update progress
+            var projectPromise =
+                (console.log(`Loading project ${project_id}...`),
+                api.getProject(project_id, true));
+
+            var nodeIdPromise = node_id
+                ? Promise.resolve(node_id)
+                : (console.log(`getNextUnapprovedNode ${project_id}...`),
+                  api.getNextUnapprovedNode(project_id, null, true));
+
+            var nodePromise = nodeIdPromise.then(node_id => {
+                if (node_id == null) {
+                    throw exceptions.NoNextNodeException(
+                        `No unapproved nodes for project ${project_id}.`
+                    );
+                }
+
+                console.log(`Loading node ${project_id}::${node_id}...`);
+                return api.getNode(project_id, node_id);
+            });
+
+            Promise.all([projectPromise, nodePromise])
+                .then(([project, node]) => {
+                    console.log(project, node);
+                    this.setData(project, node, null);
                 })
                 .catch(e => {
-                    this.axiosErrorHandler(e);
+                    console.log(e);
+                    this.setData(null, null, e);
+                })
+                .finally(() => {
+                    globalState.unsetLoading("validation");
                 });
         },
         // updateMembers gets called as an infinite loading handler.
         updateMembers($state) {
+            console.log("updateMembers");
+
             // Should members_url be updated (with unique id etc.) on response?
             var updateMembersUrl = false;
 
             if (!this.members_url) {
                 const nodes = this.node.children;
-                this.members_url = `/api/projects/${this.project_id}/nodes/${
+                this.members_url = `/api/projects/${
+                    this.project.project_id
+                }/nodes/${
                     this.node.node_id
                 }/members?objects=${!nodes}&nodes=${nodes}&arrange_by=interleaved&`;
                 this.page = 0;
@@ -290,37 +324,18 @@ export default {
                     this.axiosErrorHandler(e);
                 });
         },
-        approve(preferred = false) {
-            console.log("Approve");
+        validate(preferred = false) {
+            console.log("Validate");
             api.patchNode(this.node.project_id, this.node.node_id, {
                 approved: true,
                 preferred: preferred
             })
                 .then(() => {
-                    const msg = `Approved ${this.node.node_id}.`;
+                    const msg = `Validated node ${this.node.node_id}.`;
                     console.log(msg);
                     this.messages.unshift(msg);
-                    // Update progress
-                    api.getNodeProgress(
-                        this.project.project_id,
-                        this.project.node_id,
-                        "approve"
-                    )
-                        .then(progress => {
-                            this.progress = progress;
-                        })
-                        .catch(e => {
-                            this.axiosErrorHandler(e);
-                        });
 
-                    const to = {
-                        name: "approve",
-                        params: {
-                            project_id: this.project.project_id
-                        }
-                    };
-
-                    this.$router.push(to);
+                    this.updateView(this.project.project_id, null);
                 })
                 .catch(e => {
                     this.axiosErrorHandler(e);
@@ -336,27 +351,7 @@ export default {
                 .then(() => {
                     this.messages.unshift(`Merged ${this.node.node_id}.`);
 
-                    // Update progress
-                    api.getNodeProgress(
-                        this.project.project_id,
-                        this.project.node_id,
-                        "approve"
-                    )
-                        .then(progress => {
-                            this.progress = progress;
-                        })
-                        .catch(e => {
-                            this.axiosErrorHandler(e);
-                        });
-
-                    const to = {
-                        name: "approve",
-                        params: {
-                            project_id: this.project.project_id
-                        }
-                    };
-
-                    this.$router.push(to);
+                    this.updateView(this.project.project_id, null);
                 })
                 .catch(e => {
                     this.axiosErrorHandler(e);
@@ -364,7 +359,7 @@ export default {
         },
         keypress(event) {
             if (
-                this.loading ||
+                !this.view_valid ||
                 event.altKey ||
                 event.ctrlKey ||
                 event.metaKey ||
@@ -372,10 +367,10 @@ export default {
             ) {
                 return;
             }
-            if (event.key == "a") {
-                this.approve();
+            if (event.key == "v") {
+                this.validate();
             } else if (event.key == "f") {
-                this.approve(true);
+                this.validate(true);
             } else if (event.key == "m") {
                 this.merge();
             }
@@ -403,12 +398,13 @@ export default {
 </script>
 
 <style>
-#approve {
+#validate {
     display: flex;
     flex-direction: column;
     align-items: stretch;
     flex: 1;
     overflow: hidden;
+    height: 100%;
 }
 
 #node-info {
@@ -429,15 +425,5 @@ export default {
 
 #decision button {
     margin: 0 1em;
-}
-
-#progress {
-    display: flex;
-    flex-wrap: nowrap;
-    margin: 0.2em 0;
-}
-
-#progress div {
-    height: 0.2em;
 }
 </style>

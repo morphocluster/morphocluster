@@ -41,22 +41,16 @@
 <script>
 import globalState from "@/globalState.js";
 
-globalState;
-
 export default {
     name: "MorphoCluster",
     data: () => {
         return { globalState };
-    },
-    computed: {
-        loading: function() {
-            return globalState.loading;
-        }
     }
 };
 </script>
 <style>
 .v-toolbar__title a {
-    color: white;
+    color: white !important;
+    text-decoration: none;
 }
 </style>

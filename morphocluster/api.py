@@ -18,10 +18,7 @@ from flask import request
 from flask.blueprints import Blueprint
 from flask.helpers import url_for
 from flask_restful import reqparse
-from flask_rq2.job import FlaskJob
-from marshmallow import ValidationError
 from redis.exceptions import RedisError
-from rq.queue import Queue
 from sklearn.manifold.isomap import Isomap
 from timer_cm import Timer
 
@@ -165,9 +162,25 @@ def get_subtree(id_: str):
 @api.route("/datasets", methods=["GET"])
 def datasets_get_all():
 
-    datasets = Dataset.get_all_json()
+    datasets = Dataset.get_all_dict()
 
     return jsonify(datasets)
+
+
+@api.route("/datasets", methods=["POST"])
+def datasets_create():
+    parser = reqparse.RequestParser()
+    parser.add_argument("name", type=str, default="")
+    arguments = parser.parse_args(strict=True)
+
+    owner = request.authorization.username
+
+    dataset = Dataset.create(arguments["name"], owner)
+
+    if arguments["name"] == "":
+        dataset.update(name=f"Untitled dataset {dataset.dataset_id}")
+
+    return jsonify(dataset.to_dict())
 
 
 @api.route("/datasets/<int:dataset_id>", methods=["GET"])
@@ -175,7 +188,7 @@ def get_dataset(dataset_id):
 
     dataset = Dataset(dataset_id)
 
-    return jsonify(dataset.get_json())
+    return jsonify(dataset.to_dict())
 
 
 @api.route("/datasets/<int:dataset_id>/projects", methods=["GET"])
@@ -189,7 +202,7 @@ def dataset_get_projects(dataset_id):
 
     if arguments["include_progress"]:
         for p in projects:
-            with Project(p["project_id"]) as project:
+            with Project(p["project_id"]).lock() as project:
                 progress = project.calculate_progress()
                 p["progress"] = progress
 
@@ -204,6 +217,7 @@ def get_project(project_id):
 
     parser = reqparse.RequestParser()
     parser.add_argument("include_progress", type=strtobool, default=0)
+    parser.add_argument("include_dataset", type=strtobool, default=0)
     arguments = parser.parse_args(strict=True)
 
     with Project(project_id).lock() as project:
@@ -211,6 +225,8 @@ def get_project(project_id):
         if arguments["include_progress"]:
             progress = project.calculate_progress()
             result["progress"] = progress
+        if arguments["include_dataset"]:
+            result["dataset"] = project.get_dataset()
 
         return jsonify(result)
 
@@ -468,6 +484,8 @@ def cache_serialize_page(endpoint, **kwargs):
             )
 
             meta = {"request_id": request_id, "last_page": n_pages - 1}
+
+            meta["page"] = page
 
             if 0 < page < n_pages:
                 meta["previous_page"] = page - 1
@@ -943,6 +961,7 @@ def node_get_recommended_children(project_id, node_id):
     )
 
 
+# TODO: Renew cache handling #95
 @cache_serialize_page(".node_get_recommended_objects", page_size=50)
 def _node_get_recommended_objects(project_id=None, node_id=None, max_n=None):
     with Project(project_id).lock() as project:
@@ -1012,7 +1031,8 @@ def node_get_next_unapproved(project_id, node_id=None):
 @api.route(
     "/projects/<int:project_id>/nodes/<int:node_id>/next_unfilled", methods=["GET"]
 )
-def node_get_next_unfilled(project_id, node_id):
+@api.route("/projects/<int:project_id>/next_unfilled", methods=["GET"])
+def node_get_next_unfilled(project_id, node_id=None):
     parser = reqparse.RequestParser()
     parser.add_argument("leaf", type=strtobool, default=False)
     parser.add_argument("preferred_first", type=strtobool, default=False)

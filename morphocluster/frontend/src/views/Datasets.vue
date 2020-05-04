@@ -1,49 +1,44 @@
 <template>
     <div id="datasets" class="view">
-        <div class="scrollable">
-            <div class="container">
-                <div class="alerts" v-if="alerts.length">
-                    <b-alert
-                        :key="a"
-                        v-for="a of alerts"
-                        dismissible
-                        show
-                        :variant="a.variant"
-                    >{{ a.message }}</b-alert>
-                </div>
-                <h1>Datasets</h1>
-                <v-data-table
-                    id="datasets_table"
-                    sort-by="name"
-                    :items="datasets"
-                    :headers="headers"
-                    disable-filtering
-                    disable-pagination
-                    hide-default-footer
-                >
-                    <template v-slot:no-data>No datasets.</template>
-                    <template v-slot:item.name="{ item }">
-                        <router-link
-                            :to="{
+        <div class="container">
+            <div class="alerts" v-if="alerts.length">
+                <b-alert
+                    :key="a"
+                    v-for="a of alerts"
+                    dismissible
+                    show
+                    :variant="a.variant"
+                >{{ a.message }}</b-alert>
+            </div>
+            <h1>Datasets</h1>
+            <v-data-table
+                id="datasets_table"
+                sort-by="name"
+                :items="datasets"
+                :headers="headers"
+                disable-filtering
+                disable-pagination
+                hide-default-footer
+            >
+                <template v-slot:no-data>No datasets.</template>
+                <template v-slot:item.name="{ item }">
+                    <router-link
+                        :to="{
                                 name: 'dataset',
                                 params: { dataset_id: item.dataset_id }
                             }"
-                        >{{ item.name }}</router-link>
-                    </template>
-                    <template slot="empty">
-                        <div class="text-center">No datasets available.</div>
-                    </template>
-                </v-data-table>
-                <!-- <v-btn>Add dataset</v-btn> -->
-                <!--<b-button
-                    size="sm"
-                    variant="success"
-                    class="mr-2 float-right"
-                    :to="{name: 'datasets-add'}"
-                >
-                    <i class="mdi mdi-plus" /> Add dataset
-                </b-button>-->
-            </div>
+                    >{{ item.name }}</router-link>
+                </template>
+                <template slot="empty">
+                    <div class="text-center">No datasets available.</div>
+                </template>
+            </v-data-table>
+            <v-row>
+                <v-spacer />
+                <v-btn :to="{name: 'datasets-create'}">
+                    <v-icon>mdi-plus</v-icon>Create dataset
+                </v-btn>
+            </v-row>
         </div>
     </div>
 </template>

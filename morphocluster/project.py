@@ -24,6 +24,7 @@ from morphocluster.models import (
     nodes_rejected_objects,
     objects,
     projects,
+    datasets,
 )
 
 
@@ -191,6 +192,18 @@ class Project:
         self._dataset_id = dataset_id
 
         return dataset_id
+
+    def get_dataset(self):
+        stmt = select([datasets]).where(
+            projects.c.project_id == self.project_id
+        ).limit(1)
+        dataset = self._connection.execute(stmt).fetchone()
+
+        if dataset is None:
+            raise ProjectError("Dataset not found")
+
+        return dict(dataset)
+
 
     def lock(self):
         return _ProjectLocker(self)
@@ -444,7 +457,7 @@ class _LockedProject:
 
         print(qprojects)
 
-        result = self._connection.execute(qprojects).first()
+        result = self._connection.execute(qprojects).fetchone()
 
         assert result is not None
 

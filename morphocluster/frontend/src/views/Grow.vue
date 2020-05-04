@@ -1,41 +1,21 @@
 <template>
-    <div id="bisect">
-        <nav class="navbar navbar-expand-lg navbar-light bg-dark">
-            <router-link class="navbar-brand text-light" to="/"
-                >MorphoCluster</router-link
-            >
-            <div class="collapse navbar-collapse">
-                <ul class="navbar-nav mr-auto">
-                    <li class="nav-item nav-link text-light" v-if="project">
-                        {{ project.name }}
-                    </li>
-                    <li class="nav-item nav-link text-light">Grow</li>
-                    <li class="nav-item nav-link text-light" v-if="node">
-                        {{ node.name }}
-                    </li>
-                </ul>
-            </div>
-        </nav>
-        <div v-if="node_status == 'loading'">Loading node...</div>
-        <div class="bg-light section-heading border-bottom border-top">
+    <div id="grow">
+        <div class="grey lighten-2 section-heading elevation-1">
             Node members
             <span v-if="node">({{ node.n_objects_own }} objects)</span>
-            <span
-                class="float-right mdi mdi-dark mdi-information-outline"
-                v-b-tooltip.hover.html
-                title="All members of this node, randomly ordered."
-            />
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <div v-on="on" class="float-right mdi mdi-dark mdi-information-outline" />
+                </template>
+                <span>All members of this node, randomly ordered.</span>
+            </v-tooltip>
         </div>
         <div id="node-members" class="row scrollable">
             <!--<div v-if="node" class="col col-1">
                 <member-preview :member="node" />
             </div>-->
 
-            <div
-                :key="getUniqueId(m)"
-                v-for="m of node_members"
-                class="col col-1"
-            >
+            <div :key="getUniqueId(m)" v-for="m of node_members" class="col col-1">
                 <member-preview :member="m" />
             </div>
 
@@ -46,43 +26,32 @@
                 spinner="circles"
             >
                 <div slot="no-more">
-                    <span v-b-tooltip.hover.html title="End of list."
-                        >&#8718;</span
-                    >
+                    <v-tooltip top>
+                        <template v-slot:activator="{ on }">
+                            <span v-on="on">&#8718;</span>
+                        </template>
+                        <span>End of list.</span>
+                    </v-tooltip>
                 </div>
             </infinite-loading>
         </div>
-        <div v-if="rec_status == 'loading'">Loading recommendations...</div>
         <div
-            v-if="rec_members.length && !done"
-            class="bg-light section-heading border-bottom border-top"
+            v-if="rec_members !== null && !done"
+            class="grey lighten-2 section-heading elevation-1"
         >
             Recommended members
-            <span v-if="typeof rec_current_page != 'undefined'"
-                >(Page {{ rec_current_page + 1 }} / {{ rec_n_pages }})</span
-            >
             <span
-                class="float-right mdi mdi-dark mdi-information-outline"
-                v-b-tooltip.hover.html
-                title="Recommendations for this node, page by page."
-            />
+                v-if="typeof rec_current_page != 'undefined'"
+            >(Page {{ rec_current_page + 1 }} / {{ rec_n_pages }})</span>
+            <v-tooltip>
+                <template v-slot:activator="{ on }">
+                    <span v-on="on" class="float-right mdi mdi-dark mdi-information-outline" />
+                </template>
+                <span>Recommendations for this node, page by page.</span>
+            </v-tooltip>
         </div>
-        <div
-            id="recommended-members"
-            v-if="rec_members && !done"
-            class="row scrollable"
-        >
-            <div
-                class="col col-12 spinner-container"
-                v-if="rec_status == 'loading'"
-            >
-                <spinner spinner="circles" />
-            </div>
-            <div
-                :key="getUniqueId(m)"
-                v-for="m of rec_members"
-                class="col col-1"
-            >
+        <div id="recommended-members" v-if="rec_members !== null && !done" class="row scrollable">
+            <div :key="getUniqueId(m)" v-for="m of rec_members" class="col col-1">
                 <member-preview
                     :member="m"
                     :controls="rec_member_controls"
@@ -118,82 +87,102 @@
                 <i>start over</i> to get more.
             </p>
             <p v-if="saving">Your input is being saved...</p>
-            <p v-if="saved">
-                Your input has been saved. Go on with the next node.
-            </p>
-            <p v-if="saving_total_ms">
-                Saving took {{ saving_total_ms / 1000 }}s.
-            </p>
+            <p v-if="saved">Your input has been saved. Go on with the next node.</p>
+            <p v-if="saving_total_ms">Saving took {{ saving_total_ms / 1000 }}s.</p>
         </div>
         <div id="progress">
             <div :style="{ flexGrow: n_valid_pages }" class="bg-success" />
             <div :style="{ flexGrow: n_unsure_pages }" class="bg-warning" />
             <div :style="{ flexGrow: n_invalid_pages }" class="bg-danger" />
         </div>
-        <div
-            id="decision"
-            v-if="rec_status == 'loaded' && node_status == 'loaded'"
-        >
-            <b-form-checkbox v-model="turtle_mode">Turtle mode</b-form-checkbox>
-            <b-button
-                :disabled="saving"
-                variant="success"
-                v-b-tooltip.hover.html
-                title="All visible recommendations match without exception. Increase left limit. <kbd>F</kbd>"
-                @click.prevent="membersOk"
-            >
-                <i class="mdi mdi-check-all" /> OK
-            </b-button>
-            <b-button
-                id="button-not-ok"
-                :disabled="saving"
-                variant="danger"
-                v-b-tooltip.hover.html
-                :title="not_ok_tooltip"
-                @click.prevent="membersNotOk"
-            >
-                <i class="mdi mdi-close" /> Not OK
-            </b-button>
-            <b-button
-                :disabled="!saved"
-                variant="secondary"
-                v-b-tooltip.hover.html
-                title="Discard progress and start over. <kbd>R</kbd>"
-                @click.prevent="initialize"
-            >
-                <i class="mdi mdi-restart" /> Start over
-            </b-button>
-            <!-- <b-button variant="outline-success" v-b-tooltip.hover title="Assign all safe objects to the current node." @click.prevent="saveResult">Save result</b-button> -->
-            <!-- <div>
-        n_valid_pages: {{n_valid_pages}}, n_unsure_pages: {{n_unsure_pages}}, n_invalid_pages: {{n_invalid_pages}}, rec_interval_left: {{rec_interval_left}}, rec_interval_right: {{rec_interval_right}}
-            </div>-->
-            <b-button
-                :disabled="!saved"
-                variant="secondary"
-                v-b-tooltip.hover.html
-                title="Continue with next node. <kbd>N</kbd>"
-                @click.prevent="next"
-            >
-                <i class="mdi mdi-chevron-right" /> Next
-            </b-button>
+        <div id="decision" v-if="rec_status == 'loaded' && node">
+            <v-row justify="space-around">
+                <v-checkbox v-model="turtle_mode" label="Turtle mode" />
+                <v-col>
+                    <v-tooltip top>
+                        <template v-slot:activator="{ on }">
+                            <v-btn
+                                :disabled="saving"
+                                color="success"
+                                v-on="on"
+                                @click.prevent="membersOk"
+                            >
+                                <v-icon dark>mdi-check-all</v-icon>OK
+                            </v-btn>
+                        </template>
+                        <span>All visible recommendations match without exception. Increase left limit.</span>
+                        <kbd>F</kbd>
+                    </v-tooltip>
+                </v-col>
+                <v-col>
+                    <v-tooltip top v-model="notOkTooltipModel">
+                        <template v-slot:activator="{ on }">
+                            <v-btn
+                                id="button-not-ok"
+                                :disabled="saving"
+                                color="error"
+                                v-on="on"
+                                @click.prevent="membersNotOk"
+                            >
+                                <v-icon dark>mdi-close</v-icon>Not OK
+                            </v-btn>
+                        </template>
+                        <span v-html="not_ok_tooltip" />
+                    </v-tooltip>
+                </v-col>
+                <v-col>
+                    <v-tooltip>
+                        <template v-slot:activator="{ on }">
+                            <v-btn
+                                :disabled="!saved"
+                                color="secondary"
+                                v-on="on"
+                                @click.prevent="initialize"
+                            >
+                                <v-icon dark>mdi-restart</v-icon>Start over
+                            </v-btn>
+                        </template>
+                        Discard progress and start over.
+                        <kbd>R</kbd>
+                    </v-tooltip>
+                </v-col>
+                <v-col>
+                    <v-tooltip>
+                        <template v-slot:activator="{ on }">
+                            <v-btn
+                                :disabled="!saved"
+                                color="secondary"
+                                v-on="on"
+                                @click.prevent="next"
+                            >
+                                <v-icon dark>mdi-chevron-right</v-icon>Next
+                            </v-btn>
+                        </template>
+                        Continue with next node.
+                        <kbd>N</kbd>
+                    </v-tooltip>
+                </v-col>
+            </v-row>
         </div>
         <message-log class="bg-light" :messages="messages" />
-        <b-modal
-            ref="doneModal"
-            centered
-            no-fade
-            header-bg-variant="success"
-            title="Bisection done"
-        >
-            <div class="d-block text-center">
-                Bisection is done for this project.
-            </div>
-            <footer slot="modal-footer">
-                <b-button variant="primary" :to="{ name: 'projects' }"
-                    >Back to projects</b-button
-                >
-            </footer>
-        </b-modal>
+        <v-dialog persistent v-model="doneDialogModel">
+            <v-card>
+                <v-card-title>
+                    <span class="headline">Growing is done for this project.</span>
+                </v-card-title>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn
+                        v-if="project"
+                        variant="primary"
+                        :to="{
+                        name: 'dataset',
+                        params: { dataset_id: project.dataset_id }
+                    }"
+                    >Back to dataset</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
@@ -202,25 +191,26 @@ import axios from "axios";
 import shuffle from "lodash/shuffle";
 
 import InfiniteLoading from "vue-infinite-loading";
-import Spinner from "vue-infinite-loading/src/components/Spinner";
 
 import mixins from "@/mixins.js";
-
 import * as api from "@/helpers/api.js";
+import globalState from "@/globalState.js";
+import exceptions from "@/exceptions.js";
+import EventLog from "@/EventLog.js";
 
 import MemberPreview from "@/components/MemberPreview.vue";
 import MessageLog from "@/components/MessageLog.vue";
 
-import Vue from "vue";
-
 const MAX_N_RECOMMENDATIONS = 100000;
 
 export default {
-    name: "bisect",
+    name: "grow",
     data() {
         return {
             node_status: "",
             project: null,
+            // true, if the project needs to be reloaded (e.g. when the progress needs to be updated).
+            project_dirty: false,
             node: null,
             node_members: [],
             node_members_url: null,
@@ -233,6 +223,8 @@ export default {
             rec_interval_left: 0,
             rec_interval_right: null,
             rec_current_page: 0,
+            // Page that is actually currently shown
+            rec_current_page_shown: null,
             rec_base_url: null,
             rec_n_pages: null,
             rec_request_id: null,
@@ -268,6 +260,10 @@ export default {
             turtle_mode: false,
             turtle_mode_auto_changed: false,
 
+            // View models
+            notOkTooltipModel: false,
+            doneDialogModel: false,
+
             /* Accepted members */
             accepted_members: [],
 
@@ -287,18 +283,22 @@ export default {
                 time_done: null,
                 // Time when the result was saved
                 time_saved: null
-            }
+            },
+
+            // Log all the relevent events
+            eventLog: new EventLog(),
+
+            // Time when page was first entered
+            pageEnteredTime: null
         };
     },
     components: {
         MemberPreview,
         InfiniteLoading,
-        MessageLog,
-        Spinner
+        MessageLog
     },
     mixins: [mixins],
     watch: {
-        $route: "initialize",
         turtle_mode: function(value) {
             if (value) {
                 console.log("Turtle mode on.");
@@ -311,19 +311,23 @@ export default {
                 console.log("Turtle mode off.");
             }
 
-            Vue.nextTick(() => {
-                this.$root.$emit("bv::show::tooltip", "button-not-ok");
-            });
+            this.notOkTooltipModel = true;
         }
-    },
-    created() {
-        this.initialize();
     },
     mounted() {
         window.addEventListener("keypress", this.keypress);
     },
     beforeDestroy() {
         window.removeEventListener("keypress", this.keypress);
+    },
+    beforeRouteEnter(to, from, next) {
+        next(vm => {
+            vm.updateView(to.params.project_id, to.params.node_id);
+        });
+    },
+    beforeRouteUpdate(to, from, next) {
+        this.updateView(to.params.project_id, to.params.node_id);
+        next();
     },
     computed: {
         n_valid_pages() {
@@ -346,7 +350,179 @@ export default {
         }
     },
     methods: {
-        initialize() {
+        updateView(project_id, node_id) {
+            globalState.setLoading("growing");
+
+            if (this.pageEnteredTime == null) {
+                this.pageEnteredTime = Date.now();
+            }
+
+            // Load project if dirty
+            const projectPromise =
+                this.project && !this.project_dirty
+                    ? Promise.resolve(this.project)
+                    : (globalState.setLoading("project"),
+                      api.getProject(project_id, true, true));
+            projectPromise.then(project => {
+                this.project = project;
+                this.project_dirty = false;
+                globalState.unsetLoading("project");
+            });
+
+            if (node_id == null) {
+                console.log(`getNextUnfilledNode ${project_id}...`);
+                api.getNextUnfilledNode(project_id, null, true, true)
+                    .then(node_id => {
+                        if (node_id == null) {
+                            throw exceptions.NoNextNodeException(
+                                `No ungrown nodes for project ${project_id}.`
+                            );
+                        }
+
+                        this.$router.push({
+                            name: "grow",
+                            params: {
+                                project_id: project_id,
+                                node_id: node_id
+                            }
+                        });
+                    })
+                    .catch(e => {
+                        console.log(e);
+                        this.initializeView(null, e);
+                    })
+                    .finally(() => {
+                        globalState.unsetLoading("growing");
+                    });
+                return;
+            }
+
+            const nodePromise = api.getNode(project_id, node_id);
+
+            Promise.all([projectPromise, nodePromise])
+                .then(([, node]) => {
+                    console.log(node);
+                    this.initializeView(node, null);
+                })
+                .catch(e => {
+                    console.log(e);
+                    this.initializeView(null, e);
+                })
+                .finally(() => {
+                    globalState.unsetLoading("growing");
+                });
+        },
+        initializeView(node, error) {
+            // Completely reset data
+            Object.assign(this.$data, this.$options.data(), {
+                // project and project_dirty are initialized by updateView
+                project: this.project,
+                project_dirty: this.project_dirty,
+                node,
+                view_valid: !error
+            });
+
+            if (error instanceof exceptions.NoNextNodeException) {
+                this.done = true;
+            } else if (error) {
+                this.error = error;
+                return;
+            }
+
+            // Log pageEntered
+            this.eventLog.logEvent("pageEntered", null, this.pageEnteredTime);
+            this.pageEnteredTime = null;
+
+            // Reset infinite-loading
+            if (this.$refs.InfiniteLoading) {
+                this.$refs.InfiniteLoading.stateChanger.reset();
+            }
+
+            // Update breadcrumb
+            this.setBreadcrumbs([
+                {
+                    text: this.project.dataset.name,
+                    to: {
+                        name: "dataset",
+                        params: { dataset_id: this.project.dataset.dataset_id }
+                    },
+                    exact: true
+                },
+                {
+                    text: this.project.name,
+                    to: {
+                        name: "project",
+                        params: { project_id: this.project.project_id }
+                    },
+                    exact: true
+                },
+                {
+                    text: "Grow"
+                },
+                {
+                    text: this.node.name,
+                    to: {
+                        name: "grow",
+                        params: {
+                            project_id: this.project.project_id,
+                            node_id: this.node.node_id
+                        }
+                    }
+                }
+            ]);
+
+            this.updateRecommendations();
+        },
+        updateRecommendations() {
+            /**
+             * Update the recommendation section.
+             */
+
+            if (!this.rec_base_url) {
+                // if rec_base_url is not known
+                api.getNodeRecommendedObjects(
+                    this.project.project_id,
+                    this.node.node_id,
+                    MAX_N_RECOMMENDATIONS
+                )
+                    .then(data => {
+                        // TODO: Do something when there are no recommendations!
+                        this.rec_members = shuffle(data.data);
+                        this.rec_base_url = data.links.self;
+                        this.rec_n_pages = this.rec_interval_right =
+                            data.meta.last_page + 1;
+
+                        this.rec_current_page = this.rec_interval_left = 0;
+                        this.rec_status = "loaded";
+                        this.rec_request_id = data.meta.request_id;
+
+                        this.eventLog.logEvent("recommendationsInitialized");
+                    })
+                    .catch(e => {
+                        this.axiosErrorHandler(e);
+                    });
+            } else {
+                // If rec_base_url is known
+                axios
+                    .get(`${this.rec_base_url}&page=${this.rec_current_page}`)
+                    .then(response => {
+                        console.log(
+                            response.data.data,
+                            shuffle(response.data.data)
+                        );
+                        this.rec_members = shuffle(response.data.data);
+                        this.rec_current_page_shown = response.data.meta.page;
+
+                        this.eventLog.logEvent("recommendationsUpdated", {
+                            current_page: response.data.meta.page
+                        });
+                    })
+                    .catch(e => {
+                        this.axiosErrorHandler(e);
+                    });
+            }
+        },
+        initialize__() {
             console.log("Initializing...");
 
             // Reset data (but keep project)
@@ -368,13 +544,8 @@ export default {
                 } else {
                     // Load project
                     this.project = null;
-                    this.progress = null;
                     api.getProject(project_id, true).then(project => {
                         this.project = project;
-                        this.progress = {
-                            n_approved_objects: project.n_approved_objects,
-                            n_objects_total: project.n_objects_total
-                        };
                         resolve();
                     });
                 }
@@ -404,7 +575,7 @@ export default {
                                 );
                             }
                             const to = {
-                                name: "bisect",
+                                name: "grow",
                                 params: {
                                     project_id: project_id,
                                     node_id: node_id
@@ -553,14 +724,14 @@ export default {
                 );
             } else if (!this.found_right) {
                 // If the right side of the interval was not found yet, jump forward
-                // and increase leap.
+                // and increase leap.import InfiniteLoading from "vue-infinite-loading";
                 this.rec_current_page = Math.min(
                     this.rec_current_page + this.jump_pages,
                     this.rec_n_pages - 1
                 );
                 this.jump_pages *= 2;
             } else {
-                // Otherwise perform regular bisection
+                // Otherwise perform regular bisectionimport InfiniteLoading from "vue-infinite-loading";
                 this.rec_current_page = Math.trunc(
                     (1 - frac) * this.rec_interval_left +
                         frac * this.rec_interval_right
@@ -699,7 +870,7 @@ export default {
         },
         next() {
             this.$router.push({
-                name: "bisect",
+                name: "grow",
                 params: { project_id: this.project.project_id }
             });
         },
@@ -730,15 +901,16 @@ export default {
 </script>
 
 <style>
-#bisect {
+#grow {
     display: flex;
     flex-direction: column;
     align-items: stretch;
     flex: 1;
     overflow: hidden;
+    height: 100%;
 }
 
-#bisect > * {
+#grow > * {
     padding: 0 10px;
 }
 

@@ -14,15 +14,17 @@ export function patchNode(project_id, node_id, data) {
         });
 }
 
-export function getNextUnapprovedNode(project_id, node_id, leaf = false) {
-    return axios.get(`/api/projects/${project_id}/nodes/${node_id}/next_unapproved`, { params: { leaf } })
+export function getNextUnapprovedNode(project_id, node_id = null, leaf = false) {
+    var url = node_id ? `/api/projects/${project_id}/nodes/${node_id}/next_unapproved` : `/api/projects/${project_id}/next_unapproved`;
+    return axios.get(url, { params: { leaf } })
         .then(response => {
             return response.data;
         });
 }
 
 export function getNextUnfilledNode(project_id, node_id, leaf = false, preferred_first = false) {
-    return axios.get(`/api/projects/${project_id}/nodes/${node_id}/next_unfilled`, { params: { leaf, preferred_first } })
+    var url = node_id ? `/api/projects/${project_id}/nodes/${node_id}/next_unfilled` : `/api/projects/${project_id}/next_unfilled`;
+    return axios.get(url, { params: { leaf, preferred_first } })
         .then(response => {
             return response.data;
         });
@@ -58,8 +60,8 @@ export function mergeNodeInto(project_id, node_id, dest_node_id) {
 
 // Project
 
-export function getProject(project_id, include_progress = false) {
-    return axios.get(`/api/projects/${project_id}`, { params: { include_progress } })
+export function getProject(project_id, include_progress = false, include_dataset = false) {
+    return axios.get(`/api/projects/${project_id}`, { params: { include_progress, include_dataset } })
         .then(response => {
             return response.data;
         });
@@ -100,6 +102,13 @@ export function log(action, node_id = null, reverse_action = null, data = null) 
 
 export function datasetsGetAll() {
     return axios.get(`/api/datasets`)
+        .then(response => {
+            return response.data;
+        });
+}
+
+export function createDataset(properties = null) {
+    return axios.post(`/api/datasets`)
         .then(response => {
             return response.data;
         });

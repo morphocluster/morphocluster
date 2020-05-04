@@ -50,7 +50,7 @@ class Dataset:
             return dataset
 
     @staticmethod
-    def get_all_json(owner=None):
+    def get_all_dict(owner=None):
         """Get a list of all datasets."""
 
         stmt = select([datasets])
@@ -66,7 +66,23 @@ class Dataset:
     def __init__(self, dataset_id):
         self.dataset_id = dataset_id
 
-    def get_json(self):
+    def update(self, name=None):
+        """Update a dataset."""
+
+        print(repr(name))
+
+        connection = database.get_connection()
+
+        with connection.begin():
+            stmt = (
+                datasets.update()
+                .where(datasets.c.dataset_id == self.dataset_id)
+                .values({"name": name})
+            )
+
+            connection.execute(stmt)
+
+    def to_dict(self):
         """Get a dataset properties as dict."""
 
         stmt = select([datasets]).where(datasets.c.dataset_id == self.dataset_id)

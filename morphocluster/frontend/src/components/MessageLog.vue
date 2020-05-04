@@ -1,6 +1,6 @@
 <template>
     <div class="message-log">
-        <p v-for="m in messages" :key="m">{{ m }}</p>
+        <p v-for="(m, i) in messages" :key="i">{{ m }}</p>
     </div>
 </template>
 

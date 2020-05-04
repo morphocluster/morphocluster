@@ -1,13 +1,5 @@
 <template>
     <div id="datasets">
-        <nav class="navbar navbar-expand-lg navbar-light bg-dark">
-            <router-link class="navbar-brand text-light" to="/"
-                >MorphoCluster</router-link
-            >
-            <ul class="navbar-nav mr-auto">
-                <li class="nav-item active text-light">Add dataset</li>
-            </ul>
-        </nav>
         <div class="scrollable">
             <div class="container">
                 <div class="alerts" v-if="alerts.length">
@@ -17,38 +9,43 @@
                         dismissible
                         show
                         :variant="a.variant"
-                        >{{ a.message }}</b-alert
-                    >
+                    >{{ a.message }}</b-alert>
                 </div>
-                <file-upload ref="upload" v-model="files"
-                    >Upload file</file-upload
-                >
+                <file-upload ref="upload" v-model="files">Upload file</file-upload>
             </div>
         </div>
     </div>
 </template>
 
 <script>
-import "@mdi/font/css/materialdesignicons.css";
 //import * as api from "@/helpers/api.js";
+import mixins from "@/mixins.js";
 
 import VueUploadComponent from "vue-upload-component";
 
 export default {
-    name: "datasets",
+    name: "dataset-create",
     props: {},
     components: { FileUpload: VueUploadComponent },
+    mixins: [mixins],
     data() {
         return {
             fields: [
                 { key: "name", sortable: true }
                 //"action"
             ],
+            files: [],
             alerts: []
         };
     },
     methods: {},
-    mounted() {}
+    mounted() {
+        this.setBreadcrumbs([
+            {
+                text: "Create dataset"
+            }
+        ]);
+    }
 };
 </script>
 
