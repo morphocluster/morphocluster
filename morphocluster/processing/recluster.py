@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 import sys
 import time
+from typing import List, Optional, Dict, Any, Union
 
 import fire
 import h5py
+import hdbscan
 import numpy as np
 import pandas as pd
 
-import hdbscan
 from morphocluster.processing import Tree
 
 
@@ -33,8 +34,11 @@ def _subsample_dataset(sample_size, dataset):
 
 class Recluster:
     def __init__(self):
-        self.dataset = None
-        self.trees = []
+        self.dataset: Optional[Dict] = None
+        self.trees: List[Tree] = []
+        self.log: List = []
+
+        self._log("initialize", dict(time=time.time()))
 
     def load_features(self, features_fn, append=True):
         """
@@ -61,9 +65,12 @@ class Recluster:
 
             self.dataset["objids"] = pd.concat(
                 (self.dataset["objids"], dataset["objids"])
-            )
+            ).reset_index(drop=True)
+
         else:
             self.dataset = dataset
+
+        self._log("load_features", dict(append=append, features_fn=features_fn))
 
         print("Loaded {:,d} features.".format(len(dataset["features"])))
 
@@ -72,13 +79,16 @@ class Recluster:
 
         return self
 
-    def load_tree(self, tree):
+    def load_tree(self, tree: Union[Tree, Any]):
         """
         Load an existing cluster tree.
         """
 
         if not isinstance(tree, Tree):
+            self._log("load_tree", dict(tree_fn=str(tree)))
             tree = Tree.from_saved(tree)
+        else:
+            self._log("load_tree")
 
         self.trees.append(tree)
 
@@ -87,6 +97,11 @@ class Recluster:
     def _get_unapproved_dataset(self):
         approved_objids = []
         tree_objids = []
+
+        # If no trees are loaded, the whole dataset is unapproved
+        if not self.trees:
+            return self.dataset
+
         for i, tree in enumerate(self.trees):
             print("Tree #{}:".format(i))
 
@@ -166,16 +181,33 @@ class Recluster:
             print("Subsampling dataset ({:,d})...".format(sample_size))
             dataset = _subsample_dataset(sample_size, dataset)
 
+        print("Arguments:", kwargs)
+
         clusterer = hdbscan.HDBSCAN(**kwargs)
 
-        print("Clustering {:,d} objects...".format(len(dataset["features"])))
+        n_objects = len(dataset["features"])
+
+        print(f"Clustering {n_objects:,d} objects...")
         start = time.perf_counter()
         labels = clusterer.fit_predict(dataset["features"])
         time_fit = time.perf_counter() - start
 
         print("Clustering took {:.0f}s".format(time_fit))
 
-        print("Found {:,d} labels.".format(len(np.unique(labels))))
+        n_labels = len([l for l in np.unique(labels) if l != -1])
+        print(f"Found {n_labels:,d} labels.")
+
+        self._log(
+            "cluster",
+            dict(
+                time_fit=time_fit,
+                ignore_approved=ignore_approved,
+                sample_size=sample_size,
+                kwargs=kwargs,
+                n_objects=n_objects,
+                n_labels=n_labels,
+            ),
+        )
 
         # Turn cluster_labels to a tree
         self.trees.append(Tree.from_labels(labels, dataset["objids"]))
@@ -192,7 +224,7 @@ class Recluster:
 
         return self
 
-    def merge_trees(self):
+    def merge_trees(self) -> Tree:
         if not self.trees:
             raise ValueError("No trees.")
 
@@ -209,9 +241,17 @@ class Recluster:
         """
 
         tree = self.merge_trees()
-        tree.save(tree_fn)
+        tree.save(tree_fn, dict(log=self.log))
+
+        print(f"Saved tree to {tree_fn}.")
 
         return self
+
+    def stop(self):
+        self._log("stop", dict(time=time.time()))
+
+    def _log(self, topic, data=None):
+        self.log.append({topic: data})
 
 
 if __name__ == "__main__":
