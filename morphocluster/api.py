@@ -322,7 +322,7 @@ def _node(project, node, include_children=False):
 
 
 def _object(object_):
-    return {"object_id": object_["object_id"], "image_fn": object_["path"]}
+    return {"object_id": object_["object_id"], "image_fn": object_["image_fn"]}
 
 
 def _arrange_by_sim(result):

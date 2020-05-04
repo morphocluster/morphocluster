@@ -12,8 +12,7 @@ frontend = Blueprint(
 
 
 @frontend.route("/")
-@frontend.route("/p")
-@frontend.route("/p/<path:path>")
+@frontend.route("/datasets/<path:path>")
 def index(path=None):
     response = frontend.send_static_file("index.html")
     del response.headers["Expires"]

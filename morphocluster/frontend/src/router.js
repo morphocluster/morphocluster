@@ -15,9 +15,9 @@ var router = new Router({
       redirect: function () { window.location.reload(); }
     },
     {
-      name: 'bisect',
-      path: '/projects/:project_id/bisect/:node_id?',
-      component: () => import(/* webpackChunkName: "bisect" */ './views/Bisect.vue'),
+      name: 'grow',
+      path: '/projects/:project_id/grow/:node_id?',
+      component: () => import(/* webpackChunkName: "grow" */ './views/Grow.vue'),
     },
     {
       name: 'labeling2',
@@ -26,9 +26,9 @@ var router = new Router({
       props: (route) => ({ node_id: parseInt(route.params.node_id) }),
     },
     {
-      name: 'approve',
-      path: '/projects/:project_id/approve/:node_id?',
-      component: () => import(/* webpackChunkName: "approve" */ './views/Approve.vue'),
+      name: 'validate',
+      path: '/projects/:project_id/validate/:node_id?',
+      component: () => import(/* webpackChunkName: "validate" */ './views/Validate.vue'),
     },
     {
       name: 'project',

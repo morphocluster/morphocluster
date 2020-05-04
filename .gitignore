@@ -19,3 +19,6 @@ htmlcov/**
 dump.rdb
 .ipynb_checkpoints/
 dev-data/
+*.pdf
+morphocluster/experiments/
+.code-workspace.code-workspace

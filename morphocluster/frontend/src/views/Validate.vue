@@ -1,5 +1,5 @@
 <template>
-    <div id="approve">
+    <div id="validate">
         <nav class="navbar navbar-expand-lg navbar-light bg-dark">
             <router-link class="navbar-brand text-light" to="/"
                 >MorphoCluster</router-link
@@ -71,9 +71,9 @@
         </div>
         <div id="decision">
             <b-button
-                id="btn-approve"
+                id="btn-validate"
                 variant="success"
-                @click.prevent="approve(true)"
+                @click.prevent="validate(true)"
                 v-b-tooltip.hover.html
                 title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>"
             >
@@ -81,9 +81,9 @@
                 <i class="mdi mdi-flag" /> Approve + Flag
             </b-button>
             <b-button
-                id="btn-approve"
+                id="btn-validate"
                 variant="success"
-                @click.prevent="approve(false)"
+                @click.prevent="validate(false)"
                 v-b-tooltip.hover.html
                 title="All members look alike. Approve. <kbd>A</kbd>"
             >
@@ -137,7 +137,7 @@ import MemberPreview from "@/components/MemberPreview.vue";
 import MessageLog from "@/components/MessageLog.vue";
 
 export default {
-    name: "approve",
+    name: "validate",
     data() {
         return {
             loading: false,
@@ -218,7 +218,7 @@ export default {
                                 return null;
                             }
                             const to = {
-                                name: "approve",
+                                name: "validate",
                                 params: {
                                     project_id: project_id,
                                     node_id: node_id
@@ -290,10 +290,10 @@ export default {
                     this.axiosErrorHandler(e);
                 });
         },
-        approve(preferred = false) {
+        validate(preferred = false) {
             console.log("Approve");
             api.patchNode(this.node.project_id, this.node.node_id, {
-                approved: true,
+                validated: true,
                 preferred: preferred
             })
                 .then(() => {
@@ -304,7 +304,7 @@ export default {
                     api.getNodeProgress(
                         this.project.project_id,
                         this.project.node_id,
-                        "approve"
+                        "validate"
                     )
                         .then(progress => {
                             this.progress = progress;
@@ -314,7 +314,7 @@ export default {
                         });
 
                     const to = {
-                        name: "approve",
+                        name: "validate",
                         params: {
                             project_id: this.project.project_id
                         }
@@ -340,7 +340,7 @@ export default {
                     api.getNodeProgress(
                         this.project.project_id,
                         this.project.node_id,
-                        "approve"
+                        "validate"
                     )
                         .then(progress => {
                             this.progress = progress;
@@ -350,7 +350,7 @@ export default {
                         });
 
                     const to = {
-                        name: "approve",
+                        name: "validate",
                         params: {
                             project_id: this.project.project_id
                         }
@@ -373,9 +373,9 @@ export default {
                 return;
             }
             if (event.key == "a") {
-                this.approve();
+                this.validate();
             } else if (event.key == "f") {
-                this.approve(true);
+                this.validate(true);
             } else if (event.key == "m") {
                 this.merge();
             }
@@ -403,7 +403,7 @@ export default {
 </script>
 
 <style>
-#approve {
+#validate {
     display: flex;
     flex-direction: column;
     align-items: stretch;

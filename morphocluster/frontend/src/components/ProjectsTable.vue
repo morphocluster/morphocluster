@@ -54,7 +54,7 @@
                     variant="primary"
                     class="mr-2"
                     :to="{
-                        name: 'approve',
+                        name: 'validate',
                         params: { project_id: data.item.project_id }
                     }"
                     >Validate</b-button
@@ -64,7 +64,7 @@
                     variant="primary"
                     class="mr-2"
                     :to="{
-                        name: 'bisect',
+                        name: 'grow',
                         params: { project_id: data.item.project_id }
                     }"
                     >Grow</b-button

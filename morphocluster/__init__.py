@@ -93,7 +93,7 @@ def create_app(test_config=None):
             abort(404)
 
         response = send_from_directory(
-            app.config["DATA_DIR"], result["path"], conditional=True
+            app.config["DATA_DIR"], result["image_fn"], conditional=True
         )
 
         response.headers["Cache-Control"] += ", immutable"

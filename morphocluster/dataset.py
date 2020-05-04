@@ -114,7 +114,7 @@ class Dataset:
                         dict(
                             row,
                             dataset_id=self.dataset_id,
-                            path=os.path.join(rel_dst_root, row["path"]),
+                            image_fn=os.path.join(rel_dst_root, row["path"]),
                         )
                         for row in chunk
                     ],

@@ -1,200 +1,229 @@
 <template>
-    <div id="bisect">
-        <nav class="navbar navbar-expand-lg navbar-light bg-dark">
-            <router-link class="navbar-brand text-light" to="/"
-                >MorphoCluster</router-link
-            >
-            <div class="collapse navbar-collapse">
-                <ul class="navbar-nav mr-auto">
-                    <li class="nav-item nav-link text-light" v-if="project">
-                        {{ project.name }}
-                    </li>
-                    <li class="nav-item nav-link text-light">Grow</li>
-                    <li class="nav-item nav-link text-light" v-if="node">
-                        {{ node.name }}
-                    </li>
-                </ul>
-            </div>
-        </nav>
-        <div v-if="node_status == 'loading'">Loading node...</div>
-        <div class="bg-light section-heading border-bottom border-top">
-            Node members
-            <span v-if="node">({{ node.n_objects_own }} objects)</span>
-            <span
-                class="float-right mdi mdi-dark mdi-information-outline"
-                v-b-tooltip.hover.html
-                title="All members of this node, randomly ordered."
-            />
-        </div>
-        <div id="node-members" class="row scrollable">
-            <!--<div v-if="node" class="col col-1">
+  <div id="grow">
+    <nav class="navbar navbar-expand-lg navbar-light bg-dark">
+      <router-link
+        class="navbar-brand text-light"
+        to="/"
+      >MorphoCluster</router-link>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav mr-auto">
+          <li
+            class="nav-item nav-link text-light"
+            v-if="project"
+          >
+            {{ project.name }}
+          </li>
+          <li class="nav-item nav-link text-light">Grow</li>
+          <li
+            class="nav-item nav-link text-light"
+            v-if="node"
+          >
+            {{ node.name }}
+          </li>
+        </ul>
+      </div>
+    </nav>
+    <div v-if="node_status == 'loading'">Loading node...</div>
+    <div class="bg-light section-heading border-bottom border-top">
+      Node members
+      <span v-if="node">({{ node.n_objects_own }} objects)</span>
+      <span
+        class="float-right mdi mdi-dark mdi-information-outline"
+        v-b-tooltip.hover.html
+        title="All members of this node, randomly ordered."
+      />
+    </div>
+    <div
+      id="node-members"
+      class="row scrollable"
+    >
+      <!--<div v-if="node" class="col col-1">
                 <member-preview :member="node" />
             </div>-->
 
-            <div
-                :key="getUniqueId(m)"
-                v-for="m of node_members"
-                class="col col-1"
-            >
-                <member-preview :member="m" />
-            </div>
+      <div
+        :key="getUniqueId(m)"
+        v-for="m of node_members"
+        class="col col-1"
+      >
+        <member-preview :member="m" />
+      </div>
 
-            <infinite-loading
-                ref="infload"
-                v-if="node"
-                @infinite="updateNodeMembers"
-                spinner="circles"
-            >
-                <div slot="no-more">
-                    <span v-b-tooltip.hover.html title="End of list."
-                        >&#8718;</span
-                    >
-                </div>
-            </infinite-loading>
+      <infinite-loading
+        ref="infload"
+        v-if="node"
+        @infinite="updateNodeMembers"
+        spinner="circles"
+      >
+        <div slot="no-more">
+          <span
+            v-b-tooltip.hover.html
+            title="End of list."
+          >&#8718;</span>
         </div>
-        <div v-if="rec_status == 'loading'">Loading recommendations...</div>
-        <div
-            v-if="rec_members.length && !done"
-            class="bg-light section-heading border-bottom border-top"
-        >
-            Recommended members
-            <span v-if="typeof rec_current_page != 'undefined'"
-                >(Page {{ rec_current_page + 1 }} / {{ rec_n_pages }})</span
-            >
-            <span
-                class="float-right mdi mdi-dark mdi-information-outline"
-                v-b-tooltip.hover.html
-                title="Recommendations for this node, page by page."
-            />
-        </div>
-        <div
-            id="recommended-members"
-            v-if="rec_members && !done"
-            class="row scrollable"
-        >
-            <div
-                class="col col-12 spinner-container"
-                v-if="rec_status == 'loading'"
-            >
-                <spinner spinner="circles" />
-            </div>
-            <div
-                :key="getUniqueId(m)"
-                v-for="m of rec_members"
-                class="col col-1"
-            >
-                <member-preview
-                    :member="m"
-                    :controls="rec_member_controls"
-                    v-on:remove="removeMember"
-                    v-on:accept="acceptMember"
-                />
-            </div>
-        </div>
-        <div v-if="done" class="bg-light section-heading">Report</div>
-        <div id="report" v-if="done" class="scrollable">
-            Bisection done.
-            <table>
-                <tr>
-                    <th>Total number of pages:</th>
-                    <td>{{ rec_n_pages }}</td>
-                </tr>
-                <tr>
-                    <th>Number of valid pages:</th>
-                    <td>{{ n_valid_pages }}</td>
-                </tr>
-                <tr>
-                    <th>Number of invalid pages:</th>
-                    <td>{{ n_invalid_pages }}</td>
-                </tr>
-                <tr>
-                    <th>Number of rejected members:</th>
-                    <td>{{ rejected_members.length }}</td>
-                </tr>
-            </table>
+      </infinite-loading>
+    </div>
+    <div v-if="rec_status == 'loading'">Loading recommendations...</div>
+    <div
+      v-if="rec_members.length && !done"
+      class="bg-light section-heading border-bottom border-top"
+    >
+      Recommended members
+      <span v-if="typeof rec_current_page != 'undefined'">(Page {{ rec_current_page + 1 }} / {{ rec_n_pages }})</span>
+      <span
+        class="float-right mdi mdi-dark mdi-information-outline"
+        v-b-tooltip.hover.html
+        title="Recommendations for this node, page by page."
+      />
+    </div>
+    <div
+      id="recommended-members"
+      v-if="rec_members && !done"
+      class="row scrollable"
+    >
+      <div
+        class="col col-12 spinner-container"
+        v-if="rec_status == 'loading'"
+      >
+        <spinner spinner="circles" />
+      </div>
+      <div
+        :key="getUniqueId(m)"
+        v-for="m of rec_members"
+        class="col col-1"
+      >
+        <member-preview
+          :member="m"
+          :controls="rec_member_controls"
+          v-on:remove="removeMember"
+          v-on:accept="acceptMember"
+        />
+      </div>
+    </div>
+    <div
+      v-if="done"
+      class="bg-light section-heading"
+    >Report</div>
+    <div
+      id="report"
+      v-if="done"
+      class="scrollable"
+    >
+      Bisection done.
+      <table>
+        <tr>
+          <th>Total number of pages:</th>
+          <td>{{ rec_n_pages }}</td>
+        </tr>
+        <tr>
+          <th>Number of valid pages:</th>
+          <td>{{ n_valid_pages }}</td>
+        </tr>
+        <tr>
+          <th>Number of invalid pages:</th>
+          <td>{{ n_invalid_pages }}</td>
+        </tr>
+        <tr>
+          <th>Number of rejected members:</th>
+          <td>{{ rejected_members.length }}</td>
+        </tr>
+      </table>
 
-            <p v-if="n_valid_pages == rec_n_pages">
-                You accepted all recommendations. You may want to
-                <i>start over</i> to get more.
-            </p>
-            <p v-if="saving">Your input is being saved...</p>
-            <p v-if="saved">
-                Your input has been saved. Go on with the next node.
-            </p>
-            <p v-if="saving_total_ms">
-                Saving took {{ saving_total_ms / 1000 }}s.
-            </p>
-        </div>
-        <div id="progress">
-            <div :style="{ flexGrow: n_valid_pages }" class="bg-success" />
-            <div :style="{ flexGrow: n_unsure_pages }" class="bg-warning" />
-            <div :style="{ flexGrow: n_invalid_pages }" class="bg-danger" />
-        </div>
-        <div
-            id="decision"
-            v-if="rec_status == 'loaded' && node_status == 'loaded'"
-        >
-            <b-form-checkbox v-model="turtle_mode">Turtle mode</b-form-checkbox>
-            <b-button
-                :disabled="saving"
-                variant="success"
-                v-b-tooltip.hover.html
-                title="All visible recommendations match without exception. Increase left limit. <kbd>F</kbd>"
-                @click.prevent="membersOk"
-            >
-                <i class="mdi mdi-check-all" /> OK
-            </b-button>
-            <b-button
-                id="button-not-ok"
-                :disabled="saving"
-                variant="danger"
-                v-b-tooltip.hover.html
-                :title="not_ok_tooltip"
-                @click.prevent="membersNotOk"
-            >
-                <i class="mdi mdi-close" /> Not OK
-            </b-button>
-            <b-button
-                :disabled="!saved"
-                variant="secondary"
-                v-b-tooltip.hover.html
-                title="Discard progress and start over. <kbd>R</kbd>"
-                @click.prevent="initialize"
-            >
-                <i class="mdi mdi-restart" /> Start over
-            </b-button>
-            <!-- <b-button variant="outline-success" v-b-tooltip.hover title="Assign all safe objects to the current node." @click.prevent="saveResult">Save result</b-button> -->
-            <!-- <div>
+      <p v-if="n_valid_pages == rec_n_pages">
+        You accepted all recommendations. You may want to
+        <i>start over</i> to get more.
+      </p>
+      <p v-if="saving">Your input is being saved...</p>
+      <p v-if="saved">
+        Your input has been saved. Go on with the next node.
+      </p>
+      <p v-if="saving_total_ms">
+        Saving took {{ saving_total_ms / 1000 }}s.
+      </p>
+    </div>
+    <div id="progress">
+      <div
+        :style="{ flexGrow: n_valid_pages }"
+        class="bg-success"
+      />
+      <div
+        :style="{ flexGrow: n_unsure_pages }"
+        class="bg-warning"
+      />
+      <div
+        :style="{ flexGrow: n_invalid_pages }"
+        class="bg-danger"
+      />
+    </div>
+    <div
+      id="decision"
+      v-if="rec_status == 'loaded' && node_status == 'loaded'"
+    >
+      <b-form-checkbox v-model="turtle_mode">Turtle mode</b-form-checkbox>
+      <b-button
+        :disabled="saving"
+        variant="success"
+        v-b-tooltip.hover.html
+        title="All visible recommendations match without exception. Increase left limit. <kbd>F</kbd>"
+        @click.prevent="membersOk"
+      >
+        <i class="mdi mdi-check-all" /> OK
+      </b-button>
+      <b-button
+        id="button-not-ok"
+        :disabled="saving"
+        variant="danger"
+        v-b-tooltip.hover.html
+        :title="not_ok_tooltip"
+        @click.prevent="membersNotOk"
+      >
+        <i class="mdi mdi-close" /> Not OK
+      </b-button>
+      <b-button
+        :disabled="!saved"
+        variant="secondary"
+        v-b-tooltip.hover.html
+        title="Discard progress and start over. <kbd>R</kbd>"
+        @click.prevent="initialize"
+      >
+        <i class="mdi mdi-restart" /> Start over
+      </b-button>
+      <!-- <b-button variant="outline-success" v-b-tooltip.hover title="Assign all safe objects to the current node." @click.prevent="saveResult">Save result</b-button> -->
+      <!-- <div>
         n_valid_pages: {{n_valid_pages}}, n_unsure_pages: {{n_unsure_pages}}, n_invalid_pages: {{n_invalid_pages}}, rec_interval_left: {{rec_interval_left}}, rec_interval_right: {{rec_interval_right}}
             </div>-->
-            <b-button
-                :disabled="!saved"
-                variant="secondary"
-                v-b-tooltip.hover.html
-                title="Continue with next node. <kbd>N</kbd>"
-                @click.prevent="next"
-            >
-                <i class="mdi mdi-chevron-right" /> Next
-            </b-button>
-        </div>
-        <message-log class="bg-light" :messages="messages" />
-        <b-modal
-            ref="doneModal"
-            centered
-            no-fade
-            header-bg-variant="success"
-            title="Bisection done"
-        >
-            <div class="d-block text-center">
-                Bisection is done for this project.
-            </div>
-            <footer slot="modal-footer">
-                <b-button variant="primary" :to="{ name: 'projects' }"
-                    >Back to projects</b-button
-                >
-            </footer>
-        </b-modal>
+      <b-button
+        :disabled="!saved"
+        variant="secondary"
+        v-b-tooltip.hover.html
+        title="Continue with next node. <kbd>N</kbd>"
+        @click.prevent="next"
+      >
+        <i class="mdi mdi-chevron-right" /> Next
+      </b-button>
     </div>
+    <message-log
+      class="bg-light"
+      :messages="messages"
+    />
+    <b-modal
+      ref="doneModal"
+      centered
+      no-fade
+      header-bg-variant="success"
+      title="Bisection done"
+    >
+      <div class="d-block text-center">
+        Bisection is done for this project.
+      </div>
+      <footer slot="modal-footer">
+        <b-button
+          variant="primary"
+          :to="{ name: 'projects' }"
+        >Back to projects</b-button>
+      </footer>
+    </b-modal>
+  </div>
 </template>
 
 <script>
@@ -216,7 +245,7 @@ import Vue from "vue";
 const MAX_N_RECOMMENDATIONS = 100000;
 
 export default {
-    name: "bisect",
+    name: "grow",
     data() {
         return {
             node_status: "",
@@ -404,7 +433,7 @@ export default {
                                 );
                             }
                             const to = {
-                                name: "bisect",
+                                name: "grow",
                                 params: {
                                     project_id: project_id,
                                     node_id: node_id
@@ -560,7 +589,7 @@ export default {
                 );
                 this.jump_pages *= 2;
             } else {
-                // Otherwise perform regular bisection
+                // Otherwise perform regular growing
                 this.rec_current_page = Math.trunc(
                     (1 - frac) * this.rec_interval_left +
                         frac * this.rec_interval_right
@@ -699,7 +728,7 @@ export default {
         },
         next() {
             this.$router.push({
-                name: "bisect",
+                name: "grow",
                 params: { project_id: this.project.project_id }
             });
         },
@@ -730,7 +759,7 @@ export default {
 </script>
 
 <style>
-#bisect {
+#grow {
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -738,7 +767,7 @@ export default {
     overflow: hidden;
 }
 
-#bisect > * {
+#grow > * {
     padding: 0 10px;
 }
 
