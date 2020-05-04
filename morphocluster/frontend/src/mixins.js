@@ -1,3 +1,5 @@
+import globalState from "@/globalState.js";
+
 export default {
     data() {
         return {
@@ -29,5 +31,14 @@ export default {
             this.messages.unshift(msg);
             console.log(error);
         },
+        setBreadcrumbs(bc) {
+            globalState.setBreadcrumbs(bc);
+        },
+        setLoading(name) {
+            globalState.setLoading(name);
+        },
+        unsetLoading(name) {
+            globalState.unsetLoading(name);
+        }
     }
 }

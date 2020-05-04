@@ -12,6 +12,7 @@ frontend = Blueprint(
 
 
 @frontend.route("/")
+@frontend.route("/datasets")
 @frontend.route("/datasets/<path:path>")
 def index(path=None):
     response = frontend.send_static_file("index.html")

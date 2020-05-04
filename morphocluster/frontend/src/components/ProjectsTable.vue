@@ -1,96 +1,83 @@
 <template>
     <div class="projects-table">
-        <b-table
+        <v-data-table
             id="projects_table"
-            striped
+            disable-filtering
+            disable-pagination
+            hide-default-footer
             sort-by="name"
             :items="projects"
-            :fields="fields"
-            showEmpty
+            :headers="headers"
         >
-            <template slot="table-colgroup">
-                <col class="col-wide" />
-                <col class="col-narrow" />
-            </template>
-            <template v-slot:cell(name)="data">
+            <template v-slot:no-data>No projects.</template>
+            <template v-slot:item.name="{ item }">
                 <router-link
                     :to="{
                         name: 'project',
-                        params: { project_id: data.item.project_id }
+                        params: { project_id: item.project_id }
                     }"
-                    >{{ data.item.name }}</router-link
-                >
+                >{{ item.name }}</router-link>
             </template>
-            <template v-slot:cell(progress)="data">
-                <b-progress
-                    v-if="'progress' in data.item"
-                    :max="data.item.progress.leaves_n_nodes"
-                >
-                    <b-progress-bar
-                        variant="success"
-                        :value="data.item.progress.leaves_n_filled_nodes"
-                        v-b-tooltip.hover
-                        :title="
-                            `${data.item.progress.leaves_n_filled_nodes} / ${data.item.progress.leaves_n_nodes} grown`
-                        "
-                    />
-                    <b-progress-bar
-                        variant="warning"
-                        :value="
-                            data.item.progress.leaves_n_approved_nodes -
-                                data.item.progress.leaves_n_filled_nodes
-                        "
-                        v-b-tooltip.hover
-                        :title="
-                            `${data.item.progress.leaves_n_approved_nodes} / ${data.item.progress.leaves_n_nodes} validated`
-                        "
-                    />
-                    <!-- <b-progress-bar variant="secondary" :value="data.item.progress.leaves_n_nodes - data.item.progress.leaves_n_approved_nodes" v-b-tooltip.hover :title="`${data.item.progress.leaves_n_nodes - data.item.progress.leaves_n_approved_nodes} / ${data.item.progress.leaves_n_nodes} untreated`" /> -->
-                </b-progress>
+            <template v-slot:item.progress="{ item }">
+                <v-tooltip top>
+                    <template v-slot:activator="{ on }">
+                        <v-progress-linear
+                            rounded
+                            color="warning"
+                            :value="item.progress.leaves_n_approved_nodes"
+                            v-on="on"
+                            height="10"
+                            class="my-1"
+                        />
+                    </template>
+                    <span>{{item.progress.leaves_n_approved_nodes}} / {{item.progress.leaves_n_nodes}} validated</span>
+                </v-tooltip>
+                <v-tooltip top>
+                    <template v-slot:activator="{ on }">
+                        <v-progress-linear
+                            rounded
+                            color="success"
+                            :value="item.progress.leaves_n_filled_nodes / item.progress.leaves_n_nodes * 100"
+                            v-on="on"
+                            height="10"
+                            class="my-1"
+                        />
+                    </template>
+                    <span>{{item.progress.leaves_n_filled_nodes}} / {{item.progress.leaves_n_nodes}} grown</span>
+                </v-tooltip>
             </template>
-            <template v-slot:cell(action)="data">
-                <b-button
+            <template v-slot:item.action="{ item }">
+                <v-btn
                     size="sm"
                     variant="primary"
                     class="mr-2"
                     :to="{
                         name: 'validate',
-                        params: { project_id: data.item.project_id }
+                        params: { project_id: item.project_id }
                     }"
-                    >Validate</b-button
-                >
-                <b-button
+                >Validate</v-btn>
+                <v-btn
                     size="sm"
                     variant="primary"
                     class="mr-2"
                     :to="{
                         name: 'grow',
-                        params: { project_id: data.item.project_id }
+                        params: { project_id: item.project_id }
                     }"
-                    >Grow</b-button
-                >
-                <b-button
-                    size="sm"
-                    variant="primary"
-                    class="mr-2"
-                    @click.prevent="showSaveModal(data.item)"
-                    >Save</b-button
-                >
+                >Grow</v-btn>
+                <v-btn size="sm" variant="primary" class="mr-2" @click.prevent="onSave(item)">Save</v-btn>
             </template>
-            <template slot="visible" slot-scope="data">{{
+            <template slot="visible" slot-scope="data">
+                {{
                 data.visible ? "yes" : "no"
-            }}</template>
+                }}
+            </template>
             <template slot="empty">
                 <div class="text-center">No projects available.</div>
-            </template>
-        </b-table>
-        <b-modal
-            ref="saveModal"
-            lazy
-            centered
-            :title="save_title"
-            @ok="HandleSaveOk"
-        >
+            </template>-->
+        </v-data-table>
+        <save-project-dialog :bus="bus" @success="onSaveSuccess" @error="onSaveError" />
+        <!-- <b-modal ref="saveModal" lazy centered :title="save_title" @ok="HandleSaveOk">
             <div class="d-block text-center">
                 <form @submit.stop.prevent="HandleSaveOk">
                     <b-container fluid>
@@ -113,73 +100,69 @@
                     </b-container>
                 </form>
             </div>
-        </b-modal>
+        </b-modal>-->
     </div>
 </template>
 
 <script>
+import Vue from "vue";
+
 import * as api from "@/helpers/api.js";
+import mixins from "@/mixins.js";
+
+// Components
+import SaveProjectDialog from "@/components/SaveProjectDialog.vue";
 
 export default {
     name: "projects-table",
     props: ["dataset_id"],
-    components: {},
+    components: { SaveProjectDialog },
+    mixins: [mixins],
     data() {
         return {
-            fields: [
-                //{ key: "project_id", sortable: true },
-                { key: "name", sortable: true },
-                "progress",
-                "action"
+            headers: [
+                { text: "Project name", value: "name", sortable: true },
+                {
+                    text: "Progress",
+                    value: "progress",
+                    width: "200px",
+                    sortable: false
+                },
+                { value: "action", sortable: false }
             ],
             projects: [],
             save_slug: "",
             save_title: "",
             save_project_id: null,
             save_saving: false,
-            alerts: []
+            alerts: [],
+            loading: true,
+
+            // Project about to be saved
+            save_project: null,
+
+            // Local event bus
+            bus: new Vue()
         };
     },
     methods: {
-        showSaveModal(project) {
-            console.log("project", project);
-            this.save_slug = project.name;
-            this.save_project_id = project.project_id;
-            this.save_title = `Save ${project.name} (${this.save_project_id})`;
-
-            this.$refs.saveModal.show();
+        onSave(project) {
+            console.log("showSaveModal");
+            this.bus.$emit("showSaveProjectDialog", project);
         },
-        HandleSaveOk(evt) {
-            evt.preventDefault();
-
-            console.log("Saving", this.save_project_id, "...");
-            this.save_saving = true;
-            api.saveProject(this.save_project_id).then(result => {
-                console.log("Project saved: " + result["tree_fn"]);
-                this.save_saving = false;
-                this.$nextTick(() => {
-                    // Wrapped in $nextTick to ensure DOM is rendered before closing
-                    this.$refs.saveModal.hide();
-                });
-            });
+        onSaveSuccess(result) {
+            console.log(result);
+        },
+        onSaveError(evt) {
+            console.log(evt);
         }
     },
     mounted() {
         // Load node info
-        api.datasetGetProjects(this.dataset_id)
+        this.setLoading("projects");
+        api.datasetGetProjects(this.dataset_id, true)
             .then(projects => {
                 this.projects = projects;
-
-                return Promise.all(
-                    this.projects.map(p => {
-                        return api
-                            .getNodeProgress(p.project_id, p.node_id)
-                            .then(progress => {
-                                console.log(`Got progress for ${p.node_id}.`);
-                                this.$set(p, "progress", progress);
-                            });
-                    })
-                );
             })
             .catch(e => {
                 console.log(e);
@@ -187,6 +170,10 @@ export default {
                     message: e.message,
                     variant: "danger"
                 });
+            })
+            .finally(() => {
+                this.loading = false;
+                this.unsetLoading("projects");
             });
     }
 };

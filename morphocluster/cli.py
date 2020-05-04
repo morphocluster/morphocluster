@@ -1,14 +1,10 @@
-import itertools
-import os
 from getpass import getpass
 
 import click
 import flask_migrate
-import h5py
 import pandas as pd
-from etaprogress.progress import ProgressBar
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.sql.expression import bindparam, select
+from sqlalchemy.sql.expression import select
 from timer_cm import Timer
 from werkzeug.security import generate_password_hash
 
@@ -67,26 +63,6 @@ def init_app(app):
 
         print("Cache was cleared.")
 
-    @app.cli.command()
-    def clear_projects():
-        """
-        Delete all project-related data.
-        """
-        print("Clearing projects.")
-        print("WARNING: This is a destructive operation and all data will be lost.")
-
-        if input("Continue? (y/n) ") != "y":
-            print("Canceled.")
-            return
-
-        # TODO: Cascade drop https://stackoverflow.com/a/38679457/1116842
-
-        print("Clearing project data...")
-        with database.engine.begin() as txn:
-            affected_tables = [models.nodes, models.projects, models.nodes_objects]
-            database.metadata.drop_all(txn, tables=affected_tables)
-            database.metadata.create_all(txn, tables=affected_tables)
-
     ###
     # dataset subcommand
     ###
@@ -116,7 +92,7 @@ def init_app(app):
             dataset = Dataset(dataset_id)
 
             for feature_fn in features_fns:
-                dataset.load_object_features(features_fn)
+                dataset.load_object_features(feature_fn)
 
     @dataset.command()
     @click.argument("dataset_id", type=int)
@@ -172,7 +148,7 @@ def init_app(app):
         connection = database.get_connection()
 
         with connection.begin():
-            with Project.create(name, dataset_id) as project:
+            with Project.create(name, dataset_id).lock() as project:
 
                 if tree_fn:
                     project.import_tree(tree_fn)
@@ -186,7 +162,7 @@ def init_app(app):
                         )
 
         print(
-            "Created project: {} (id {:d}) in {}.".format(
+            "Created project {} (id {:d}) in dataset {}.".format(
                 name, project.project_id, dataset_id
             )
         )
@@ -227,13 +203,6 @@ def init_app(app):
                     for k in sorted(prog.keys()):
                         print("{}: {}".format(k, prog[k]))
 
-    @app.cli.command()
-    @click.argument("root_id", type=int)
-    def connect_supertree(root_id):
-        with database.engine.connect() as conn:
-            tree = Tree(conn)
-            tree.connect_supertree(root_id)
-
     def _validate_consolidate_project_id(ctx, param, value):
         # We don't need these
         del ctx
@@ -258,32 +227,36 @@ def init_app(app):
             if project_id == "all":
                 print("Consolidating all projects...")
                 # root_ids = [p["node_id"] for p in tree.get_projects()]
+                raise NotImplementedError()
             elif project_id == "visible":
                 print("Consolidating visible projects...")
                 # root_ids = [p["node_id"] for p in tree.get_projects(True)]
+                raise NotImplementedError()
             else:
-                project_id = [project_id]
+                project_ids = [project_id]
 
             for pid in project_id:
                 with timer.child(str(pid)):
                     print(f"Consolidating project {pid}...")
-                    with Project(pid) as project:
+                    with Project(pid).lock() as project:
                         project.consolidate()
             print("Done.")
 
-    @app.cli.command()
+    ###
+    # user subcommand
+    ###
+    @app.cli.group()
+    def user():
+        pass
+
+    @user.command("add")
     @click.argument("username")
-    def add_user(username):
+    @click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True)
+    def user_add(username, password):
         print("Adding user {}:".format(username))
-        password = getpass("Password: ")
-        password_repeat = getpass("Retype Password: ")
 
         if not password:
             print("Password must not be empty!")
-            return
-
-        if password != password_repeat:
-            print("Passwords do not match!")
             return
 
         try:

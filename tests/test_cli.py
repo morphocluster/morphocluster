@@ -7,7 +7,8 @@ def test_load(flask_app, datadir):
     # Create dataset with objects and features
     result = runner.invoke(
         args=[
-            "create-dataset",
+            "dataset",
+            "create",
             "test_dataset",
             "test_user",
             "--objects",
@@ -27,7 +28,8 @@ def test_load(flask_app, datadir):
     # Load project
     result = runner.invoke(
         args=[
-            "create-project",
+            "project",
+            "create",
             "test_project",
             str(dataset_id),
             "--tree",

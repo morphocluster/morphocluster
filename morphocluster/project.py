@@ -1,3 +1,4 @@
+import contextlib
 import itertools
 import operator
 import typing as T
@@ -8,7 +9,6 @@ import pandas.api.types
 import tqdm
 from scipy.spatial.distance import cdist
 from sqlalchemy import func, select, update
-from sqlalchemy.engine import Transaction
 from sqlalchemy.sql import text
 from sqlalchemy.sql.elements import ClauseElement, literal_column
 from sqlalchemy.sql.expression import bindparam, literal
@@ -24,6 +24,7 @@ from morphocluster.models import (
     nodes_rejected_objects,
     objects,
     projects,
+    datasets,
 )
 
 
@@ -174,8 +175,6 @@ class Project:
         self._dataset_id = None
 
         self._connection = database.get_connection()
-        self._transactions: T.List[Transaction] = []
-        self._locked = 0
 
     @property
     def dataset_id(self):
@@ -194,14 +193,49 @@ class Project:
 
         return dataset_id
 
+    def get_dataset(self):
+        stmt = select([datasets]).where(
+            projects.c.project_id == self.project_id
+        ).limit(1)
+        dataset = self._connection.execute(stmt).fetchone()
+
+        if dataset is None:
+            raise ProjectError("Dataset not found")
+
+        return dict(dataset)
+
+
+    def lock(self):
+        return _ProjectLocker(self)
+
+
+class _ProjectLocker:
+    def __init__(self, project):
+        self.project = project
+
+    def __enter__(self) -> "_LockedProject":
+        self.project._connection.execute(
+            select([func.pg_advisory_xact_lock(self.project.project_id)])
+        )
+        return _LockedProject(self.project)
+
+    def __exit__(self, *_):
+        pass
+
+
+class _LockedProject:
+    def __init__(self, project):
+        self.project = project
+
+    def __getattr__(self, name):
+        return getattr(self.project, name)
+
     def import_tree(self, tree):
         """Fill the project with the supplied tree.
 
         Returns:
             A Project instance
         """
-
-        assert self._locked
 
         print("Loading {}...".format(tree))
 
@@ -264,8 +298,6 @@ class Project:
         Returns: node ID
         """
 
-        assert self._locked
-
         if node_id is None:
             stmt = select([func.max(nodes.c.node_id)]).where(
                 nodes.c.project_id == self.project_id
@@ -319,8 +351,6 @@ class Project:
         Optionally, save the tree to a file.
         """
 
-        assert self._locked
-
         if root_id is None:
             root_id = self.get_root_id()
 
@@ -357,6 +387,7 @@ class Project:
         node_objects = (
             select([nodes_objects.c.node_id, nodes_objects.c.object_id])
             .select_from(nodes_objects)
+            .where(nodes_objects.c.project_id == self.project_id)
             .where(nodes_objects.c.node_id == subtree.c.node_id)
         )
 
@@ -394,8 +425,6 @@ class Project:
             node_id of the project's root or None.
         """
 
-        assert self._locked
-
         stmt = select([nodes.c.node_id]).where(
             (nodes.c.parent_id == None) & (nodes.c.project_id == self.project_id)
         )
@@ -409,8 +438,6 @@ class Project:
     def to_dict(self) -> T.Dict:
         """Get the properties of the project as a dict.
         """
-
-        assert self._locked
 
         qroots = (
             select([nodes.c.project_id, nodes.c.node_id])
@@ -430,7 +457,7 @@ class Project:
 
         print(qprojects)
 
-        result = self._connection.execute(qprojects).first()
+        result = self._connection.execute(qprojects).fetchone()
 
         assert result is not None
 
@@ -445,8 +472,6 @@ class Project:
         # AND    x.object_id IN :object_ids
         # AND    x.project_id = :project_id AND y.project_id=:project_id
         # RETURNING y.node_id AS old_node_id, z.vector ORDER BY old_node_id;
-
-        assert self._locked
 
         if isinstance(object_ids_or_condition, ClauseElement):
             condition = object_ids_or_condition
@@ -565,7 +590,6 @@ class Project:
         return len(rows)
 
     def update_cached_values(self, node_ids, op, **values):
-        assert self._locked
 
         if op == "=":
             # Cache is invalidated if None in values
@@ -653,8 +677,6 @@ class Project:
         Returns:
             int: Number of nodes relocated.
         """
-
-        assert self._locked
 
         if isinstance(node_ids_or_condition, ClauseElement):
             condition = node_ids_or_condition
@@ -817,8 +839,6 @@ class Project:
             tuple: (n_relocated_objects, n_relocated_children)
         """
 
-        assert self._locked
-
         node_path = self.get_path(node_id)
 
         # Relocate objects
@@ -863,8 +883,6 @@ class Project:
             nodes_to_invalidate: Collection of `node_id`s
             unapprove (bool): Unapprove the specified nodes.
         """
-
-        assert self._locked
 
         values = {nodes.c.cache_valid: False}
 
@@ -939,11 +957,6 @@ class Project:
         )
         return [r for (r,) in result.fetchall()]
 
-    def delete(self):
-        """Delete this project from the database."""
-        assert self._locked
-        raise NotImplementedError()
-
     def get_children(self, node_id, require_valid=True, order_by=None, include=None):
         """
         Parameters:
@@ -958,8 +971,6 @@ class Project:
             A list children of node_id: [{"node_id": ..., }, ...]
 
         """
-
-        assert self._locked
 
         if require_valid:
             self.consolidate_node(node_id, depth="children")
@@ -980,8 +991,6 @@ class Project:
 
     def get_objects(self, node_id, offset=None, limit=None, order_by=None):
         """Get objects directly below a node."""
-
-        assert self._locked
 
         stmt = (
             select([objects])
@@ -1045,8 +1054,6 @@ class Project:
         """
         Save objects as rejected for a certain node_id to prevent further recommendation.
         """
-
-        assert self._locked
 
         if not object_ids:
             return
@@ -1173,7 +1180,7 @@ class Project:
                 return objects_[order].tolist()
 
     def get_next_node(
-        self, node_id, leaf=False, recurse_cb=None, filter=None, preferred_first=False
+        self, node_id=None, leaf=False, recurse_cb=None, filter=None, preferred_first=False
     ):
         """
         Get the id of the next unapproved node.
@@ -1186,6 +1193,9 @@ class Project:
             node_id
             leaf: Only return leaves.
         """
+
+        if node_id is None:
+            node_id = self.get_root_id()
 
         # First try if there are candidates below this node
         subtree = _rquery_subtree(self.project_id, node_id, recurse_cb)
@@ -1233,33 +1243,6 @@ class Project:
 
         return None
 
-    # Context manager protocol
-
-    def __enter__(self):
-        self._transactions.append(self._connection.begin())
-
-        try:
-            # Advisory lock for project_id
-            self._connection.execute(
-                select([func.pg_advisory_xact_lock(self.project_id)])
-            )
-            self._locked += 1
-        except:
-            self._transactions.pop().rollback()
-            raise
-
-        return self
-
-    def __exit__(self, type_, value, traceback):
-        txn: Transaction = self._transactions.pop()
-
-        if type_ is None and txn.is_active:
-            txn.commit()
-        else:
-            txn.rollback()
-
-        self._locked -= 1
-
     def remove(self):
         """Remove the project and all belonging entries from the database."""
         connection = database.get_connection()
@@ -1295,8 +1278,6 @@ class Project:
         Returns:
             pd.DataFrame
         """
-
-        assert self._locked
 
         invalid_subtree = _rquery_subtree(self.project_id, node_id, recurse_cb)
 
@@ -1361,8 +1342,6 @@ class Project:
         if exact_vector not in ("exact", "raise", "approx"):
             raise ValueError("exact_vector has to be one of exact, raise, approx")
 
-        assert self._locked
-
         if depth == -1:
             if descend_approved:
                 recurse_cb = None
@@ -1386,6 +1365,7 @@ class Project:
             return (
                 select([func.count()])
                 .select_from(nodes_objects)
+                .where(nodes_objects.c.project_id == self.project_id)
                 .where(nodes_objects.c.node_id == invalid_subtree.c.node_id)
                 .as_scalar()
                 .label("n_objects_own_")
@@ -1397,6 +1377,7 @@ class Project:
             return (
                 select([func.count()])
                 .select_from(children)
+                .where(children.c.project_id == self.project_id)
                 .where(children.c.parent_id == invalid_subtree.c.node_id)
                 .as_scalar()
                 .label("n_children_")
@@ -1628,7 +1609,7 @@ class Project:
 
                 print("Updated {:d} nodes.".format(n_updated))
 
-            # Drop updated__ column again to be compatible with Project.get_subtree
+            # Drop updated__ column again to be compatible with get_subtree
             invalid_subtree.drop(columns=["updated__"], inplace=True)
 
         if return_ == "node":
@@ -1643,7 +1624,6 @@ class Project:
             return invalid_subtree
 
     def reset_cached_values(self):
-        assert self._locked
 
         # Cached values are prefixed with an underscore
         values = {
@@ -1659,7 +1639,6 @@ class Project:
         self._connection.execute(stmt)
 
     def get_n_objects(self):
-        assert self._locked
 
         stmt = (
             select([func.count()])
@@ -1675,7 +1654,6 @@ class Project:
         return n_objects
 
     def get_n_nodes(self):
-        assert self._locked
 
         stmt = (
             select([func.count()])
@@ -1688,7 +1666,6 @@ class Project:
         return n_nodes
 
     def update_node(self, node_id, data):
-        assert self._locked
 
         allowed_fields = {
             "parent_id",
@@ -1722,14 +1699,18 @@ class Project:
                 & (old_nodes.c.node_id == nodes.c.node_id)
             )
             .returning(old_nodes)
-            .limit(1)
         )
 
-        old_data = self._connection.execute(stmt).fetchone()
+        result = self._connection.execute(stmt)
+
+        old_data = result.fetchone()
+
+        # Make sure we only got one row
+        assert result.fetchone() is None
 
         n_objects_ = old_data[old_nodes.c.n_objects_]
 
-        for flag_name in ("approved", "filled", "preferred"):
+        for flag_name in set(("approved", "filled", "preferred")).intersection(data.keys()):
             direction = data[flag_name] - old_data[flag_name]
             if direction == 0:
                 # No change
@@ -1743,7 +1724,6 @@ class Project:
             self.update_cached_values(path, op, **values)
 
     def consolidate(self):
-        assert self._locked
 
         root_id = self.get_root_id()
 

@@ -7,6 +7,6 @@ def test_auth(flask_client):
     assert response.status_code == 401
 
     # A request with authorization should not fail with 401
-    headers = {'Authorization': _basic_auth_str("test", "test")}
+    headers = {"Authorization": _basic_auth_str("test_user", "test_user")}
     response = flask_client.get("/", headers=headers)
     assert response.status_code != 401

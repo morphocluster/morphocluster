@@ -4,6 +4,7 @@ import h5py
 import numpy as np
 import pandas as pd
 import pytest
+import sqlalchemy.exc
 from numpy.testing import assert_allclose
 from pandas.testing import assert_frame_equal, assert_index_equal, assert_series_equal
 from timer_cm import Timer
@@ -19,42 +20,79 @@ def null2None(df):
     return df.where((pd.notnull(df)), None)
 
 
+def test_create_remove_dataset(flask_app):
+    connection = database.get_connection()
+    with connection.begin():
+        dataset = Dataset.create("test_dataset", "test_user")
+
+        dataset_root = dataset.root
+        dataset.remove()
+
+        assert not os.path.isdir(dataset_root)
+
+
 @pytest.fixture(name="dataset", scope="session")
 def _dataset(flask_app, datadir):
-    dataset = Dataset.create("test_dataset")
+    connection = database.get_connection()
+    with connection.begin():
+        print("Creating dataset... ", end="", flush=True)
+        dataset = Dataset.create("test_dataset", "test_user")
+        print(f"{dataset.dataset_id}.")
 
-    dataset.load_objects(datadir / "objects.zip")
-    dataset.load_object_features(datadir / "features.h5")
+        dataset.load_objects(datadir / "objects.zip")
+        dataset.load_object_features(datadir / "features.h5")
 
     yield dataset
 
-    dataset_root = dataset.root
-    dataset.remove()
+    try:
+        with connection.begin():
+            print(f"Removing dataset {dataset.dataset_id}... ")
+            dataset_root = dataset.root
+            dataset.remove()
+    except sqlalchemy.exc.ProgrammingError as exc:
+        print(exc)
 
-    assert not os.path.isdir(dataset_root)
+
+def test_objects_table_exists(dataset):
+    """Check that a partition exists for this database."""
+    connection = database.get_connection()
+
+    with connection.begin():
+        stmt = f"""
+            SELECT EXISTS 
+            (
+                SELECT 1
+                FROM information_schema.tables 
+                WHERE table_name = 'objects_{dataset.dataset_id}'
+            );"""
+        assert connection.execute(stmt).scalar()
 
 
 @pytest.fixture(name="project")
 def _project(dataset: Dataset, datadir):
-    print("Creating project...")
-    project: Project = dataset.create_project("test_project")
-
     connection = database.get_connection()
+    with connection.begin():
+        print(f"Creating project in {dataset.dataset_id}... ", end="", flush=True)
+        project: Project = dataset.create_project("test_project")
+        print(f"{project.project_id}.")
 
-    with project:
-        project.import_tree(datadir / "tree.zip")
+        with project.lock() as locked_project:
 
-        # Assert that a root ID exists at this point
-        project.get_root_id()
+            locked_project.import_tree(datadir / "tree.zip")
 
-    # Assert project is listed
-    projects = Project.get_all()
-    assert len(projects) == 1
+            # Assert that a root ID exists at this point
+            locked_project.get_root_id()
+
+        # Assert project is listed
+        projects = Project.get_all(dataset.dataset_id)
+        assert len(projects) == 1
 
     yield project
 
-    with project:
-        project.remove()
+    with connection.begin():
+        print(f"Removing project {project.project_id}... ")
+        with project.lock() as locked_project:
+            locked_project.remove()
 
 
 @pytest.fixture(name="orig_tree", scope="session")
@@ -111,9 +149,9 @@ def assert_all_valid_after_consolidate(tree):
 
 
 # Assert that consolidate_node works as expected
-def test_consolidate_node_raw(project, orig_tree, datadir):
+def test_consolidate_node_raw(project: Project, orig_tree, datadir):
     features_fn = str(datadir / "features.h5")
-    with project, h5py.File(features_fn, "r") as f_features:
+    with project.lock() as project, h5py.File(features_fn, "r") as f_features:
         object_ids = f_features["object_id"]
         vectors = f_features["features"]
 
@@ -154,7 +192,7 @@ def test_consolidate_node_raw(project, orig_tree, datadir):
 
 def test_match_imported(project, orig_tree):
     # Assert exported tree is the same as imported
-    with project:
+    with project.lock() as project:
         db_tree = project.export_tree()
 
         node_columns = sorted(orig_tree.nodes.columns)
@@ -189,8 +227,8 @@ def test_match_imported(project, orig_tree):
 
 
 def test_reentrancy(project: Project):
-    with project:
-        with project:
+    with project.lock() as project:
+        with project.lock():
             pass
 
     # TODO: Exception
@@ -199,13 +237,13 @@ def test_reentrancy(project: Project):
 def test_no_second_import(project: Project, datadir):
     # Assert project may not import a second tree
     with pytest.raises(ProjectError):
-        with project:
+        with project.lock() as project:
             project.import_tree(datadir / "tree.zip")
 
 
 def test_get_objects(project: Project, orig_tree: pd.DataFrame):
     # Assert that get_objects retrieves the right objects
-    with project:
+    with project.lock() as project:
         for node_id in orig_tree.nodes["node_id"]:
             db_objects = project.get_objects(node_id)
 
@@ -221,7 +259,7 @@ def test_get_objects(project: Project, orig_tree: pd.DataFrame):
 
 def test_create_node(project: Project):
     # Assert create_node can calculate node_id
-    with project:
+    with project.lock() as project:
         node_id = project.create_node()
         assert node_id is not None
 
@@ -309,7 +347,7 @@ def assert_all_valid_iff(df, condition, columns, extra_cb=None):
 
 def test_relocate_objects(project: Project, orig_tree: pd.DataFrame):
     # Assert relocate_objects recalculates the vectors
-    with project:
+    with project.lock() as project:
         root_id = project.get_root_id()
         n_objects = project.get_n_objects()
         n_nodes = project.get_n_nodes()
@@ -493,6 +531,7 @@ def test_relocate_objects(project: Project, orig_tree: pd.DataFrame):
             vector_sum_own_2,
             vector_sum_own_3,
             obj="vector_sum_own_2:vector_sum_own_3",
+            atol=1e-4,
         )
         # TODO: Increase precision by changing nodes.vector_sum_own_ back to Pickle type
         assert_vectors_equal(
@@ -537,7 +576,7 @@ def test_update_node():
 
 def test_merge_node(project: Project):
     # Assert relocate_objects recalculates the vectors
-    with project:
+    with project.lock() as project:
         root_id = project.get_root_id()
         n_objects = project.get_n_objects()
         n_nodes = project.get_n_nodes()
@@ -800,7 +839,7 @@ RELOCATE_NODES_INVARIANT_ROOT_BEFORE_AFTER = [
 
 
 def test_relocate_nodes(project: Project):
-    with project:
+    with project.lock() as project:
         root_id = project.get_root_id()
         n_objects = project.get_n_objects()
         n_nodes = project.get_n_nodes()

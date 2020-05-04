@@ -1,86 +1,75 @@
 <template>
-    <div id="datasets">
-        <nav class="navbar navbar-expand-lg navbar-light bg-dark">
-            <router-link class="navbar-brand text-light" to="/"
-                >MorphoCluster</router-link
-            >
-            <b-breadcrumb :items="breadcrumb"></b-breadcrumb>
-        </nav>
-        <div class="scrollable">
-            <div class="container">
-                <div class="alerts" v-if="alerts.length">
-                    <b-alert
-                        :key="a"
-                        v-for="a of alerts"
-                        dismissible
-                        show
-                        :variant="a.variant"
-                        >{{ a.message }}</b-alert
-                    >
-                </div>
-                <h1>Datasets</h1>
-                <b-table
-                    id="datasets_table"
-                    striped
-                    sort-by="name"
-                    :items="datasets"
-                    :fields="fields"
-                    showEmpty
-                >
-                    <template v-slot:cell(name)="data">
-                        <router-link
-                            :to="{
-                                name: 'dataset',
-                                params: { dataset_id: data.item.dataset_id }
-                            }"
-                            >{{ data.item.name }}</router-link
-                        >
-                    </template>
-                    <template slot="empty">
-                        <div class="text-center">No datasets available.</div>
-                    </template>
-                </b-table>
-                <!--<b-button
-                    size="sm"
-                    variant="success"
-                    class="mr-2 float-right"
-                    :to="{name: 'datasets-add'}"
-                >
-                    <i class="mdi mdi-plus" /> Add dataset
-                </b-button>-->
+    <div id="datasets" class="view">
+        <div class="container">
+            <div class="alerts" v-if="alerts.length">
+                <b-alert
+                    :key="a"
+                    v-for="a of alerts"
+                    dismissible
+                    show
+                    :variant="a.variant"
+                >{{ a.message }}</b-alert>
             </div>
+            <h1>Datasets</h1>
+            <v-data-table
+                id="datasets_table"
+                sort-by="name"
+                :items="datasets"
+                :headers="headers"
+                disable-filtering
+                disable-pagination
+                hide-default-footer
+            >
+                <template v-slot:no-data>No datasets.</template>
+                <template v-slot:item.name="{ item }">
+                    <router-link
+                        :to="{
+                                name: 'dataset',
+                                params: { dataset_id: item.dataset_id }
+                            }"
+                    >{{ item.name }}</router-link>
+                </template>
+                <template slot="empty">
+                    <div class="text-center">No datasets available.</div>
+                </template>
+            </v-data-table>
+            <v-row>
+                <v-spacer />
+                <v-btn :to="{name: 'datasets-create'}">
+                    <v-icon>mdi-plus</v-icon>Create dataset
+                </v-btn>
+            </v-row>
         </div>
     </div>
 </template>
 
 <script>
-import "@mdi/font/css/materialdesignicons.css";
 import * as api from "@/helpers/api.js";
+import mixins from "@/mixins.js";
 
 export default {
     name: "datasets",
     props: {},
     components: {},
+    mixins: [mixins],
     data() {
         return {
-            fields: [
-                { key: "name", sortable: true }
+            headers: [
+                { value: "name", text: "Name", sortable: true }
                 //"action"
             ],
             datasets: [],
-            alerts: [],
-            breadcrumb: [
-                {
-                    text: "Datasets"
-                }
-            ]
+            alerts: []
         };
     },
     methods: {},
-    mounted() {
+    created() {
+        this.setLoading("datasets");
         api.datasetsGetAll()
             .then(datasets => {
                 this.datasets = datasets;
+                // Update breadcrumb
+                this.setBreadcrumbs([{ text: "Datasets" }]);
             })
             .catch(e => {
                 console.log(e);
@@ -88,6 +77,9 @@ export default {
                     message: e.message,
                     variant: "danger"
                 });
+            })
+            .finally(() => {
+                this.unsetLoading("datasets");
             });
     }
 };

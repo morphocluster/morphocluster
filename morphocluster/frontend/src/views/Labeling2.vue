@@ -5,11 +5,7 @@
             <node-header v-if="node" :node="node" />
 
             <div class="row">
-                <div
-                    v-for="m in node_members"
-                    class="col col-1"
-                    :key="getUniqueId(m)"
-                >
+                <div v-for="m in node_members" class="col col-1" :key="getUniqueId(m)">
                     <member-preview v-bind:member="m" />
                 </div>
             </div>
@@ -109,11 +105,6 @@ export default {
 
 #labeling2 > * {
     padding: 0 10px;
-}
-
-.scrollable {
-    margin: 0;
-    overflow-y: auto;
 }
 
 #node-members .col,

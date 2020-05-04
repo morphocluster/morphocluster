@@ -23,8 +23,8 @@ from sqlalchemy.types import (
     Text,
 )
 
-from morphocluster.extensions import database as db
 from morphocluster.cube import Cube
+from morphocluster.extensions import database as db
 
 metadata = db.metadata
 
@@ -61,6 +61,7 @@ objects = Table(
     PrimaryKeyConstraint("dataset_id", "object_id", name="objects_pk"),
     postgresql_partition_by="LIST(dataset_id)",
 )
+
 
 #: :type projects: sqlalchemy.sql.schema.Table
 projects = Table(
