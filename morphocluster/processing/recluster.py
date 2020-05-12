@@ -28,10 +28,7 @@ def _subsample_dataset(sample_size, dataset):
     features = features[idx]
     objids = objids.iloc[idx].reset_index(drop=True)
 
-    return {
-        "features": features,
-        "objids": objids
-    }
+    return {"features": features, "objids": objids}
 
 
 class Recluster:
@@ -54,15 +51,17 @@ class Recluster:
             dataset = {
                 "features": f_features["features"][:],
                 # Sometimes, objids are still ints (which is wrong)
-                "objids": pd.Series(f_features["objids"][:]).astype(str)
+                "objids": pd.Series(f_features["objids"][:]).astype(str),
             }
 
         if append and self.dataset is not None:
-            self.dataset["features"] = np.concatenate((self.dataset["features"],
-                                                       dataset["features"]))
+            self.dataset["features"] = np.concatenate(
+                (self.dataset["features"], dataset["features"])
+            )
 
-            self.dataset["objids"] = pd.concat((self.dataset["objids"],
-                                                dataset["objids"]))
+            self.dataset["objids"] = pd.concat(
+                (self.dataset["objids"], dataset["objids"])
+            )
         else:
             self.dataset = dataset
 
@@ -94,49 +93,63 @@ class Recluster:
             approved_nodes_selector = tree.nodes["approved"] == True
             approved_node_ids = tree.nodes.loc[approved_nodes_selector, "node_id"]
 
-            approved_objects_selector = tree.objects["node_id"].isin(
-                approved_node_ids)
+            approved_objects_selector = tree.objects["node_id"].isin(approved_node_ids)
 
             n_objects = len(tree.objects)
             n_approved_objects = approved_objects_selector.sum()
 
             approved_objids.append(
-                tree.objects.loc[approved_objects_selector, "object_id"])
+                tree.objects.loc[approved_objects_selector, "object_id"]
+            )
 
             tree_objids.append(tree.objects["object_id"])
 
-            print(" Approved objects: {:,d} / {:,d} ({:.2%})".format(
-                n_approved_objects, n_objects, (n_approved_objects / n_objects)))
-            print(" Unapproved objects: {:,d} / {:,d} ({:.2%})".format(
-                n_objects - n_approved_objects, n_objects, ((n_objects - n_approved_objects) / n_objects)))
+            print(
+                " Approved objects: {:,d} / {:,d} ({:.2%})".format(
+                    n_approved_objects, n_objects, (n_approved_objects / n_objects)
+                )
+            )
+            print(
+                " Unapproved objects: {:,d} / {:,d} ({:.2%})".format(
+                    n_objects - n_approved_objects,
+                    n_objects,
+                    ((n_objects - n_approved_objects) / n_objects),
+                )
+            )
 
-        approved_objids = pd.concat(
-            approved_objids).drop_duplicates().reset_index(drop=True)
+        approved_objids = (
+            pd.concat(approved_objids).drop_duplicates().reset_index(drop=True)
+        )
 
-        tree_objids = pd.concat(
-            tree_objids).drop_duplicates().reset_index(drop=True)
+        tree_objids = pd.concat(tree_objids).drop_duplicates().reset_index(drop=True)
 
         # This is faster than np.isin
         dataset_objids = pd.Series(self.dataset["objids"])
         dataset_available_selector = dataset_objids.isin(tree_objids)
         n_dataset_available = dataset_available_selector.sum()
 
-        print("Availability (dset/both/tree): {:,d} / {:,d} / {:,d}".format(
-            len(dataset_available_selector) - n_dataset_available,
-            n_dataset_available,
-            len(tree_objids) - n_dataset_available))
+        print(
+            "Availability (dset/both/tree): {:,d} / {:,d} / {:,d}".format(
+                len(dataset_available_selector) - n_dataset_available,
+                n_dataset_available,
+                len(tree_objids) - n_dataset_available,
+            )
+        )
 
         dataset_selector = ~dataset_objids.isin(approved_objids)
 
         n_selected = dataset_selector.sum()
         n_total = len(dataset_objids)
 
-        print("Unapproved objects present in dataset: {:,d} / {:,d} ({:.2%})".format(
-            n_selected, n_total, (n_selected / n_total)))
+        print(
+            "Unapproved objects present in dataset: {:,d} / {:,d} ({:.2%})".format(
+                n_selected, n_total, (n_selected / n_total)
+            )
+        )
 
         return {
             "features": self.dataset["features"][dataset_selector],
-            "objids": dataset_objids[dataset_selector].reset_index(drop=True)
+            "objids": dataset_objids[dataset_selector].reset_index(drop=True),
         }
 
     def cluster(self, ignore_approved=True, sample_size=None, **kwargs):

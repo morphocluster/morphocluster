@@ -19,11 +19,11 @@ from morphocluster.tree import Tree
 
 def _add_user(username, password):
     pwhash = generate_password_hash(
-        password, method='pbkdf2:sha256:10000', salt_length=12)
+        password, method="pbkdf2:sha256:10000", salt_length=12
+    )
 
     with database.engine.connect() as conn:
-        stmt = models.users.insert(
-            {"username": username, "pwhash": pwhash})
+        stmt = models.users.insert({"username": username, "pwhash": pwhash})
         conn.execute(stmt)
 
 
@@ -56,7 +56,8 @@ def init_app(app):
         with database.engine.begin() as txn:
             # Cached values are prefixed with an underscore
             cached_columns = list(
-                c for c in models.nodes.columns.keys() if c.startswith("_"))
+                c for c in models.nodes.columns.keys() if c.startswith("_")
+            )
             values = {c: None for c in cached_columns}
             values["cache_valid"] = False
             stmt = models.nodes.update().values(values)
@@ -80,13 +81,12 @@ def init_app(app):
 
         print("Clearing project data...")
         with database.engine.begin() as txn:
-            affected_tables = [models.nodes,
-                               models.projects, models.nodes_objects]
+            affected_tables = [models.nodes, models.projects, models.nodes_objects]
             database.metadata.drop_all(txn, tables=affected_tables)
             database.metadata.create_all(txn, tables=affected_tables)
 
     @app.cli.command()
-    @click.argument('collection_fn')
+    @click.argument("collection_fn")
     def load_object_locations(collection_fn):
         """
         Load a collection of objects.
@@ -94,10 +94,12 @@ def init_app(app):
         # Load collections
         with database.engine.begin() as txn:
             print("Loading {}...".format(collection_fn))
-            data = pd.read_csv(collection_fn,
-                               header=None,
-                               names=["object_id", "path", "label"],
-                               usecols=["object_id", "path"])
+            data = pd.read_csv(
+                collection_fn,
+                header=None,
+                names=["object_id", "path", "label"],
+                usecols=["object_id", "path"],
+            )
 
             data_iter = data.itertuples()
             bar = ProgressBar(len(data), max_width=40)
@@ -105,8 +107,7 @@ def init_app(app):
                 chunk = tuple(itertools.islice(data_iter, 5000))
                 if not chunk:
                     break
-                txn.execute(models.objects.insert(),
-                            [row._asdict() for row in chunk])
+                txn.execute(models.objects.insert(), [row._asdict() for row in chunk])
 
                 bar.numerator += len(chunk)
                 print(bar, end="\r")
@@ -114,22 +115,24 @@ def init_app(app):
             print("Done.")
 
     @app.cli.command()
-    @click.argument('features_fns', nargs=-1)
+    @click.argument("features_fns", nargs=-1)
     def load_features(features_fns):
         """
         Load object features from an HDF5 file.
         """
         for features_fn in features_fns:
             print("Loading {}...".format(features_fn))
-            with h5py.File(features_fn, "r", libver="latest") as f_features, database.engine.begin() as conn:
+            with h5py.File(
+                features_fn, "r", libver="latest"
+            ) as f_features, database.engine.begin() as conn:
                 object_ids = f_features["objids"]
                 vectors = f_features["features"]
 
-                stmt = (models.objects.update()
-                        .where(models.objects.c.object_id == bindparam('_object_id'))
-                        .values({
-                            'vector': bindparam('vector')
-                        }))
+                stmt = (
+                    models.objects.update()
+                    .where(models.objects.c.object_id == bindparam("_object_id"))
+                    .values({"vector": bindparam("vector")})
+                )
 
                 bar = ProgressBar(len(object_ids), max_width=40)
                 obj_iter = iter(zip(object_ids, vectors))
@@ -137,8 +140,13 @@ def init_app(app):
                     chunk = tuple(itertools.islice(obj_iter, 1000))
                     if not chunk:
                         break
-                    conn.execute(stmt, [{"_object_id": str(object_id), "vector": vector} for (
-                        object_id, vector) in chunk])
+                    conn.execute(
+                        stmt,
+                        [
+                            {"_object_id": str(object_id), "vector": vector}
+                            for (object_id, vector) in chunk
+                        ],
+                    )
 
                     bar.numerator += len(chunk)
                     print(bar, end="\r")
@@ -146,9 +154,9 @@ def init_app(app):
                 print("Done.")
 
     @app.cli.command()
-    @click.argument('tree_fn')
-    @click.argument('project_name', default=None)
-    @click.option('--consolidate/--no-consolidate', default=True)
+    @click.argument("tree_fn")
+    @click.argument("project_name", default=None)
+    @click.option("--consolidate/--no-consolidate", default=True)
     def load_project(tree_fn, project_name, consolidate):
         """
         Load a project from a saved tree.
@@ -161,10 +169,8 @@ def init_app(app):
                 project_name = os.path.basename(os.path.splitext(tree_fn)[0])
 
             with conn.begin():
-                print("Loading {}...".format(
-                    tree_fn))
-                project_id = tree.load_project(
-                    project_name, tree_fn)
+                print("Loading {}...".format(tree_fn))
+                project_id = tree.load_project(project_name, tree_fn)
                 root_id = tree.get_root_id(project_id)
 
                 if consolidate:
@@ -175,8 +181,8 @@ def init_app(app):
             print("Project ID: {}".format(project_id))
 
     @app.cli.command()
-    @click.argument('root_id', type=int)
-    @click.argument('tree_fn')
+    @click.argument("root_id", type=int)
+    @click.argument("tree_fn")
     def export_tree(root_id, tree_fn):
         """
         Export the whole tree with its objects.
@@ -187,8 +193,8 @@ def init_app(app):
             tree.export_tree(root_id, tree_fn)
 
     @app.cli.command()
-    @click.argument('root_id', type=int, required=False)
-    @click.option('--log/--no-log', "log", default=False)
+    @click.argument("root_id", type=int, required=False)
+    @click.option("--log/--no-log", "log", default=False)
     def progress(root_id, log):
         """
         Report progress on a tree
@@ -211,7 +217,7 @@ def init_app(app):
                         print("{}: {}".format(k, prog[k]))
 
     @app.cli.command()
-    @click.argument('root_id', type=int)
+    @click.argument("root_id", type=int)
     def connect_supertree(root_id):
         with database.engine.connect() as conn:
             tree = Tree(conn)
@@ -228,11 +234,10 @@ def init_app(app):
         try:
             return int(value)
         except ValueError:
-            raise click.BadParameter(
-                'root_id can be "all", "visible" or an actual id.')
+            raise click.BadParameter('root_id can be "all", "visible" or an actual id.')
 
     @app.cli.command()
-    @click.argument('root_id', default="visible", callback=validate_consolidate_root_id)
+    @click.argument("root_id", default="visible", callback=validate_consolidate_root_id)
     def consolidate(root_id):
         with database.engine.connect() as conn, Timer("Consolidate") as timer:
             tree = Tree(conn)
@@ -254,7 +259,7 @@ def init_app(app):
             print("Done.")
 
     @app.cli.command()
-    @click.argument('username')
+    @click.argument("username")
     def add_user(username):
         print("Adding user {}:".format(username))
         password = getpass("Password: ")
@@ -274,7 +279,7 @@ def init_app(app):
             print(e)
 
     @app.cli.command()
-    @click.argument('username')
+    @click.argument("username")
     def change_user(username):
         print("Changing user {}:".format(username))
         password = getpass("Password: ")
@@ -285,43 +290,46 @@ def init_app(app):
             return
 
         pwhash = generate_password_hash(
-            password, method='pbkdf2:sha256:10000', salt_length=12)
+            password, method="pbkdf2:sha256:10000", salt_length=12
+        )
 
         try:
             with database.engine.connect() as conn:
-                stmt = models.users.insert(
-                    {"username": username, "pwhash": pwhash})
+                stmt = models.users.insert({"username": username, "pwhash": pwhash})
                 conn.execute(stmt)
         except IntegrityError as e:
             print(e)
 
     @app.cli.command()
-    @click.argument('root_id')
-    @click.argument('classification_fn')
+    @click.argument("root_id")
+    @click.argument("classification_fn")
     def export_classifications(root_id, classification_fn):
         with database.engine.connect() as conn:
             tree = Tree(conn)
             tree.export_classifications(root_id, classification_fn)
 
     @app.cli.command()
-    @click.argument('node_id')
-    @click.argument('filename')
+    @click.argument("node_id")
+    @click.argument("filename")
     def export_direct_objects(node_id, filename):
         with database.engine.connect() as conn, open(filename, "w") as f:
             tree = Tree(conn)
 
-            f.writelines("{}\n".format(o["object_id"])
-                         for o in tree.get_objects(node_id))
+            f.writelines(
+                "{}\n".format(o["object_id"]) for o in tree.get_objects(node_id)
+            )
 
     @app.cli.command()
-    @click.argument('filename')
+    @click.argument("filename")
     def export_log(filename):
         with database.engine.connect() as conn:
             log = pd.read_sql_query(
-                select([models.log, models.nodes.c.project_id])
-                .select_from(models.log.outerjoin(models.nodes)),
+                select([models.log, models.nodes.c.project_id]).select_from(
+                    models.log.outerjoin(models.nodes)
+                ),
                 conn,
-                index_col="log_id")
+                index_col="log_id",
+            )
             log.to_csv(filename)
 
     @app.cli.command()

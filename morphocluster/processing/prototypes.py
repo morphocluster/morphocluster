@@ -10,7 +10,7 @@ from sklearn.utils.validation import check_is_fitted
 
 
 def _check_is_clusterer(clusterer):
-    attributes = ('fit_predict', 'n_clusters')
+    attributes = ("fit_predict", "n_clusters")
     if not all(hasattr(clusterer, attr) for attr in attributes):
         raise TypeError("%s is not a proper clusterer instance." % (clusterer))
 
@@ -67,7 +67,7 @@ class Prototypes:
         self.prototypes_ = self.clusterer.cluster_centers_
         self.support_ = np.bincount(labels)
 
-    def transform(self, X, metric='euclidean', **kwargs):
+    def transform(self, X, metric="euclidean", **kwargs):
         """
         Compute distance for every row in X.
 
@@ -99,7 +99,7 @@ class Prototypes:
 
         return distances
 
-    def distance(self, other, metric='euclidean', **kwargs):
+    def distance(self, other, metric="euclidean", **kwargs):
         """
         Compute the distance of self to another Prototypes object.
 
@@ -108,14 +108,13 @@ class Prototypes:
             in Proceedings of 12th International Conference on Pattern Recognition.
             IEEE Comput. Soc. Press, pp. 566–568. doi: 10.1109/ICPR.1994.576361.
         """
-        dist_matrix = cdist(
-            other.prototypes, self.prototypes_, metric=metric, **kwargs)
+        dist_matrix = cdist(other.prototypes, self.prototypes_, metric=metric, **kwargs)
 
         return max(np.mean(np.min(dist_matrix, axis=a)) for a in (0, 1))
 
 
 class PrototypeClassifier(ClassifierMixin):
-    def __init__(self, clusterer, metric='euclidean', n_classes=None):
+    def __init__(self, clusterer, metric="euclidean", n_classes=None):
         self.metric = metric
         self.clusterer = clusterer
         self.n_classes = n_classes
@@ -145,11 +144,11 @@ class PrototypeClassifier(ClassifierMixin):
             self.prototypes_[label] = prototypes
 
     def predict_score(self, X, _softmax=True):
-        check_is_fitted(self, 'prototypes_')
+        check_is_fitted(self, "prototypes_")
 
         distances = np.inf + np.zeros(
-            (X.shape[0], max(self.prototypes_.keys()) + 1),
-            dtype=X.dtype)
+            (X.shape[0], max(self.prototypes_.keys()) + 1), dtype=X.dtype
+        )
 
         for label, prototypes in self.prototypes_.items():
             try:
@@ -174,7 +173,7 @@ class PrototypeClassifier(ClassifierMixin):
         ...
 
 
-def merge_prototypes(children, k, metric='euclidean'):
+def merge_prototypes(children, k, metric="euclidean"):
     """
     Merge a number of prototypes of a list of children so that k new prototypes result.
 
@@ -186,7 +185,8 @@ def merge_prototypes(children, k, metric='euclidean'):
     Returns: Prototypes object
     """
     clusterer = AgglomerativeClustering(
-        n_clusters=k, affinity=metric, linkage="complete")
+        n_clusters=k, affinity=metric, linkage="complete"
+    )
 
     if not children:
         return Prototypes(None)
@@ -208,11 +208,9 @@ def merge_prototypes(children, k, metric='euclidean'):
     unique_labels = np.unique(labels)
 
     new_prototypes = np.empty(
-        (unique_labels.shape[0], prototypes_.shape[1]),
-        prototypes_.dtype)
-    new_support = np.empty(
-        (unique_labels.shape[0]),
-        support_.dtype)
+        (unique_labels.shape[0], prototypes_.shape[1]), prototypes_.dtype
+    )
+    new_support = np.empty((unique_labels.shape[0]), support_.dtype)
 
     for label in unique_labels:
         mask = labels == label

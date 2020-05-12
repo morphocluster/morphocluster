@@ -1,8 +1,8 @@
-'''
+"""
 Created on 23.05.2018
 
 @author: mschroeder
-'''
+"""
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_redis import FlaskRedis

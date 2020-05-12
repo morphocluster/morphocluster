@@ -1,12 +1,13 @@
-'''
+"""
 Created on 10.08.2018
 
 @author: mschroeder
-'''
+"""
 
 import numpy as np
 from collections.abc import Sequence
 from morphocluster.helpers import seq2array
+
 
 class MemberCollection(Sequence):
     """
@@ -19,18 +20,21 @@ class MemberCollection(Sequence):
         none_action: "raise" | "zero" | "remove"
             How to deal with None vector values.
     """
-    
+
     def __init__(self, members, none_action="raise"):
         self.members = members
         self.none_action = none_action
-        
+
     @property
     def vectors(self):
         try:
             return self._vectors
         except AttributeError:
-            vectors = [ m["_centroid"] if "_centroid" in m else m["vector"] for m in self.members ]
-            
+            vectors = [
+                m["_centroid"] if "_centroid" in m else m["vector"]
+                for m in self.members
+            ]
+
             if self.none_action == "raise":
                 self._vectors = np.array(vectors)
             elif self.none_action == "zero":
@@ -39,7 +43,7 @@ class MemberCollection(Sequence):
                 self._vectors = np.array([v for v in vectors if v is not None])
             else:
                 NotImplementedError(self.none_action)
-                
+
             return self._vectors
 
     @property
@@ -47,12 +51,15 @@ class MemberCollection(Sequence):
         try:
             return self._cardinalities
         except AttributeError:
-            cardinalities = [ m["_n_objects_deep"] if "_n_objects_deep" in m else 1 for m in self.members ]
-            
+            cardinalities = [
+                m["_n_objects_deep"] if "_n_objects_deep" in m else 1
+                for m in self.members
+            ]
+
             self._cardinalities = np.array(cardinalities)
-                
+
             return self._cardinalities
-        
+
     # Abstract methods
     def __getitem__(self, index):
         return self.members[index]

@@ -14,7 +14,7 @@ def validate_background_job(fun):
 
 @rq.job
 def add(x, y):
-    return x+y
+    return x + y
 
 
 @rq.job
@@ -28,10 +28,12 @@ def export_project(project_id):
         project = db_tree.get_project(project_id)
         tree = db_tree.dump_tree(root_id)
 
-    tree_fn = os.path.join(config["PROJECT_EXPORT_DIR"],
-                           "{:%Y-%m-%d-%H-%M-%S}--{}--{}.zip".format(dt.datetime.now(),
-                                                                     project["project_id"],
-                                                                     project["name"]))
+    tree_fn = os.path.join(
+        config["PROJECT_EXPORT_DIR"],
+        "{:%Y-%m-%d-%H-%M-%S}--{}--{}.zip".format(
+            dt.datetime.now(), project["project_id"], project["name"]
+        ),
+    )
 
     tree.save(tree_fn)
 
@@ -71,7 +73,8 @@ def recluster_project(project_id, min_cluster_size):
         sample_size=sample_size,
         min_cluster_size=min_cluster_size,
         min_samples=1,
-        cluster_selection_method="leaf")
+        cluster_selection_method="leaf",
+    )
 
     tree = recluster.merge_trees()
 
@@ -83,8 +86,7 @@ def recluster_project(project_id, min_cluster_size):
         db_tree = Tree(conn)
 
         with conn.begin():
-            project_id = db_tree.load_project(
-                project_name, tree)
+            project_id = db_tree.load_project(project_name, tree)
             root_id = db_tree.get_root_id(project_id)
 
             print("Consolidating ...")

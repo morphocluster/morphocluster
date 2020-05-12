@@ -1,8 +1,8 @@
-'''
+"""
 Created on 19.03.2018
 
 @author: mschroeder
-'''
+"""
 import json
 import os
 import uuid
@@ -46,7 +46,7 @@ def batch(iterable, n=1):
     """
     l = len(iterable)
     for ndx in range(0, l, n):
-        yield iterable[ndx:min(ndx + n, l)]
+        yield iterable[ndx : min(ndx + n, l)]
 
 
 def json_converter(value):
@@ -80,11 +80,15 @@ def log(connection, action, node_id=None, reverse_action=None, data=None):
     auth = request.authorization
     username = auth.username if auth is not None else None
 
-    stmt = models.log.insert({'node_id': node_id,
-                              'username': username,
-                              'action': action,
-                              'reverse_action': reverse_action,
-                              'data': data})
+    stmt = models.log.insert(
+        {
+            "node_id": node_id,
+            "username": username,
+            "action": action,
+            "reverse_action": reverse_action,
+            "data": data,
+        }
+    )
 
     connection.execute(stmt)
 
@@ -96,10 +100,12 @@ def record(state):
 
 @api.after_request
 def api_headers(response):
-    response.headers['Last-Modified'] = datetime.now()
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '-1'
+    response.headers["Last-Modified"] = datetime.now()
+    response.headers[
+        "Cache-Control"
+    ] = "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "-1"
 
     return response
 
@@ -112,6 +118,7 @@ def _node_icon(node):
         return "mdi mdi-check-decagram"
 
     return "mdi mdi-hexagon-multiple"
+
 
 # ===============================================================================
 # /tree
@@ -131,8 +138,10 @@ def _tree_node(node, supertree=False):
     result = {
         "id": node["node_id"],
         "text": "{} ({})".format(node["name"] or node["node_id"], node["_n_children"]),
-        "children": node["n_superchildren"] > 0 if supertree else node["_n_children"] > 0,
-        "icon": _node_icon(node)
+        "children": node["n_superchildren"] > 0
+        if supertree
+        else node["_n_children"] > 0,
+        "icon": _node_icon(node),
     }
 
     return result
@@ -156,7 +165,8 @@ def get_subtree(node_id):
 
         if flags["supertree"]:
             children = tree.get_children(
-                node_id, supertree=True, include="starred", order_by="_n_children DESC")
+                node_id, supertree=True, include="starred", order_by="_n_children DESC"
+            )
         else:
             children = tree.get_children(node_id, order_by="_n_children DESC")
 
@@ -234,16 +244,17 @@ def save_project(project_id):
 
         root_id = tree.get_root_id(project_id)
 
-        tree_fn = os.path.join(api.config["PROJECT_EXPORT_DIR"],
-                               "{:%Y-%m-%d-%H-%M-%S}--{}--{}.zip".format(datetime.now(),
-                                                                         project["project_id"],
-                                                                         project["name"]))
+        tree_fn = os.path.join(
+            api.config["PROJECT_EXPORT_DIR"],
+            "{:%Y-%m-%d-%H-%M-%S}--{}--{}.zip".format(
+                datetime.now(), project["project_id"], project["name"]
+            ),
+        )
 
         tree.export_tree(root_id, tree_fn)
 
-        return jsonify({
-            "tree_fn": tree_fn,
-        })
+        return jsonify({"tree_fn": tree_fn,})
+
 
 # ===============================================================================
 # /nodes
@@ -266,8 +277,7 @@ def create_node():
         tree = Tree(connection)
         data = request.get_json()
 
-        object_ids = [m["object_id"]
-                      for m in data["members"] if "object_id" in m]
+        object_ids = [m["object_id"] for m in data["members"] if "object_id" in m]
         node_ids = [m["node_id"] for m in data["members"] if "node_id" in m]
 
         project_id = data.get("project_id", None)
@@ -284,7 +294,8 @@ def create_node():
 
         with connection.begin():
             node_id = tree.create_node(
-                int(project_id), parent_id=parent_id, name=name, starred=starred)
+                int(project_id), parent_id=parent_id, name=name, starred=starred
+            )
 
             tree.relocate_nodes(node_ids, node_id)
 
@@ -326,8 +337,9 @@ def _node(tree, node, include_children=False):
     }
 
     if include_children:
-        result["children"] = [_node(tree, c)
-                              for c in tree.get_children(node["node_id"])]
+        result["children"] = [
+            _node(tree, c) for c in tree.get_children(node["node_id"])
+        ]
 
     return result
 
@@ -347,19 +359,21 @@ def _arrange_by_sim(result):
         return ()
 
     # Get vector values
-    vectors = seq2array([m["_centroid"] if "_centroid" in m else m["vector"] for m in result],
-                        len(result))
+    vectors = seq2array(
+        [m["_centroid"] if "_centroid" in m else m["vector"] for m in result],
+        len(result),
+    )
 
     if vectors.shape[0] <= ISOMAP_FIT_SUBSAMPLE_N:
         subsample = vectors
     else:
-        idxs = np.random.choice(
-            vectors.shape[0], ISOMAP_FIT_SUBSAMPLE_N, replace=False)
+        idxs = np.random.choice(vectors.shape[0], ISOMAP_FIT_SUBSAMPLE_N, replace=False)
         subsample = vectors[idxs]
 
     try:
-        isomap = Isomap(
-            n_components=1, n_neighbors=ISOMAP_N_NEIGHBORS, n_jobs=4).fit(subsample)
+        isomap = Isomap(n_components=1, n_neighbors=ISOMAP_N_NEIGHBORS, n_jobs=4).fit(
+            subsample
+        )
         order = np.squeeze(isomap.transform(vectors))
     except ValueError:
         print(subsample)
@@ -371,8 +385,9 @@ def _arrange_by_sim(result):
 
 
 def _arrange_by_nleaves(result):
-    n_leaves = np.array([len(m["_leaves"]) if "_leaves" in m else 0 for m in result],
-                        dtype=int)
+    n_leaves = np.array(
+        [len(m["_leaves"]) if "_leaves" in m else 0 for m in result], dtype=int
+    )
 
     return np.argsort(n_leaves)[::-1]
 
@@ -387,8 +402,7 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
     # If a request_id is given, load the result from the cache
     if request_id is not None:
         try:
-            cache_key = '{}:{}'.format(func.__name__,
-                                       request_id)
+            cache_key = "{}:{}".format(func.__name__, request_id)
             print("Loading cache key {}...".format(cache_key))
             page_result = redis_lru.lindex(cache_key, page)
 
@@ -400,17 +414,18 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
             if compress:
                 page_result = zlib.decompress(page_result).decode()
 
-            #print("Returning page {} from cached result".format(page))
+            # print("Returning page {} from cached result".format(page))
 
             return page_result, n_pages, request_id
 
         except RedisError as exc:
             raise ValueError(
-                "Could not retrieve cache_key: {}".format(cache_key)) from exc
+                "Could not retrieve cache_key: {}".format(cache_key)
+            ) from exc
 
     # Otherwise calculate a result
     request_id = uuid.uuid4().hex
-    cache_key = '{}:{}'.format(func.__name__, request_id)
+    cache_key = "{}:{}".format(func.__name__, request_id)
 
     # Calculate result
     result = func(**func_kwargs)
@@ -425,11 +440,11 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
 
     if n_pages:
         if compress:
-            #raw_length = sum(len(p) for p in pages)
+            # raw_length = sum(len(p) for p in pages)
             cache_pages = [zlib.compress(p.encode()) for p in pages]
-            #compressed_length = sum(len(p) for p in pages)
+            # compressed_length = sum(len(p) for p in pages)
 
-            #print("Compressed pages. Ratio: {:.2%}".format(compressed_length / raw_length))
+            # print("Compressed pages. Ratio: {:.2%}".format(compressed_length / raw_length))
         else:
             cache_pages = pages
 
@@ -472,30 +487,25 @@ def cache_serialize_page(endpoint, **kwargs):
                 raise ValueError("page may not be None!")
 
             raw_result, n_pages, request_id = _load_or_calc(
-                func, func_kwargs, request_id, page, **kwargs)
+                func, func_kwargs, request_id, page, **kwargs
+            )
 
             meta = {
-                'request_id': request_id,
-                'last_page': n_pages - 1,
+                "request_id": request_id,
+                "last_page": n_pages - 1,
             }
 
             if 0 < page < n_pages:
-                meta['previous_page'] = page - 1
+                meta["previous_page"] = page - 1
 
             if page + 1 < n_pages:
-                meta['next_page'] = page + 1
+                meta["next_page"] = page + 1
 
             link_parameters = func_kwargs.copy()
             link_parameters["request_id"] = request_id
-            links = {
-                'self': url_for(endpoint, **link_parameters)
-            }
+            links = {"self": url_for(endpoint, **link_parameters)}
 
-            result = {
-                'meta': meta,
-                'links': links,
-                'data': "$data-placeholder$"
-            }
+            result = {"meta": meta, "links": links, "data": "$data-placeholder$"}
 
             result = json_dumps(result)
 
@@ -504,8 +514,7 @@ def cache_serialize_page(endpoint, **kwargs):
             # ===================================================================
             # Construct response
             # ===================================================================
-            response = Response(
-                result, mimetype=api.config['JSONIFY_MIMETYPE'])
+            response = Response(result, mimetype=api.config["JSONIFY_MIMETYPE"])
 
             # =======================================================================
             # Generate Link response header
@@ -529,7 +538,7 @@ def cache_serialize_page(endpoint, **kwargs):
             url = url_for(endpoint, **link_parameters)
             link_header_fields.append('<{}>; rel="last"'.format(url))
 
-            response.headers["Link"] = ",". join(link_header_fields)
+            response.headers["Link"] = ",".join(link_header_fields)
 
             return response
 
@@ -547,10 +556,11 @@ def _arrange_by_starred_sim(result, starred):
 
     try:
         # Get vectors
-        vectors = seq2array((m["_centroid"] if "_centroid" in m else m["vector"] for m in result),
-                            len(result))
-        starred_vectors = seq2array((m["_centroid"] for m in starred),
-                                    len(starred))
+        vectors = seq2array(
+            (m["_centroid"] if "_centroid" in m else m["vector"] for m in result),
+            len(result),
+        )
+        starred_vectors = seq2array((m["_centroid"] for m in starred), len(starred))
     except ValueError as e:
         print(e)
         return ()
@@ -562,7 +572,8 @@ def _arrange_by_starred_sim(result, starred):
         max_dist_idx = np.argsort(max_dist)[::-1]
 
         assert len(max_dist_idx) == len(result), "{} != {}".format(
-            len(max_dist_idx), len(result))
+            len(max_dist_idx), len(result)
+        )
 
         return max_dist_idx
 
@@ -573,7 +584,14 @@ def _arrange_by_starred_sim(result, starred):
 
 
 @cache_serialize_page(".get_node_members")
-def _get_node_members(node_id, nodes=False, objects=False, arrange_by="", starred_first=False, descending=False):
+def _get_node_members(
+    node_id,
+    nodes=False,
+    objects=False,
+    arrange_by="",
+    starred_first=False,
+    descending=False,
+):
     with database.engine.connect() as connection, Timer("_get_node_members") as timer:
         tree = Tree(connection)
 
@@ -582,8 +600,7 @@ def _get_node_members(node_id, nodes=False, objects=False, arrange_by="", starre
         result = []
         if nodes:
             with timer.child("tree.get_children()"):
-                result.extend(tree.get_children(
-                    node_id, include=sorted_nodes_include))
+                result.extend(tree.get_children(node_id, include=sorted_nodes_include))
         if objects:
             with timer.child("tree.get_objects()"):
                 result.extend(tree.get_objects(node_id))
@@ -604,8 +621,7 @@ def _get_node_members(node_id, nodes=False, objects=False, arrange_by="", starre
             elif arrange_by == "starred_sim":
                 with timer.child("starred_sim"):
                     # If no starred members yet, arrange by distance to regular children
-                    anchors = starred if len(
-                        starred) else tree.get_children(node_id)
+                    anchors = starred if len(starred) else tree.get_children(node_id)
 
                     order = _arrange_by_starred_sim(result, anchors)
             elif arrange_by == "interleaved":
@@ -619,8 +635,7 @@ def _get_node_members(node_id, nodes=False, objects=False, arrange_by="", starre
                 with timer.child("random"):
                     order = np.random.permutation(len(result))
             else:
-                warnings.warn(
-                    "arrange_by={} not supported!".format(arrange_by))
+                warnings.warn("arrange_by={} not supported!".format(arrange_by))
                 order = ()
 
             if descending:
@@ -706,8 +721,12 @@ def get_node_stats(node_id):
             progress = tree.calculate_progress(node_id)
 
             if arguments["log"] is not None:
-                log(connection, "progress-{}".format(arguments["log"]),
-                    node_id=node_id, data=json_dumps(progress))
+                log(
+                    connection,
+                    "progress-{}".format(arguments["log"]),
+                    node_id=node_id,
+                    data=json_dumps(progress),
+                )
 
             return jsonify(progress)
 
@@ -734,8 +753,7 @@ def get_node(node_id):
     with database.engine.connect() as connection:
         tree = Tree(connection)
 
-        flags = {k: request.args.get(k, 0, strtobool)
-                 for k in ("include_children",)}
+        flags = {k: request.args.get(k, 0, strtobool) for k in ("include_children",)}
 
         node = tree.get_node(node_id)
 
@@ -752,8 +770,7 @@ def patch_node(node_id):
         tree = Tree(connection)
 
         data = request.get_json()
-        flags = {k: request.args.get(k, 0, strtobool)
-                 for k in ("include_children",)}
+        flags = {k: request.args.get(k, 0, strtobool) for k in ("include_children",)}
 
         # TODO: Use argparse
         if "starred" in data:
@@ -761,14 +778,17 @@ def patch_node(node_id):
 
         if "parent_id" in data:
             raise ValueError(
-                "parent_id must not be set directly, use /nodes/<node_id>/adopt.")
+                "parent_id must not be set directly, use /nodes/<node_id>/adopt."
+            )
 
         with connection.begin():
             tree.update_node(node_id, data)
 
-            log(connection,
+            log(
+                connection,
                 "update_node({})".format(json.dumps(data, sort_keys=True)),
-                node_id=node_id)
+                node_id=node_id,
+            )
 
             node = tree.get_node(node_id, True)
 
@@ -803,8 +823,11 @@ def node_adopt_members(parent_id):
             tree.relocate_nodes(node_ids, parent_id)
             tree.relocate_objects(object_ids, parent_id)
 
-        print("Node {} adopted {} nodes and {} objects."
-              .format(parent_id, len(node_ids), len(object_ids)))
+        print(
+            "Node {} adopted {} nodes and {} objects.".format(
+                parent_id, len(node_ids), len(object_ids)
+            )
+        )
 
         return jsonify({})
 
@@ -835,15 +858,18 @@ def accept_recommended_objects(node_id):
 
         with t.child("assemble set of rejected objects"):
             rejected_object_ids = set(
-                m[1:] for m in parameters["rejected_members"] if m.startswith("o"))
+                m[1:] for m in parameters["rejected_members"] if m.startswith("o")
+            )
 
         with t.child("assemble list of accepted objects"):
             object_ids = []
             for page in range(parameters["last_page"] + 1):
                 response = _node_get_recommended_objects(
-                    node_id=node_id, request_id=parameters["request_id"], page=page)
-                page_object_ids = (v["object_id"]
-                                   for v in json.loads(response.data.decode())["data"])
+                    node_id=node_id, request_id=parameters["request_id"], page=page
+                )
+                page_object_ids = (
+                    v["object_id"] for v in json.loads(response.data.decode())["data"]
+                )
                 object_ids.extend(page_object_ids)
 
         # Save list of objects to enable calculation of Average Precision and the like
@@ -853,13 +879,14 @@ def accept_recommended_objects(node_id):
                 with t2.child("calc rejected"):
                     rejected = [o in rejected_object_ids for o in object_ids]
                 with t2.child("assemble DataFrame"):
-                    data = pd.DataFrame(
-                        {"object_id": object_ids, "rejected": rejected})
+                    data = pd.DataFrame({"object_id": object_ids, "rejected": rejected})
 
                 data_fn = os.path.join(
                     app.config["PROJECT_EXPORT_DIR"],
-                    "{:%Y-%m-%d-%H-%M-%S}--accept-reject--{}.csv".format(datetime.now(),
-                                                                         node_id))
+                    "{:%Y-%m-%d-%H-%M-%S}--accept-reject--{}.csv".format(
+                        datetime.now(), node_id
+                    ),
+                )
                 with t2.child("write data"):
                     data.to_csv(data_fn, index=False)
 
@@ -881,7 +908,10 @@ def accept_recommended_objects(node_id):
             log_data.update(addlog_data)
         elif addlog_data is not None:
             raise ValueError(
-                "Parameter log_data should be a dict, got a {}!".format(type(addlog_data)))
+                "Parameter log_data should be a dict, got a {}!".format(
+                    type(addlog_data)
+                )
+            )
 
         with database.engine.connect() as connection:
             tree = Tree(connection)
@@ -889,12 +919,18 @@ def accept_recommended_objects(node_id):
                 tree.relocate_objects(object_ids, node_id)
                 tree.reject_objects(node_id, rejected_object_ids)
 
-            log(connection, "accept_recommended_objects",
+            log(
+                connection,
+                "accept_recommended_objects",
                 node_id=node_id,
-                data=json_dumps(log_data))
+                data=json_dumps(log_data),
+            )
 
-        print("Node {} adopted {} objects and rejected {} objects."
-              .format(node_id, len(object_ids), len(rejected_object_ids)))
+        print(
+            "Node {} adopted {} objects and rejected {} objects.".format(
+                node_id, len(object_ids), len(rejected_object_ids)
+            )
+        )
 
         return jsonify({})
 
@@ -903,8 +939,7 @@ def accept_recommended_objects(node_id):
 def _node_get_recommended_children(node_id, max_n):
     with database.engine.connect() as connection:
         tree = Tree(connection)
-        result = [_node(tree, c)
-                  for c in tree.recommend_children(node_id, max_n=max_n)]
+        result = [_node(tree, c) for c in tree.recommend_children(node_id, max_n=max_n)]
         return result
 
 
@@ -988,12 +1023,18 @@ def node_get_next(node_id):
 
         # Descend if the successor is not approved
         # Rationale: Approval is for a whole subtree.
-        def recurse(_, s): return s.c.approved == False
+        def recurse(_, s):
+            return s.c.approved == False
 
         # Filter descendants that are not approved
-        def filter(subtree): return subtree.c.approved == False
+        def filter(subtree):
+            return subtree.c.approved == False
 
-        return jsonify(tree.get_next_node(node_id, leaf=arguments["leaf"], recurse_cb=recurse, filter=filter))
+        return jsonify(
+            tree.get_next_node(
+                node_id, leaf=arguments["leaf"], recurse_cb=recurse, filter=filter
+            )
+        )
 
 
 @api.route("/nodes/<int:node_id>/next_unfilled", methods=["GET"])
@@ -1009,10 +1050,17 @@ def node_get_next_unfilled(node_id):
         tree = Tree(connection)
 
         # Filter descendants that are approved and unfilled
-        def filter(subtree): return (subtree.c.approved ==
-                                     True) & (subtree.c.filled == False)
+        def filter(subtree):
+            return (subtree.c.approved == True) & (subtree.c.filled == False)
 
-        return jsonify(tree.get_next_node(node_id, leaf=arguments["leaf"], preferred_first=arguments["preferred_first"], filter=filter))
+        return jsonify(
+            tree.get_next_node(
+                node_id,
+                leaf=arguments["leaf"],
+                preferred_first=arguments["preferred_first"],
+                filter=filter,
+            )
+        )
 
 
 @api.route("/nodes/<int:node_id>/n_sorted", methods=["GET"])
@@ -1048,8 +1096,11 @@ def post_node_merge_into(node_id):
         # TODO: Unapprove
         tree.merge_node_into(node_id, data["dest_node_id"])
 
-        log(connection, "merge_node_into({}, {})".format(node_id, data["dest_node_id"]),
-            node_id=data["dest_node_id"])
+        log(
+            connection,
+            "merge_node_into({}, {})".format(node_id, data["dest_node_id"]),
+            node_id=data["dest_node_id"],
+        )
 
         return jsonify(None)
 
@@ -1069,8 +1120,10 @@ def post_node_classify(node_id):
         subnode (boolean): Move classified objects into a child of the target node. (Default: False)
     """
 
-    flags = {k: request.args.get(k, 0, strtobool)
-             for k in ("nodes", "objects", "safe", "subnode")}
+    flags = {
+        k: request.args.get(k, 0, strtobool)
+        for k in ("nodes", "objects", "safe", "subnode")
+    }
 
     print(flags)
 
@@ -1091,73 +1144,85 @@ def post_node_classify(node_id):
 
             starred_centroids = np.array([c["_centroid"] for c in starred])
 
-            print("|starred_centroids|", np.linalg.norm(
-                starred_centroids, axis=1))
+            print("|starred_centroids|", np.linalg.norm(starred_centroids, axis=1))
 
             # Initialize classifier
             classifier = Classifier(starred_centroids)
 
             if flags["subnode"]:
+
                 def _subnode_for(node_id):
                     return tree.create_node(parent_id=node_id, name="classified")
+
                 target_nodes = keydefaultdict(_subnode_for)
             else:
                 target_nodes = keydefaultdict(lambda k: k)
 
             if flags["nodes"]:
-                unstarred_centroids = np.array(
-                    [c["_centroid"] for c in unstarred])
+                unstarred_centroids = np.array([c["_centroid"] for c in unstarred])
                 unstarred_ids = np.array([c["node_id"] for c in unstarred])
 
                 # Predict unstarred children (if any)
                 n_unstarred = len(unstarred_centroids)
                 if n_unstarred > 0:
-                    print("Predicting {} unstarred children of {}...".format(
-                        n_unstarred, node_id))
+                    print(
+                        "Predicting {} unstarred children of {}...".format(
+                            n_unstarred, node_id
+                        )
+                    )
                     type_predicted = classifier.classify(
-                        unstarred_centroids, safe=flags["safe"])
+                        unstarred_centroids, safe=flags["safe"]
+                    )
 
                     for i, starred_node in enumerate(starred):
                         nodes_to_move = [
-                            int(n) for n in unstarred_ids[type_predicted == i]]
+                            int(n) for n in unstarred_ids[type_predicted == i]
+                        ]
 
                         if len(nodes_to_move):
                             target_node_id = target_nodes[starred_node["node_id"]]
-                            tree.relocate_nodes(nodes_to_move,
-                                                target_node_id,
-                                                unapprove=True)
+                            tree.relocate_nodes(
+                                nodes_to_move, target_node_id, unapprove=True
+                            )
 
                     n_predicted_children = np.sum(type_predicted > -1)
 
             if flags["objects"]:
                 # Predict objects
                 objects = tree.get_objects(node_id)
-                print("Predicting {} objects of {}...".format(
-                    len(objects), node_id))
+                print("Predicting {} objects of {}...".format(len(objects), node_id))
                 object_vectors = np.array([o["vector"] for o in objects])
                 object_ids = np.array([o["object_id"] for o in objects])
 
-                type_predicted = classifier.classify(
-                    object_vectors, safe=flags["safe"])
+                type_predicted = classifier.classify(object_vectors, safe=flags["safe"])
 
                 for i, starred_node in enumerate(starred):
-                    objects_to_move = [str(o)
-                                       for o in object_ids[type_predicted == i]]
+                    objects_to_move = [str(o) for o in object_ids[type_predicted == i]]
                     if len(objects_to_move):
                         target_node_id = target_nodes[starred_node["node_id"]]
                         print(
-                            "Moving objects {!r} -> {}".format(objects_to_move, target_node_id))
-                        tree.relocate_objects(objects_to_move,
-                                              target_node_id,
-                                              unapprove=True)
+                            "Moving objects {!r} -> {}".format(
+                                objects_to_move, target_node_id
+                            )
+                        )
+                        tree.relocate_objects(
+                            objects_to_move, target_node_id, unapprove=True
+                        )
 
                 n_predicted_objects = np.sum(type_predicted > -1)
 
-            log(connection, "classify_members(nodes={nodes},objects={objects})".format(
-                **flags), node_id=node_id)
+            log(
+                connection,
+                "classify_members(nodes={nodes},objects={objects})".format(**flags),
+                node_id=node_id,
+            )
 
-            return jsonify({"n_predicted_children": int(n_predicted_children),
-                            "n_predicted_objects": int(n_predicted_objects)})
+            return jsonify(
+                {
+                    "n_predicted_children": int(n_predicted_children),
+                    "n_predicted_objects": int(n_predicted_objects),
+                }
+            )
 
 
 @api.route("/log", methods=["POST"])
@@ -1167,11 +1232,13 @@ def create_log_entry():
     print("Log:", log_data)
 
     with database.engine.connect() as connection:
-        log(connection,
+        log(
+            connection,
             log_data["action"],
             node_id=log_data["node_id"],
             reverse_action=log_data["reverse_action"],
-            data=json_dumps(log_data["data"]))
+            data=json_dumps(log_data["data"]),
+        )
 
     return jsonify({})
 
@@ -1193,11 +1260,7 @@ def create_job():
 
     data["job"] = job
 
-    return Response(
-        JobSchema().dumps(data),
-        status=202,
-        headers={'Location': job_url}
-    )
+    return Response(JobSchema().dumps(data), status=202, headers={"Location": job_url})
 
 
 @api.route("/jobs/<job_id>", methods=["GET"])

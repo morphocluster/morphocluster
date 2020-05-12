@@ -3,7 +3,7 @@ API schemas
 """
 from marshmallow import Schema, fields
 
-#from morphocluster.extensions import marshmallow as ma
+# from morphocluster.extensions import marshmallow as ma
 
 
 class RQJobSchema(Schema):
@@ -23,8 +23,9 @@ class JobSchema(Schema):
 
     # Creation only
     args = fields.List(fields.Raw, load_only=True)
-    kwargs = fields.Dict(keys=fields.Str, values=fields.Raw,
-                         default=dict, load_only=True)
+    kwargs = fields.Dict(
+        keys=fields.Str, values=fields.Raw, default=dict, load_only=True
+    )
 
     # Dump only
     id = fields.Str(dump_only=True)
