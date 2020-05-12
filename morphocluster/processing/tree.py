@@ -3,6 +3,7 @@
 Conversion between different tree formats.
 """
 
+import json
 import os
 import sys
 from io import StringIO
@@ -31,7 +32,7 @@ class Tree(object):
     """
 
     @staticmethod
-    def from_collection(collection_fn, unlabeled_collection_fn=None):
+    def from_collection(collection_fn, unlabeled_collection_fn=None) -> "Tree":
         """
         Read a collection of objects.
         """
@@ -40,7 +41,7 @@ class Tree(object):
             header=None,
             names=("objid", "path", "label"),
             index_col=False,
-            usecols=("objid", "label",),
+            usecols=("objid", "label"),
             dtype=str,
         )
 
@@ -81,13 +82,13 @@ class Tree(object):
         return Tree(nodes, objects)
 
     @staticmethod
-    def from_saved(tree_fn):
+    def from_saved(tree_fn) -> "Tree":
         """
         Read a saved tree.
         """
         with ZipFile(tree_fn, "r") as archive:
             with archive.open("nodes.csv", "r") as nodes_f:
-                nodes = pd.read_csv(nodes_f)
+                nodes = pd.read_csv(nodes_f, dtype={"name": str})
             with archive.open("objects.csv", "r") as objects_f:
                 objects = pd.read_csv(objects_f, dtype={"object_id": str})
 
@@ -98,10 +99,17 @@ class Tree(object):
                 # No such member
                 rejected_objects = None
 
-        return Tree(nodes, objects, rejected_objects)
+            try:
+                with archive.open("meta.json", "r") as meta_f:
+                    meta = json.load(meta_f)
+            except KeyError:
+                # No such member
+                meta = None
+
+        return Tree(nodes, objects, rejected_objects, meta)
 
     @staticmethod
-    def from_HDBSCAN(path, root_first=True):
+    def from_HDBSCAN(path, root_first=True) -> "Tree":
         """
         Read the tree from a HDBSCAN clustering.
         tree.csv is the condensed tree.
@@ -152,7 +160,7 @@ class Tree(object):
         return Tree(nodes, objects)
 
     @staticmethod
-    def from_labels(labels, object_ids):
+    def from_labels(labels, object_ids) -> "Tree":
         """
         Construct a tree from a label vector and a vector of object_ids.
 
@@ -167,10 +175,14 @@ class Tree(object):
 
         # Compose nodes out of unique_labels (except -1)
         nodes = [
-            {"node_id": node_id, "parent_id": root_id}
-            for node_id in unique_labels
-            if node_id != -1
+            {"node_id": label, "parent_id": root_id}
+            for label in unique_labels
+            if label != -1
         ]
+
+        if not nodes:
+            raise ValueError("No non-empty labels were supplied.")
+
         # Add root node
         nodes.append({"node_id": root_id})
         nodes = pd.DataFrame(nodes)
@@ -183,7 +195,7 @@ class Tree(object):
         return Tree(nodes, objects)
 
     @staticmethod
-    def from_cluster_labels(cluster_labels_fn, object_ids_fn=None):
+    def from_cluster_labels(cluster_labels_fn, object_ids_fn=None) -> "Tree":
         """
         Construct tree from a cluster_labels file.
 
@@ -220,7 +232,7 @@ class Tree(object):
 
         return Tree(nodes, objects)
 
-    def __init__(self, nodes=None, objects=None, rejected_objects=None):
+    def __init__(self, nodes=None, objects=None, rejected_objects=None, meta=None):
         if nodes is not None:
             if not isinstance(nodes, pd.DataFrame):
                 nodes = pd.DataFrame(nodes)
@@ -251,11 +263,16 @@ class Tree(object):
         self.nodes = nodes
         self.objects = objects
         self.rejected_objects = rejected_objects
+        self.meta = meta
 
-    def save(self, tree_fn):
+    def save(self, tree_fn, meta=None):
         """
         Save nodes and objects to an archive.
         """
+
+        # Merge meta into self.meta
+        meta = {**(self.meta or {}), **(meta or {})}
+
         with ZipFile(tree_fn, "w", ZIP_DEFLATED) as archive:
             buffer_ = StringIO()
             self.nodes.to_csv(buffer_, index=False)
@@ -270,22 +287,28 @@ class Tree(object):
                 self.rejected_objects.to_csv(buffer_, index=False)
                 archive.writestr("rejected_objects.csv", buffer_.getvalue())
 
+            if meta is not None:
+                archive.writestr("meta.json", json.dumps(meta))
+
     def get_root_id(self):
         """
         Get the ID of the root node.
         """
         selector = self.nodes["parent_id"].isnull()
-        return np.asscalar(self.nodes.loc[selector, "node_id"])
+        result = self.nodes.loc[selector, "node_id"]
+        return next(iter(result), None)
 
-    def topological_order(self, root_id=None):
+    def topological_order(self, root_id=None, order_by_name=False):
         """
         Yield nodes in topological order.
         """
 
-        for node_idx in self.topological_order_idx(root_id=root_id):
+        for node_idx in self.topological_order_idx(
+            root_id=root_id, order_by_name=order_by_name
+        ):
             yield self.nodes.loc[node_idx]
 
-    def topological_order_idx(self, root_id=None):
+    def topological_order_idx(self, root_id=None, order_by_name=False):
         """
         Yield node indices in topological order.
         """
@@ -298,7 +321,12 @@ class Tree(object):
             node_id = queue.pop()
 
             child_selector = self.nodes["parent_id"] == node_id
-            queue.extend(self.nodes.loc[child_selector, "node_id"])
+            children = self.nodes.loc[child_selector]
+
+            if order_by_name:
+                children = children.sort_values("name")
+
+            queue.extend(children["node_id"])
 
             node_selector = self.nodes["node_id"] == node_id
 
@@ -405,7 +433,7 @@ class Tree(object):
             )
         self_objects = self.objects[~duplicate_objects_mask]
 
-        self.nodes = pd.concat((self.nodes, other_nodes), ignore_index=True)
+        self.nodes = pd.concat((self.nodes, other_nodes), ignore_index=True, sort=False)
         self.objects = pd.concat((self_objects, other_objects), ignore_index=True)
 
     def to_networkx(self):
@@ -425,7 +453,7 @@ class Tree(object):
 
         return result
 
-    def to_ete(self):
+    def to_ete(self, order_by_name=False):
         """
         Return an ETE tree.
         """
@@ -440,21 +468,22 @@ class Tree(object):
 
         nodes = {}
 
-        for row in self.topological_order():
+        for row in self.topological_order(order_by_name=order_by_name):
             try:
                 parent = nodes[row["parent_id"]]
             except KeyError:
                 parent = tree
 
-            try:
-                name = row["name"]
-            except KeyError:
-                name = row["node_id"]
+            features = row.to_dict()
 
-            if pd.isnull(name):
-                name = ""
+            if "name" not in features:
+                features["name"] = features["node_id"]
 
-            node = nodes[row["node_id"]] = parent.add_child(name=name)
+            if pd.isnull(features["name"]):
+                features["name"] = ""
+
+            node = nodes[row["node_id"]] = parent.add_child()
+            node.add_features(**features)
 
         return tree.children[0]
 
@@ -474,7 +503,7 @@ class Tree(object):
         # Check objects
         ons = set(self.objects["node_id"])
         nns = set(self.nodes["node_id"])
-        if len(ons - nns):
+        if ons - nns:
             raise ValueError("Some objects are not reachable.")
 
     def copy(self):

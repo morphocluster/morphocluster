@@ -1,11 +1,13 @@
 import itertools
 import os
+import zipfile
 from getpass import getpass
 
 import click
 import flask_migrate
 import h5py
 import pandas as pd
+import tqdm
 from etaprogress.progress import ProgressBar
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql.expression import bindparam, select
@@ -86,32 +88,38 @@ def init_app(app):
             database.metadata.create_all(txn, tables=affected_tables)
 
     @app.cli.command()
-    @click.argument("collection_fn")
-    def load_object_locations(collection_fn):
-        """
-        Load a collection of objects.
-        """
-        # Load collections
-        with database.engine.begin() as txn:
-            print("Loading {}...".format(collection_fn))
-            data = pd.read_csv(
-                collection_fn,
-                header=None,
-                names=["object_id", "path", "label"],
-                usecols=["object_id", "path"],
-            )
+    @click.argument("archive_fn")
+    def load_objects(archive_fn):
+        """Load an archive of objects into the database."""
 
-            data_iter = data.itertuples()
-            bar = ProgressBar(len(data), max_width=40)
+        batch_size = 1000
+
+        dst_root = app.config["DATA_DIR"]
+
+        print(f"Loading {archive_fn} into {dst_root}...")
+        with database.engine.begin() as txn, zipfile.ZipFile(archive_fn) as zf:
+            index = pd.read_csv(zf.open("index.csv"), usecols=["object_id", "path"])
+            index_iter = index.itertuples()
+            progress = tqdm.tqdm(total=len(index))
             while True:
-                chunk = tuple(itertools.islice(data_iter, 5000))
+                chunk = tuple(
+                    row._asdict() for row in itertools.islice(index_iter, batch_size)
+                )
                 if not chunk:
                     break
-                txn.execute(models.objects.insert(), [row._asdict() for row in chunk])
+                txn.execute(
+                    models.objects.insert(),  # pylint: disable=no-value-for-parameter
+                    [
+                        dict(row)
+                        for row in chunk
+                    ],
+                )
 
-                bar.numerator += len(chunk)
-                print(bar, end="\r")
-            print()
+                for row in chunk:
+                    zf.extract(row["path"], dst_root)
+
+                progress.update(len(chunk))
+            progress.close()
             print("Done.")
 
     @app.cli.command()
@@ -125,7 +133,7 @@ def init_app(app):
             with h5py.File(
                 features_fn, "r", libver="latest"
             ) as f_features, database.engine.begin() as conn:
-                object_ids = f_features["objids"]
+                object_ids = f_features["object_id"]
                 vectors = f_features["features"]
 
                 stmt = (
@@ -155,7 +163,7 @@ def init_app(app):
 
     @app.cli.command()
     @click.argument("tree_fn")
-    @click.argument("project_name", default=None)
+    @click.argument("project_name", required=False, default=None)
     @click.option("--consolidate/--no-consolidate", default=True)
     def load_project(tree_fn, project_name, consolidate):
         """
