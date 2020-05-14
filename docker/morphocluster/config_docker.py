@@ -8,3 +8,5 @@ RQ_REDIS_URL = "redis://redis-rq:6379/0"
 SQLALCHEMY_DATABASE_URI = (
     "postgresql://morphocluster:morphocluster@postgres/morphocluster"
 )
+
+PROJECT_EXPORT_DIR = "/data/export"

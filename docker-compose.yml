@@ -1,0 +1,50 @@
+version: '3'
+services:
+  morphocluster:
+    build:
+      context: .
+      dockerfile: docker/morphocluster/Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    volumes:
+      - morphocluster-data:/data
+  postgres:
+    build: docker/postgresql
+    environment:
+      POSTGRES_USER: morphocluster
+      POSTGRES_PASSWORD: morphocluster
+      POSTGRES_DB: morphocluster
+    ports:
+      ## Expose Port 5432 for direct access of the database.
+      ## Remove in production!
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+  redis-rq:
+    image: "redis:5-alpine"
+    ports:
+      - "6379"
+  redis-lru:
+    build: docker/redis-lru
+    ports:
+      - "6379"
+
+volumes:
+  postgres-data:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      # Location on host filesystem for PostgreSQL data
+      #device: /data/morphocluster/data
+      device: /home/moi/Work/17-MorphoCluster/Data/postgres
+  morphocluster-data:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      # Location on host filesystem for 
+      #device: /data/morphocluster/data
+      device: /home/moi/Work/17-MorphoCluster/Data/data
