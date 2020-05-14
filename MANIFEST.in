@@ -1,2 +1,4 @@
-graft cluster_labeling/templates
-graft cluster_labeling/static
+graft morphocluster/templates
+graft morphocluster/static
+include versioneer.py
+include morphocluster/_version.py

@@ -28,7 +28,11 @@ setup(
         "marshmallow>=3.0.0b20",
         "match_arrays",
         "Flask-RQ2",
+        "tqdm",
+        "Click",
+        "chardet",
     ],
     setup_requires=["pytest-runner"],
     tests_require=["pytest"],
+    entry_points={"console_scripts": ["morphocluster = morphocluster.scripts:main"]},
 )
