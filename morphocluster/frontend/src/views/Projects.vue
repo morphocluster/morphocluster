@@ -39,16 +39,10 @@
             <col class="col-wide" />
             <col class="col-narrow" />
           </template>
-          <template
-            slot="name"
-            slot-scope="data"
-          >
+          <template v-slot:cell(name)="data">
             <router-link :to="{name: 'project', params: {project_id: data.item.project_id}}">{{data.item.name}}</router-link>
           </template>
-          <div
-            slot="progress"
-            slot-scope="data"
-          >
+           <template v-slot:cell(progress)="data">
             <b-progress
               v-if="'progress' in data.item"
               :max="data.item.progress.leaves_n_nodes"
@@ -65,13 +59,9 @@
                 v-b-tooltip.hover
                 :title="`${data.item.progress.leaves_n_approved_nodes} / ${data.item.progress.leaves_n_nodes} approved`"
               />
-              <!-- <b-progress-bar variant="secondary" :value="data.item.progress.leaves_n_nodes - data.item.progress.leaves_n_approved_nodes" v-b-tooltip.hover :title="`${data.item.progress.leaves_n_nodes - data.item.progress.leaves_n_approved_nodes} / ${data.item.progress.leaves_n_nodes} untreated`" /> -->
             </b-progress>
-          </div>
-          <template
-            slot="action"
-            slot-scope="data"
-          >
+          </template>
+          <template v-slot:cell(action)="data">
             <b-button
               size="sm"
               variant="primary"
@@ -93,13 +83,7 @@
               @click.prevent="showSaveModal(data.item)"
             >Save</b-button>
           </template>
-          <template
-            slot="visible"
-            slot-scope="data"
-          >
-            {{data.visible ? "yes" : "no"}}
-          </template>
-          <template slot="empty">
+          <template v-slot:empty>
             <div class="text-center">No projects available.</div>
           </template>
         </b-table>
