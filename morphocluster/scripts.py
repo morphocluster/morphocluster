@@ -1,11 +1,14 @@
+import csv
 import fnmatch
 import os.path
 import zipfile
 
+import chardet
 import click
 import pandas as pd
 
 from morphocluster.processing.extract_features import extract_features
+from morphocluster.processing.recluster import Recluster
 
 
 @click.group()
@@ -43,9 +46,6 @@ def ecotaxa_fix_types(dataframe):
     )
 
     return dataframe
-
-
-import chardet, csv
 
 
 @main.command()
@@ -113,14 +113,42 @@ def fix_ecotaxa(archive_fn):
 @click.argument("archive_fn", type=click.Path(exists=True, dir_okay=False))
 @click.argument("output_fn", type=click.Path(exists=False, dir_okay=False))
 @click.option("--normalize/--no-normalize", default=True)
-def features(model_fn, archive_fn, output_fn, normalize):
+@click.option("--batch-size", type=int, default=512)
+@click.option("--num-workers", type=int, default=0)
+def features(model_fn, archive_fn, output_fn, normalize, batch_size, num_workers):
     """
     Extract features from an EcoTaxa export (or compatible) archive.
     """
 
-    extract_features(model_fn, archive_fn, output_fn, normalize)
+    extract_features(
+        model_fn, archive_fn, output_fn, normalize, batch_size, num_workers
+    )
 
 
 @main.command()
-def cluster():
-    ...
+@click.argument("features_fns", type=click.Path(exists=True, readable=True), nargs=-1)
+@click.argument("result_fn", type=click.Path(exists=False, writable=True), nargs=1)
+@click.option(
+    "--tree", "tree_fn", type=click.Path(exists=True, readable=True), default=None
+)
+@click.option("--min-cluster-size", type=int, default=128)
+@click.option("--min-samples", type=int, default=1)
+@click.option("--method", type=click.Choice(["eom", "leaf"]), default="leaf")
+def cluster(
+    features_fns, result_fn, tree_fn, min_cluster_size, min_samples, method,
+):
+    rc = Recluster()
+
+    for fn in features_fns:
+        rc.load_features(fn)
+
+    if tree_fn is not None:
+        rc.load_tree(tree_fn)
+
+    rc.cluster(
+        min_cluster_size=min_cluster_size,
+        min_samples=min_samples,
+        cluster_selection_method=method,
+    )
+
+    rc.save(result_fn)

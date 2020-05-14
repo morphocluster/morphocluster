@@ -14,11 +14,11 @@ from morphocluster.processing import Tree
 def _subsample_dataset(sample_size, dataset):
     """
     dataset["features"] is a numpy.ndarray
-    dataset["objids"] is a pandas.Series
+    dataset["object_id"] is a pandas.Series
     """
 
     features = dataset["features"]
-    objids = dataset["objids"]
+    object_id = dataset["object_id"]
 
     if features.shape[0] <= sample_size:
         return dataset
@@ -26,9 +26,9 @@ def _subsample_dataset(sample_size, dataset):
     idx = np.random.permutation(features.shape[0])[:sample_size]
 
     features = features[idx]
-    objids = objids.iloc[idx].reset_index(drop=True)
+    object_id = object_id.iloc[idx].reset_index(drop=True)
 
-    return {"features": features, "objids": objids}
+    return {"features": features, "object_id": object_id}
 
 
 class Recluster:
@@ -50,8 +50,8 @@ class Recluster:
         with h5py.File(features_fn, "r") as f_features:
             dataset = {
                 "features": f_features["features"][:],
-                # Sometimes, objids are still ints (which is wrong)
-                "objids": pd.Series(f_features["objids"][:]).astype(str),
+                # Sometimes, object_id are still ints (which is wrong)
+                "object_id": pd.Series(f_features["object_id"][:]).astype(str),
             }
 
         if append and self.dataset is not None:
@@ -59,8 +59,8 @@ class Recluster:
                 (self.dataset["features"], dataset["features"])
             )
 
-            self.dataset["objids"] = pd.concat(
-                (self.dataset["objids"], dataset["objids"])
+            self.dataset["object_id"] = pd.concat(
+                (self.dataset["object_id"], dataset["object_id"])
             )
         else:
             self.dataset = dataset
@@ -85,8 +85,8 @@ class Recluster:
         return self
 
     def _get_unapproved_dataset(self):
-        approved_objids = []
-        tree_objids = []
+        approved_object_id = []
+        tree_object_id = []
         for i, tree in enumerate(self.trees):
             print("Tree #{}:".format(i))
 
@@ -98,11 +98,11 @@ class Recluster:
             n_objects = len(tree.objects)
             n_approved_objects = approved_objects_selector.sum()
 
-            approved_objids.append(
+            approved_object_id.append(
                 tree.objects.loc[approved_objects_selector, "object_id"]
             )
 
-            tree_objids.append(tree.objects["object_id"])
+            tree_object_id.append(tree.objects["object_id"])
 
             print(
                 " Approved objects: {:,d} / {:,d} ({:.2%})".format(
@@ -117,29 +117,31 @@ class Recluster:
                 )
             )
 
-        approved_objids = (
-            pd.concat(approved_objids).drop_duplicates().reset_index(drop=True)
+        approved_object_id = (
+            pd.concat(approved_object_id).drop_duplicates().reset_index(drop=True)
         )
 
-        tree_objids = pd.concat(tree_objids).drop_duplicates().reset_index(drop=True)
+        tree_object_id = (
+            pd.concat(tree_object_id).drop_duplicates().reset_index(drop=True)
+        )
 
         # This is faster than np.isin
-        dataset_objids = pd.Series(self.dataset["objids"])
-        dataset_available_selector = dataset_objids.isin(tree_objids)
+        dataset_object_id = pd.Series(self.dataset["object_id"])
+        dataset_available_selector = dataset_object_id.isin(tree_object_id)
         n_dataset_available = dataset_available_selector.sum()
 
         print(
             "Availability (dset/both/tree): {:,d} / {:,d} / {:,d}".format(
                 len(dataset_available_selector) - n_dataset_available,
                 n_dataset_available,
-                len(tree_objids) - n_dataset_available,
+                len(tree_object_id) - n_dataset_available,
             )
         )
 
-        dataset_selector = ~dataset_objids.isin(approved_objids)
+        dataset_selector = ~dataset_object_id.isin(approved_object_id)
 
         n_selected = dataset_selector.sum()
-        n_total = len(dataset_objids)
+        n_total = len(dataset_object_id)
 
         print(
             "Unapproved objects present in dataset: {:,d} / {:,d} ({:.2%})".format(
@@ -149,7 +151,7 @@ class Recluster:
 
         return {
             "features": self.dataset["features"][dataset_selector],
-            "objids": dataset_objids[dataset_selector].reset_index(drop=True),
+            "object_id": dataset_object_id[dataset_selector].reset_index(drop=True),
         }
 
     def cluster(self, ignore_approved=True, sample_size=None, **kwargs):
@@ -178,7 +180,7 @@ class Recluster:
         print("Found {:,d} labels.".format(len(np.unique(labels))))
 
         # Turn cluster_labels to a tree
-        self.trees.append(Tree.from_labels(labels, dataset["objids"]))
+        self.trees.append(Tree.from_labels(labels, dataset["object_id"]))
 
         return self
 
