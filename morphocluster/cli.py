@@ -94,7 +94,7 @@ def init_app(app):
 
         batch_size = 1000
 
-        dst_root = app.config["DATA_DIR"]
+        dst_root = app.config["DATASET_PATH"]
 
         print(f"Loading {archive_fn} into {dst_root}...")
         with database.engine.begin() as txn, zipfile.ZipFile(archive_fn) as zf:
