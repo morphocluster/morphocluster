@@ -33,6 +33,8 @@ def create_app(test_config=None):
     if test_config is not None:
         app.config.update(test_config)
 
+    os.makedirs(app.config["PROJECT_EXPORT_DIR"], exist_ok=True)
+
     # Register extensions
     from morphocluster.extensions import database, migrate, redis_lru, rq
 
@@ -85,7 +87,7 @@ def create_app(test_config=None):
             result = conn.execute(stmt).first()
 
         if result is None:
-            abort(404)
+            return "Unknown object", 404
 
         response = send_from_directory(
             app.config["DATASET_PATH"], result["path"], conditional=True

@@ -85,6 +85,7 @@ class Recluster:
         """
 
         if not isinstance(tree, Tree):
+            print(f"Loading tree {tree}...")
             self._log("load_tree", dict(tree_fn=str(tree)))
             tree = Tree.from_saved(tree)
         else:

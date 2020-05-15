@@ -126,7 +126,9 @@ def features(model_fn, archive_fn, output_fn, normalize, batch_size, num_workers
 
 
 @main.command()
-@click.argument("features_fns", type=click.Path(exists=True, readable=True), nargs=-1)
+@click.argument(
+    "features_fns", type=click.Path(exists=True, readable=True), nargs=-1, required=True
+)
 @click.argument("result_fn", type=click.Path(exists=False, writable=True), nargs=1)
 @click.option(
     "--tree", "tree_fn", type=click.Path(exists=True, readable=True), default=None

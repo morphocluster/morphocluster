@@ -445,7 +445,7 @@ def extract_features(
         h5_targets = f_features.create_dataset("targets", (n_objects,), dtype="int8")
 
         offset = 0
-        for objids, inputs in tqdm(data_loader):
+        for objids, inputs in tqdm(data_loader, unit="batch"):
             if use_cuda:
                 inputs = inputs.cuda(non_blocking=True)
 

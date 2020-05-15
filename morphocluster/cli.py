@@ -100,7 +100,7 @@ def init_app(app):
         with database.engine.begin() as txn, zipfile.ZipFile(archive_fn) as zf:
             index = pd.read_csv(zf.open("index.csv"), usecols=["object_id", "path"])
             index_iter = index.itertuples()
-            progress = tqdm.tqdm(total=len(index))
+            progress = tqdm.tqdm(total=len(index), unit="obj")
             while True:
                 chunk = tuple(
                     row._asdict() for row in itertools.islice(index_iter, batch_size)
@@ -109,10 +109,7 @@ def init_app(app):
                     break
                 txn.execute(
                     models.objects.insert(),  # pylint: disable=no-value-for-parameter
-                    [
-                        dict(row)
-                        for row in chunk
-                    ],
+                    [dict(row) for row in chunk],
                 )
 
                 for row in chunk:
