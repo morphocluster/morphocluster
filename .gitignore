@@ -6,7 +6,7 @@ venv
 .project
 *.egg-info/
 *.db
-activate
+/activate
 *.err
 *.log
 *.pid
