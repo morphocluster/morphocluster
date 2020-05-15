@@ -10,10 +10,10 @@ Installation (Web Application)
 
 The web application runs in a Docker container.
 
-1. Decide where to store the data, e.g. `/data/morphocluster`, and create the required directories, e.g. `mkdir -p /data/morphocluster/{postgres,data}`.
-   Copy `docker-compose.default.yml` to `docker-compose.yml` and edit the relevant parts (e.g. paths).
-   Copy `environment.default.yml` to `environment.yml` and edit the relevant parts (e.g. for CUDA).
-2. Build environment: `docker-compose up --build`
+1. Decide where to store the data, e.g. ``/data/morphocluster``, and create the required directories, e.g. ``mkdir -p /data/morphocluster/{postgres,data}``.
+   Copy ``docker-compose.default.yml`` to ``docker-compose.yml`` and edit the relevant parts (e.g. paths).
+   Copy ``environment.default.yml`` to ``environment.yml`` and edit the relevant parts (e.g. for CUDA).
+2. Build environment: ``docker-compose up --build``
    This will take a while when run for the first time.
 3. In a new terminal, connect to the MorphoCluster container and set it up:
 
@@ -32,8 +32,8 @@ The web application runs in a Docker container.
       Retype Password: <hidden>
 
 4. Data preparation.
-   MorphoCluster accepts input data in ZIP files containing the image files and an `index.csv` file with two columns:
-   `object_id` (a unique identifier for every object) and `path` (image file path inside the archive).
+   MorphoCluster accepts input data in ZIP files containing the image files and an ``index.csv`` file with two columns:
+   ``object_id`` (a unique identifier for every object) and ``path`` (image file path inside the archive).
    `EcoTaxa <https://ecotaxa.obs-vlfr.fr/>`_ export files have to be converted (see below).
 
    Place the image archive and the deep learning model parameters into the data directory that is mounted inside the container.
@@ -72,9 +72,9 @@ The web application runs in a Docker container.
 
    Keep in mind that the paths are *inside* the Docker container, not on the host.
 
-4. Connect to the MorphoCluster service using the browser (`http://localhost:8000/`_).
+4. Connect to the MorphoCluster service using the browser (http://localhost:8000/).
    Validate and Grow the found clusters and save the result.
-   It will be placed in `/data/export/` in the container.
+   It will be placed in ``/data/export/`` in the container.
 5. Repeat clustering, tree import, validation and growing.
 
 
@@ -89,11 +89,11 @@ GPU processing
 
 By default, MorphoCluster uses the CPU to calculate deep learning image features.
 It is strongly advisable to use the GPU for that to speed up feature extraction dramatically.
-To enable feature extraction on the GPU, modify `environment.yml` to exclude `cpuonly` and include the correct `cudatoolkit` version.
-This has to be done before running `docker-compose up --build`.
+To enable feature extraction on the GPU, modify ``environment.yml`` to exclude ``cpuonly`` and include the correct ``cudatoolkit`` version.
+This has to be done before running ``docker-compose up --build``.
 Read about the `requirements for running CUDA containers <https://github.com/NVIDIA/nvidia-docker/wiki/CUDA>`_.
 
-Currently, `docker-compose` does not directly support NVIDIA docker (see `#1073 <https://github.com/NVIDIA/nvidia-docker/issues/1073>`_, `#6691 <https://github.com/docker/compose/issues/6691>`_). 
+Currently, ``docker-compose`` does not directly support NVIDIA docker (see `#1073 <https://github.com/NVIDIA/nvidia-docker/issues/1073>`_, `#6691 <https://github.com/docker/compose/issues/6691>`_). 
 It is therefore advisable to run the feature extraction direcly on the host.
 
 .. [Schroeder2020] Schröder, S., Kiko, R., & Koch, R. (2020). "MorphoCluster: Efficient Annotation of Plankton images by Clustering" `arXiv:2005.01595 <http://arxiv.org/abs/2005.01595>`_.
