@@ -19,3 +19,5 @@ htmlcov/**
 dump.rdb
 .ipynb_checkpoints/
 morphocluster/config_dev.py
+environment.yml
+docker-compose.yml

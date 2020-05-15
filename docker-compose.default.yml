@@ -39,12 +39,10 @@ volumes:
       type: none
       # Location on host filesystem for PostgreSQL data
       #device: /data/morphocluster/data
-      device: /home/moi/Work/17-MorphoCluster/Data/postgres
   morphocluster-data:
     driver: local
     driver_opts:
       o: bind
       type: none
-      # Location on host filesystem for 
+      # Location on host filesystem for application data
       #device: /data/morphocluster/data
-      device: /home/moi/Work/17-MorphoCluster/Data/data
