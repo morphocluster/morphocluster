@@ -72,10 +72,10 @@ The web application runs in a Docker container.
 
    Keep in mind that the paths are *inside* the Docker container, not on the host.
 
-4. Connect to the MorphoCluster service using the browser (http://localhost:8000/).
+5. Connect to the MorphoCluster service using the browser (http://localhost:8000/).
    Validate and Grow the found clusters and save the result.
    It will be placed in ``/data/export/`` in the container.
-5. Repeat clustering, tree import, validation and growing.
+6. Repeat clustering, tree import, validation and growing.
 
 
 Prerequisites
