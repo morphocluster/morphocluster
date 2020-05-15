@@ -381,7 +381,13 @@ class Model(nn.Module):
 
 
 def extract_features(
-    model_parameters_fn: str, archive_fn: str, features_fn: str, normalize=True, batch_size=1024, num_workers=0
+    model_parameters_fn: str,
+    archive_fn: str,
+    features_fn: str,
+    normalize=True,
+    batch_size=1024,
+    num_workers=0,
+    cuda=True,
 ):
     """
     model_parameters_fn = "/data1/mschroeder/NoveltyDetection/Results/CrossVal/2018-02-06-12-39-56/split-2/model_state.pth"
@@ -392,10 +398,11 @@ def extract_features(
     normalize = True
     """
 
-    use_cuda = torch.cuda.is_available()
+    use_cuda = cuda and torch.cuda.is_available()
 
     if use_cuda:
         map_location = torch.device("cuda")
+        print("Using CUDA.")
     else:
         map_location = torch.device("cpu")
 
@@ -428,7 +435,11 @@ def extract_features(
     dataset = ArchiveDataset(archive_fn, transform)
 
     data_loader = torch.utils.data.DataLoader(
-        dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True
+        dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True,
     )
 
     model.eval()
