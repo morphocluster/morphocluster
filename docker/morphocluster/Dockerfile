@@ -4,10 +4,15 @@ WORKDIR /code
 # supervisor is required to run multiple processes in parallel
 RUN apt-get update --fix-missing && \
     apt-get install -y supervisor netcat && \
+    apt-get -qq --no-install-recommends install openssh-server && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY docker/morphocluster/run.sh docker/wait-for environment.yml docker/morphocluster/activate ./
+# Setup SSH
+RUN mkdir /var/run/sshd
+RUN mkdir /root/.ssh
+
+COPY docker/morphocluster/run.sh docker/wait-for docker/morphocluster/environment.yml docker/morphocluster/activate ./
 
 COPY docker/morphocluster/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
