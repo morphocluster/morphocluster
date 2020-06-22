@@ -6,6 +6,8 @@ services:
       dockerfile: docker/morphocluster/Dockerfile
     ports:
       - "8000:8000"
+      # Expose port 22 for external SSH access:
+      #- "8022:22"
     depends_on:
       - postgres
     volumes:

@@ -101,7 +101,8 @@ SSH access
 
 For users without the privilege to execute docker commands on the host system (e.g. for security reasons), it is possible to connect to the docker container directly via SSH.
 
-1. Create a public key
+1. Make sure that port 22 is exposed in ``docker-compose.yml``.
+2. Create a public key
    
    .. code:: sh
 
@@ -113,7 +114,7 @@ For users without the privilege to execute docker commands on the host system (e
       # It looks a bit like this:
       ssh-rsa asdxyz ...
 
-2. Connect to the docker container and install the public key.
+3. Connect to the docker container and install the public key.
 
    .. code:: sh
 
@@ -122,7 +123,7 @@ For users without the privilege to execute docker commands on the host system (e
       # Install your SSH public key
       echo "ssh-rsa [asdxyz ... what you copied above]" > /root/.ssh/authorized_keys
 
-3. You can now connect to the docker container directly:
+4. You can now connect to the docker container directly:
 
    .. code:: sh
 
