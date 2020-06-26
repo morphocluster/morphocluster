@@ -63,7 +63,11 @@ def fix_ecotaxa(archive_fn):
 
         # Find index file
         index_pat = "ecotaxa_*"
-        index_fns = fnmatch.filter(zf.namelist(), index_pat)
+        index_fns = [
+            fn
+            for fn in zf.namelist()
+            if fnmatch.fnmatch(os.path.basename(fn), index_pat)
+        ]
 
         if not index_fns:
             raise ValueError(
@@ -114,15 +118,13 @@ def fix_ecotaxa(archive_fn):
 @click.argument("output_fn", type=click.Path(exists=False, dir_okay=False))
 @click.option("--normalize/--no-normalize", default=True)
 @click.option("--batch-size", type=int, default=512)
-@click.option("--num-workers", type=int, default=0)
-def features(model_fn, archive_fn, output_fn, normalize, batch_size, num_workers):
+# @click.option("--num-workers", type=int, default=0)
+def features(model_fn, archive_fn, output_fn, normalize, batch_size):
     """
     Extract features from an EcoTaxa export (or compatible) archive.
     """
 
-    extract_features(
-        model_fn, archive_fn, output_fn, normalize, batch_size, num_workers
-    )
+    extract_features(model_fn, archive_fn, output_fn, normalize, batch_size)
 
 
 @main.command()
