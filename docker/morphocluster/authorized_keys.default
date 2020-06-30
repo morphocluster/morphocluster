@@ -1,0 +1,2 @@
+# Include the public keys that should be able to connect to the container.
+# The keys have the format "<keytype> <key> <comment>" and are for example located in ~/.ssh/id_rsa.pub

@@ -12,6 +12,7 @@ services:
       - postgres
     volumes:
       - morphocluster-data:/data
+      - ${PWD}/docker/morphocluster/authorized_keys:/authorized_keys:ro
   postgres:
     build: docker/postgresql
     environment:

@@ -12,7 +12,7 @@ The web application runs in a Docker container.
 
 1. Decide where to store the data, e.g. ``/data/morphocluster``, and create the required directories, e.g. ``mkdir -p /data/morphocluster/{postgres,data}``.
    Copy ``docker-compose.default.yml`` to ``docker-compose.yml`` and edit the relevant parts (e.g. paths).
-   Copy ``environment.default.yml`` to ``environment.yml`` and edit the relevant parts (e.g. for CUDA).
+   Copy ``environment.default.yml`` to ``docker/environment.yml`` and edit the relevant parts (e.g. for CUDA).
 2. Build environment: ``docker-compose up --build``
    This will take a while when run for the first time.
 3. In a new terminal, connect to the MorphoCluster container and set it up:
@@ -114,16 +114,11 @@ For users without the privilege to execute docker commands on the host system (e
       # It looks a bit like this:
       ssh-rsa asdxyz ...
 
-3. Connect to the docker container and install the public key.
+3. Create ``docker/authorized_keys`` from the ``docker/authorized_keys.default`` template
+   and paste the public key created in the previous step.
 
-   .. code:: sh
-
-      $ docker-compose exec morphocluster bash
-
-      # Install your SSH public key
-      echo "ssh-rsa [asdxyz ... what you copied above]" > /root/.ssh/authorized_keys
-
-4. You can now connect to the docker container directly:
+4. After starting the morphocluster docker service,
+   you can now connect to the docker container directly:
 
    .. code:: sh
 

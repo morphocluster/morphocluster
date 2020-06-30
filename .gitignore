@@ -21,3 +21,5 @@ dump.rdb
 morphocluster/config_dev.py
 environment.yml
 docker-compose.yml
+docker/morphocluster/authorized_keys
+mprofile_*.dat
