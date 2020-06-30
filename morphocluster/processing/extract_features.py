@@ -2,16 +2,16 @@
 """
 import csv
 import fnmatch
+import io
+import multiprocessing
 import threading
 import zipfile
 from collections import OrderedDict
 
+import chardet
 import h5py
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-
-import chardet
 import PIL
 import torch
 import torch.nn as nn
@@ -20,6 +20,7 @@ from PIL import Image, ImageOps
 from torch.nn.functional import avg_pool2d
 from torchvision import models
 from torchvision.transforms import Resize, ToTensor
+from tqdm import tqdm
 
 
 def _check_img_type(img):
@@ -386,7 +387,7 @@ def extract_features(
     features_fn: str,
     normalize=True,
     batch_size=1024,
-    num_workers=0,
+    # num_workers=0, # ERROR: Parallelization does not work with zip files.
     cuda=True,
 ):
     """
@@ -438,7 +439,7 @@ def extract_features(
         dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=num_workers,
+        num_workers=0 #num_workers,
         pin_memory=True,
     )
 
