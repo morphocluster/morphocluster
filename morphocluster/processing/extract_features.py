@@ -439,7 +439,7 @@ def extract_features(
         dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=0 #num_workers,
+        num_workers=0,  # num_workers has to be 0 because ArchiveDataset is not threadsafe
         pin_memory=True,
     )
 
