@@ -11,10 +11,10 @@ Installation (Web Application)
 The web application runs in a Docker container.
 
 1. Decide where to store the data, e.g. ``/data/morphocluster``, and create the required directories, e.g. ``mkdir -p /data/morphocluster/{postgres,data}``.
-   Copy ``docker-compose.default.yml`` to ``docker-compose.yml`` and edit the relevant parts (e.g. paths).
-   Copy ``environment.default.yml`` to ``docker/environment.yml`` and edit the relevant parts (e.g. for CUDA).
-2. Build environment: ``docker-compose up --build``
-   This will take a while when run for the first time.
+   Make a copy of ``docker-compose.default.yml`` in the same directory, name it ``docker-compose.yml`` and edit the relevant parts (e.g. paths).
+   Make a copy of ``environment.default.yml`` in the same directory, name it ``environment.yml`` and edit the relevant parts (e.g. for CUDA).
+2. Open a shell in the repository folder and build environment: ``docker-compose up --build``
+   This will take a long while when run for the first time.
 3. In a new terminal, connect to the MorphoCluster container and set it up:
 
    .. code:: sh
@@ -114,7 +114,7 @@ For users without the privilege to execute docker commands on the host system (e
       # It looks a bit like this:
       ssh-rsa asdxyz ...
 
-3. Create ``docker/authorized_keys`` from the ``docker/authorized_keys.default`` template
+3. Create ``docker/morphocluster/authorized_keys`` from the ``docker/morphocluster/authorized_keys.default`` template
    and paste the public key created in the previous step.
 
 4. After starting the morphocluster docker service,
@@ -126,6 +126,6 @@ For users without the privilege to execute docker commands on the host system (e
 
       # Inside the container, change into /code and activate the environment
       $ cd /code
-      $ . ./run.sh
+      $ . activate
 
 .. [Schroeder2020] Schröder, S., Kiko, R., & Koch, R. (2020). "MorphoCluster: Efficient Annotation of Plankton images by Clustering" `arXiv:2005.01595 <http://arxiv.org/abs/2005.01595>`_.

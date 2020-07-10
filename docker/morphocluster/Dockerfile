@@ -12,7 +12,7 @@ RUN apt-get update --fix-missing && \
 RUN mkdir /var/run/sshd
 RUN mkdir /root/.ssh && chmod 700 /root/.ssh
 
-COPY docker/morphocluster/run.sh docker/wait-for docker/morphocluster/environment.yml docker/morphocluster/activate ./
+COPY docker/morphocluster/run.sh docker/wait-for environment.yml docker/morphocluster/activate ./
 
 COPY docker/morphocluster/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
