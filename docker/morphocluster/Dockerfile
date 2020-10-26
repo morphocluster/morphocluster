@@ -34,6 +34,7 @@ RUN . /opt/conda/etc/profile.d/conda.sh && \
 RUN . /opt/conda/etc/profile.d/conda.sh && \
     conda activate morphocluster && \
     cd morphocluster/frontend  && \
+    npm --version \
     npm ci && \
     npm run build
 

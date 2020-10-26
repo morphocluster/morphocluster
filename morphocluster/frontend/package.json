@@ -29,11 +29,13 @@
     "less-loader": "^4.1.0",
     "vue-template-compiler": "^2.6.11"
   },
-  "extends": [
-    "plugin:vue/essential",
-    "eslint:recommended"
-  ],
-  "rules": {
-    "no-console": "off"
+  "eslintConfig": {
+    "extends": [
+      "plugin:vue/essential",
+      "eslint:recommended"
+    ],
+    "rules": {
+      "no-console": "off"
+    }
   }
 }
