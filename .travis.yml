@@ -8,5 +8,4 @@ before_install:
     - cp environment.default.yml environment.yml
 
     - docker-compose --version
-    - docker-compose build
-    - docker-compose start
+    - docker-compose build && docker-compose start
