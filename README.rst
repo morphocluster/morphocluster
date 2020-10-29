@@ -1,6 +1,15 @@
 Morphocluster
 =============
 
+|Travis| |GPLv3 license|
+
+.. |Travis| image:: https://travis-ci.org/morphocluster/morphocluster.svg?branch=master
+    :target: https://travis-ci.org/morphocluster/morphocluster
+    
+.. |GPLv3 license| image:: https://img.shields.io/badge/License-GPLv3-blue.svg
+   :target: LICENSE
+
+
 ..
 
     This repository contains the source code for the MorphoCluster application described in [Schroeder2020]_.
