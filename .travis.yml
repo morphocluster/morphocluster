@@ -1,4 +1,4 @@
-language: python
+language: minimal
 
 services:
     - docker
@@ -10,6 +10,6 @@ before_install:
     - docker-compose --version
     - docker-compose up --no-start
     - docker-compose start
-    
+
 after_script:
     - docker-compose stop
