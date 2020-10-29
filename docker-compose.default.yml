@@ -36,16 +36,18 @@ services:
 
 volumes:
   postgres-data:
-    driver: local
-    driver_opts:
-      o: bind
-      type: none
-      # Location on host filesystem for PostgreSQL data
-      #device: /data/morphocluster/data
+    ## Example: Store PostgreSQL data in a host directory
+    # driver: local
+    # driver_opts:
+    #   o: bind
+    #   type: none
+    #    
+    #   # Replace with your own configuration
+    #   device: /data/morphocluster/data
   morphocluster-data:
-    driver: local
-    driver_opts:
-      o: bind
-      type: none
-      # Location on host filesystem for application data
-      #device: /data/morphocluster/data
+    ## Example: Store application data in a host directory
+    # driver: local
+    # driver_opts:
+    #   o: bind
+    #   type: none
+    #   device: /data/morphocluster/data
