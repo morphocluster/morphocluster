@@ -7,15 +7,11 @@
     "build": "vue-cli-service build",
     "lint": "vue-cli-service lint"
   },
-  "eslintConfig": {
-    "rules": {
-      "no-console": "off"
-    }
-  },
   "dependencies": {
     "@mdi/font": "^2.7.94",
     "axios": "^0.18.1",
     "bootstrap-vue": "^2.14.0",
+    "core-js": "^3.6.5",
     "lodash": "^4.17.13",
     "vue": "^2.6.11",
     "vue-infinite-loading": "^2.3.3",
@@ -23,9 +19,12 @@
     "vue-simple-spinner": "^1.2.8"
   },
   "devDependencies": {
-    "@vue/cli-plugin-babel": "^3.0.1",
-    "@vue/cli-plugin-eslint": "^3.0.1",
-    "@vue/cli-service": "^3.0.1",
+    "@vue/cli-plugin-babel": "^4.5.8",
+    "@vue/cli-plugin-eslint": "^4.5.8",
+    "@vue/cli-service": "^4.5.8",
+    "babel-eslint": "^10.1.0",
+    "eslint": "^6.7.2",
+    "eslint-plugin-vue": "^6.2.2",
     "less": "^3.8.1",
     "less-loader": "^4.1.0",
     "vue-template-compiler": "^2.6.11"
