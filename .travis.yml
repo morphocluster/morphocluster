@@ -1,0 +1,12 @@
+language: python
+
+services:
+    - docker
+    
+before_install:
+    - cp docker-compose.default.yml docker-compose.yml
+    - cp environment.default.yml environment.yml
+
+    - docker-compose --version
+    - docker-compose build
+    - docker-compose start
