@@ -1,6 +1,12 @@
 Morphocluster
 =============
 
+|Travis|
+
+.. |Travis| image:: https://travis-ci.org/morphocluster/morphocluster.svg?branch=master
+    :target: https://travis-ci.org/morphocluster/morphocluster
+
+
 ..
 
     This repository contains the source code for the MorphoCluster application described in [Schroeder2020]_.
