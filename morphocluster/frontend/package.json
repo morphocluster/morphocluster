@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@mdi/font": "^2.7.94",
-    "axios": "^0.18.1",
+    "axios": "^0.21.1",
     "bootstrap-vue": "^2.14.0",
     "lodash": "^4.17.13",
     "vue": "^2.6.11",
