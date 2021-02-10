@@ -25,6 +25,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    # Increase shared memory to allow for big queries
+    shm_size: '2gb'
   redis-rq:
     image: "redis:5-alpine"
     ports:
