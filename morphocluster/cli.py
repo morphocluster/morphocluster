@@ -129,15 +129,18 @@ def init_app(app):
             print("Loading {}...".format(features_fn))
             with h5py.File(
                 features_fn, "r", libver="latest"
-            ) as f_features, database.engine.begin() as conn:
-                object_ids = f_features["object_id"]
-                vectors = f_features["features"]
-
+            ) as f_features:
+                object_ids = f_features["object_id"].asstr()[:]
+                vectors = f_features["features"][:]
+            
+            with database.engine.begin() as conn:
                 stmt = (
                     models.objects.update()
                     .where(models.objects.c.object_id == bindparam("_object_id"))
                     .values({"vector": bindparam("vector")})
                 )
+
+                # TODO: Use UPDATE ... RETURNING to get the number of affected rows
 
                 bar = ProgressBar(len(object_ids), max_width=40)
                 obj_iter = iter(zip(object_ids, vectors))
@@ -156,6 +159,9 @@ def init_app(app):
                     bar.numerator += len(chunk)
                     print(bar, end="\r")
                 print()
+
+                # TODO: In the end, print a summary of how many objects have a feature vector now.
+
                 print("Done.")
 
     @app.cli.command()

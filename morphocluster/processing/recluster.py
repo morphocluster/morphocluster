@@ -55,7 +55,7 @@ class Recluster:
             dataset = {
                 "features": f_features["features"][:],
                 # Sometimes, object_id are still ints (which is wrong)
-                "object_id": pd.Series(f_features["object_id"][:]).astype(str),
+                "object_id": pd.Series(f_features["object_id"].asstr()[:]),
             }
 
         if append and self.dataset is not None:
