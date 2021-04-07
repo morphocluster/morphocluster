@@ -13,6 +13,13 @@ services:
     volumes:
       - morphocluster-data:/data
       - ${PWD}/docker/morphocluster/authorized_keys:/authorized_keys:ro
+    # # Uncomment this block to use the host's GPU inside the container
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities:
+    #           - gpu
   postgres:
     build: docker/postgresql
     environment:
