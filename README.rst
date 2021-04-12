@@ -46,7 +46,7 @@ The web application runs in a Docker container.
    ``object_id`` (a unique identifier for every object) and ``path`` (image file path inside the archive).
    `EcoTaxa <https://ecotaxa.obs-vlfr.fr/>`_ export files have to be converted (see below).
 
-   Place the image archive and the deep learning [model parameters](https://github.com/morphocluster/morphocluster/raw/fa9bec972596761f4f9acc1fa68ab238d2213262/data/model_state.pth) into the data directory that is mounted inside the container.
+   Place the image archive and the deep learning `model parameters <https://github.com/morphocluster/morphocluster/raw/fa9bec972596761f4f9acc1fa68ab238d2213262/data/model_state.pth>`_ into the data directory that is mounted inside the container.
 
    .. code:: sh
 
