@@ -62,7 +62,7 @@ The web application runs in a Docker container.
       $ morphocluster fix-ecotaxa archive.zip
 
       # 1. Calculate deep learning image features.
-      # Without a GPU (see below) this will be dead slow.
+      # Using the GPU (see below) will considerably speed this up.
       $ morphocluster features model_state.pth archive.zip features.h5
 
       # 2a. Cluster the features.
