@@ -11,7 +11,7 @@
     "@mdi/font": "^2.7.94",
     "axios": "^0.21.1",
     "bootstrap-vue": "^2.14.0",
-    "lodash": "^4.17.13",
+    "lodash": "^4.17.21",
     "vue": "^2.6.11",
     "vue-infinite-loading": "^2.3.3",
     "vue-router": "^3.0.1",
