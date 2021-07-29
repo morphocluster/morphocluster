@@ -46,7 +46,7 @@ The web application runs in a Docker container.
    ``object_id`` (a unique identifier for every object) and ``path`` (image file path inside the archive).
    `EcoTaxa <https://ecotaxa.obs-vlfr.fr/>`_ export files have to be converted (see below).
 
-   Place the image archive and the deep learning model parameters into the data directory that is mounted inside the container.
+   Place the image archive and the deep learning `model parameters <https://github.com/morphocluster/morphocluster/raw/fa9bec972596761f4f9acc1fa68ab238d2213262/data/model_state.pth>`_ into the data directory that is mounted inside the container.
 
    .. code:: sh
 
@@ -62,7 +62,7 @@ The web application runs in a Docker container.
       $ morphocluster fix-ecotaxa archive.zip
 
       # 1. Calculate deep learning image features.
-      # Without a GPU (see below) this will be dead slow.
+      # Using the GPU (see below) will considerably speed this up.
       $ morphocluster features model_state.pth archive.zip features.h5
 
       # 2a. Cluster the features.

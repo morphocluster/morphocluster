@@ -36,6 +36,9 @@ class MemberCollection(Sequence):
             ]
 
             if self.none_action == "raise":
+                n_none = sum(1 for v in vectors if v is None)
+                if n_none:
+                    raise ValueError(f"vectors contain {n_none} None entries (out of {len(vectors)})")
                 self._vectors = np.array(vectors)
             elif self.none_action == "zero":
                 self._vectors = seq2array(vectors, len(vectors))

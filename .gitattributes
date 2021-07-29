@@ -3,3 +3,5 @@ templates/* linguist-vendored
 _updated/app/static/* linguist-vendored
 _updated/app/templates/* linguist-vendored
 morphocluster/_version.py export-subst
+data/model_state.pth filter=lfs diff=lfs merge=lfs -text
+data/* filter=lfs diff=lfs merge=lfs -text

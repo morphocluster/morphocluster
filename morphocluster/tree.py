@@ -1486,108 +1486,112 @@ class Tree(object):
                 # Iterate over DataFrame fixing the values along the way
                 bar = ProgressBar(len(invalid_subtree), max_width=40)
                 for node_id in invalid_subtree.index:
-                    if invalid_subtree.at[node_id, "cache_valid"]:
-                        # Don't recalculate valid nodes as invalid_subtree (rightly)
-                        # doesn't include their children.
-                        continue
+                    try:
+                        if invalid_subtree.at[node_id, "cache_valid"]:
+                            # Don't recalculate valid nodes as invalid_subtree (rightly)
+                            # doesn't include their children.
+                            continue
 
-                    child_selector = invalid_subtree["parent_id"] == node_id
-                    children = invalid_subtree.loc[child_selector]
-                    children_dict = MemberCollection(
-                        children.reset_index().to_dict("records"), "zero"
-                    )
+                        child_selector = invalid_subtree["parent_id"] == node_id
+                        children = invalid_subtree.loc[child_selector]
+                        children_dict = MemberCollection(
+                            children.reset_index().to_dict("records"), "zero"
+                        )
 
-                    # 2. _n_objects_deep
-                    _n_objects = invalid_subtree.loc[node_id, "_n_objects"]
-                    _n_objects_deep = _n_objects + children["_n_objects_deep"].sum()
-                    invalid_subtree.at[node_id, "_n_objects_deep"] = _n_objects_deep
+                        # 2. _n_objects_deep
+                        _n_objects = invalid_subtree.loc[node_id, "_n_objects"]
+                        _n_objects_deep = _n_objects + children["_n_objects_deep"].sum()
+                        invalid_subtree.at[node_id, "_n_objects_deep"] = _n_objects_deep
 
-                    # Sample 1000 objects to speed up the calculation
-                    objects_ = MemberCollection(
-                        self.get_objects(node_id, order_by=objects.c.rand, limit=1000),
-                        "raise",
-                    )
+                        # Sample 1000 objects to speed up the calculation
+                        objects_ = MemberCollection(
+                            self.get_objects(node_id, order_by=objects.c.rand, limit=1000),
+                            "raise",
+                        )
 
-                    # 3. _own_type_objects, _type_objects
-                    # TODO: Replace _own_type_objects with "_atypical_objects"
-                    invalid_subtree.at[
-                        node_id, "_own_type_objects"
-                    ] = self._calc_own_type_objects(children_dict, objects_)
-                    # self._calc_own_type_objects(children_dict, objects_)
+                        # 3. _own_type_objects, _type_objects
+                        # TODO: Replace _own_type_objects with "_atypical_objects"
+                        invalid_subtree.at[
+                            node_id, "_own_type_objects"
+                        ] = self._calc_own_type_objects(children_dict, objects_)
+                        # self._calc_own_type_objects(children_dict, objects_)
 
-                    invalid_subtree.at[
-                        node_id, "_type_objects"
-                    ] = self._calc_type_objects(children_dict, objects_)
+                        invalid_subtree.at[
+                            node_id, "_type_objects"
+                        ] = self._calc_type_objects(children_dict, objects_)
 
-                    if (
-                        len(children_dict) > 0
-                        and len(invalid_subtree.at[node_id, "_type_objects"]) == 0
-                    ):
-                        print(
-                            "\nNode {} has no type objects although it has children!".format(
-                                node_id
+                        if (
+                            len(children_dict) > 0
+                            and len(invalid_subtree.at[node_id, "_type_objects"]) == 0
+                        ):
+                            print(
+                                "\nNode {} has no type objects although it has children!".format(
+                                    node_id
+                                )
                             )
-                        )
 
-                    # 4. _centroid
-                    _centroid = []
+                        # 4. _centroid
+                        _centroid = []
 
-                    if len(objects_) > 0:
-                        # Object mean, weighted with number of objects
-                        obj_mean = np.sum(objects_.vectors, axis=0)
-                        obj_mean /= np.linalg.norm(obj_mean)
-                        _centroid.append(_n_objects * obj_mean)
-                    if len(children_dict) > 0:
-                        children_mean = np.sum(
-                            children_dict.cardinalities[:, np.newaxis]
-                            * children_dict.vectors,
-                            axis=0,
-                        )
-                        _centroid.append(children_mean)
+                        if len(objects_) > 0:
+                            # Object mean, weighted with number of objects
+                            obj_mean = np.sum(objects_.vectors, axis=0)
+                            obj_mean /= np.linalg.norm(obj_mean)
+                            _centroid.append(_n_objects * obj_mean)
+                        if len(children_dict) > 0:
+                            children_mean = np.sum(
+                                children_dict.cardinalities[:, np.newaxis]
+                                * children_dict.vectors,
+                                axis=0,
+                            )
+                            _centroid.append(children_mean)
 
-                    if len(_centroid) > 0:
-                        _centroid = np.sum(_centroid, axis=0)
-                        _centroid /= np.linalg.norm(_centroid)
-                    else:
-                        _centroid = None
+                        if len(_centroid) > 0:
+                            _centroid = np.sum(_centroid, axis=0)
+                            _centroid /= np.linalg.norm(_centroid)
+                        else:
+                            _centroid = None
 
-                    invalid_subtree.at[node_id, "_centroid"] = _centroid
+                        invalid_subtree.at[node_id, "_centroid"] = _centroid
 
-                    if invalid_subtree.loc[node_id, "_centroid"] is None:
-                        print("\nNode {} has no centroid!".format(node_id))
+                        if invalid_subtree.loc[node_id, "_centroid"] is None:
+                            print("\nNode {} has no centroid!".format(node_id))
 
-                    # 5. _prototypes
-                    _prototypes = []
+                        # 5. _prototypes
+                        _prototypes = []
 
-                    if len(objects_) > 0:
-                        prots = Prototypes(clusterer)
-                        prots.fit(objects_.vectors)
-                        _prototypes.append(prots)
-                    if len(children_dict) > 0:
-                        _prototypes.extend(
-                            c["_prototypes"]
-                            for c in children_dict
-                            if c["_prototypes"] is not None
-                        )
+                        if len(objects_) > 0:
+                            prots = Prototypes(clusterer)
+                            prots.fit(objects_.vectors)
+                            _prototypes.append(prots)
+                        if len(children_dict) > 0:
+                            _prototypes.extend(
+                                c["_prototypes"]
+                                for c in children_dict
+                                if c["_prototypes"] is not None
+                            )
 
-                    if len(_prototypes) > 0:
-                        try:
-                            _prototypes = merge_prototypes(_prototypes, N_PROTOTYPES)
-                        except:
-                            for prots in _prototypes:
-                                print(prots.prototypes_)
-                            raise
-                    else:
-                        _prototypes = None
-                        print("\nNode {} has no prototypes!".format(node_id))
+                        if len(_prototypes) > 0:
+                            try:
+                                _prototypes = merge_prototypes(_prototypes, N_PROTOTYPES)
+                            except:
+                                for prots in _prototypes:
+                                    print(prots.prototypes_)
+                                raise
+                        else:
+                            _prototypes = None
+                            print("\nNode {} has no prototypes!".format(node_id))
 
-                    invalid_subtree.at[node_id, "_prototypes"] = _prototypes
+                        invalid_subtree.at[node_id, "_prototypes"] = _prototypes
 
-                    # Finally, flag as updated
-                    invalid_subtree.at[node_id, "__updated"] = True
+                        # Finally, flag as updated
+                        invalid_subtree.at[node_id, "__updated"] = True
 
-                    bar.numerator += 1
-                    print(node_id, bar, end="    \r")
+                        bar.numerator += 1
+                        print(node_id, bar, end="    \r")
+                    except:
+                        print(f"Error processing node {node_id}")
+                        raise
                 print()
 
                 # Convert _n_objects_deep to int (might be object when containing NULL values in the database)
