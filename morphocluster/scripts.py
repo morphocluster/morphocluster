@@ -138,8 +138,10 @@ def features(model_fn, archive_fn, output_fn, normalize, batch_size):
 @click.option("--min-cluster-size", type=int, default=128)
 @click.option("--min-samples", type=int, default=1)
 @click.option("--method", type=click.Choice(["eom", "leaf"]), default="leaf")
+@click.option("--sample-size", type=int, default=None)
+@click.option("--pca", type=int, default=None)
 def cluster(
-    features_fns, result_fn, tree_fn, min_cluster_size, min_samples, method,
+    features_fns, result_fn, tree_fn, min_cluster_size, min_samples, method, sample_size, pca
 ):
     rc = Recluster()
 
@@ -153,6 +155,8 @@ def cluster(
         min_cluster_size=min_cluster_size,
         min_samples=min_samples,
         cluster_selection_method=method,
+        sample_size=sample_size,
+        pca=pca,
     )
 
     rc.save(result_fn)

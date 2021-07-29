@@ -8,6 +8,7 @@ import h5py
 import hdbscan
 import numpy as np
 import pandas as pd
+import sklearn.decomposition
 
 from morphocluster.processing import Tree
 
@@ -55,7 +56,7 @@ class Recluster:
             dataset = {
                 "features": f_features["features"][:],
                 # Sometimes, object_id are still ints (which is wrong)
-                "object_id": pd.Series(f_features["object_id"][:]).astype(str),
+                "object_id": pd.Series(f_features["object_id"].asstr()[:]),
             }
 
         if append and self.dataset is not None:
@@ -170,7 +171,7 @@ class Recluster:
             "object_id": dataset_object_id[dataset_selector].reset_index(drop=True),
         }
 
-    def cluster(self, ignore_approved=True, sample_size=None, **kwargs):
+    def cluster(self, ignore_approved=True, sample_size=None, pca=None, **kwargs):
         """
         Cluster the data.
         """
@@ -184,15 +185,26 @@ class Recluster:
             print("Subsampling dataset ({:,d})...".format(sample_size))
             dataset = _subsample_dataset(sample_size, dataset)
 
+        features = dataset["features"]
+        if pca is not None:
+            print(f"Performing PCA ({pca})...")
+            start = time.perf_counter()
+            pca = sklearn.decomposition.PCA(pca)
+            features = pca.fit_transform(features)
+            time_fit = time.perf_counter() - start
+            print("Dimensionality reduction took {:.0f}s".format(time_fit))
+            print("Explained variance ratio:", pca.explained_variance_ratio_.sum())
+
+        print("Feature shape:", features.shape)
         print("Arguments:", kwargs)
 
         clusterer = hdbscan.HDBSCAN(**kwargs)
 
-        n_objects = len(dataset["features"])
+        n_objects = len(features)
 
         print(f"Clustering {n_objects:,d} objects...")
         start = time.perf_counter()
-        labels = clusterer.fit_predict(dataset["features"])
+        labels = clusterer.fit_predict(features)
         time_fit = time.perf_counter() - start
 
         print("Clustering took {:.0f}s".format(time_fit))
