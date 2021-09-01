@@ -28,12 +28,14 @@ COPY morphocluster ./morphocluster
 COPY migrations ./migrations
 RUN . /opt/conda/etc/profile.d/conda.sh && \
     conda activate morphocluster && \
+    echo Installing packages... && \
     pip install -e .
 
 # Build frontend
 RUN . /opt/conda/etc/profile.d/conda.sh && \
     conda activate morphocluster && \
     cd morphocluster/frontend  && \
+    echo Building frontend... && \
     npm --version && \
     npm ci && \
     npm run build

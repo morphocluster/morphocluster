@@ -1186,9 +1186,13 @@ class Tree(object):
             # This is slow!
             # old_node_ids is required for invalidation
             # TODO: Distinct!
-            stmt = select([nodes_objects.c.node_id], for_update=True).where(
-                nodes_objects.c.object_id.in_(object_ids)
-                & (nodes_objects.c.project_id == project_id)
+            stmt = (
+                select([nodes_objects.c.node_id])
+                .with_for_update()
+                .where(
+                    nodes_objects.c.object_id.in_(object_ids)
+                    & (nodes_objects.c.project_id == project_id)
+                )
             )
             old_node_ids = [
                 r["node_id"] for r in self.connection.execute(stmt).fetchall()
