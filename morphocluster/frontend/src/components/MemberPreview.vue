@@ -1,7 +1,7 @@
 <template>
   <div class="member-preview card" :style="style">
-    <div class="member-header">
-        <div class="member-title" :title="title">{{title}}</div>
+    <div class="member-header" :title="title">
+        <!-- <div class="member-title" >{{title}}</div> -->
       <div class="member-controls">
         <i
           v-for="c of controls"
@@ -64,7 +64,7 @@ export default {
 	border-top-left-radius: calc(.25rem - 1px);
 	padding-top: 3px;
 	height: auto;
-	display: flex;
+	/*display: flex;*/
 }
 
 .member-body {
@@ -90,6 +90,12 @@ export default {
 	max-height: 150px;
 	margin: 0 auto;
 	display: block;
+}
+
+.member-controls {
+  font-size: x-large;
+  /* margin-left: auto; */
+  float: right;
 }
 
 .member-controls i {
