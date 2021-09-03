@@ -36,5 +36,5 @@ dependencies:
     - match_arrays
     - Flask-RQ2
     - tqdm
-    - Click
+    - Click==7.1.2
     - chardet
