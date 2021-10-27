@@ -1027,6 +1027,7 @@ class Tree(object):
         """
         with Timer("Tree.recommend_objects") as timer:
             node = self.get_node(node_id)
+            project_id = node["project_id"]
 
             # Get the path to the node (without the node itself)
             path = self.get_path_ids(node_id)[:-1]
@@ -1036,15 +1037,14 @@ class Tree(object):
             rejected_object_ids = (
                 select([nodes_rejected_objects.c.object_id])
                 .where(nodes_rejected_objects.c.node_id == node_id)
-                .alias("rejected_object_ids")
             )
 
-            with timer.child("Query matching objects"):
+            with timer.child("Query matching objects") as c:
                 # Traverse the parse in reverse
                 for parent_id in path[::-1]:
                     n_left = max_n - len(objects_)
 
-                    # Break if we already have enough nodes
+                    # Break if we already have enough objects
                     if n_left <= 0:
                         break
 
@@ -1054,11 +1054,16 @@ class Tree(object):
                         .select_from(objects.join(nodes_objects))
                         .where(
                             (nodes_objects.c.node_id == parent_id)
+                            & (nodes_objects.c.project_id == project_id)
                             & (~objects.c.object_id.in_(rejected_object_ids))
                         )
                     )
 
-                    result = self.connection.execute(stmt).fetchall()
+                    with c.child("execute"):
+                        r = self.connection.execute(stmt)
+
+                    with c.child("fetch"):
+                        result = r.fetchall()
 
                     objects_.extend(dict(r) for r in result)
 
