@@ -3,25 +3,72 @@ Created on 13.03.2018
 
 @author: mschroeder
 """
-# pylint: disable=W,C,R
-from sqlalchemy import Table, Column, ForeignKey, Index
-
 import datetime
 
-from sqlalchemy.types import (
-    Integer,
-    BigInteger,
-    String,
-    DateTime,
-    PickleType,
-    Boolean,
-    Text,
-    Float,
-)
-from sqlalchemy.sql.schema import UniqueConstraint, CheckConstraint
+# pylint: disable=W,C,R
+from sqlalchemy import Column, ForeignKey, Index, Table
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.sql import func
+from sqlalchemy.sql.schema import CheckConstraint, UniqueConstraint
+from sqlalchemy.types import (
+    BigInteger,
+    Boolean,
+    DateTime,
+    Float,
+    Integer,
+    PickleType,
+    String,
+    Text,
+    TypeEngine,
+    UserDefinedType,
+)
+
 from morphocluster.extensions import database as db
+
+
+class Point(UserDefinedType):
+    """
+    Represent a point by using a zero-volume cube from the cube extension.
+
+    This allows to calculate distances inside the database.
+
+    https://www.postgresql.org/docs/current/cube.html
+    """
+
+    def __init__(self, *, numpy=False) -> None:
+        super().__init__()
+
+        self.numpy = numpy
+
+    def get_col_spec(self, **kw):
+        return "CUBE"
+
+    def bind_processor(self, dialect):
+        def process(value):
+            return ",".join(str(v) for v in value)
+
+        return process
+
+    def result_processor(self, dialect, coltype):
+        if self.numpy:
+            import numpy as np
+
+            def process_numpy(value: str):
+                return np.fromstring(value[1:-1], sep=",")
+
+            return process_numpy
+
+        def process_tuple(value: str):
+            return tuple(float(v) for v in value[1:-1].split(","))
+
+        return process_tuple
+
+    class Comparator(TypeEngine.Comparator):
+        def dist_euclidean(self, other):
+            return self.op("<->", return_type=Float)(other)
+
+    comparator_factory = Comparator
+
 
 metadata = db.metadata
 
@@ -31,7 +78,7 @@ objects = Table(
     metadata,
     Column("object_id", String, primary_key=True),
     Column("path", String, nullable=False),
-    Column("vector", PickleType, nullable=True),
+    Column("vector", Point(numpy=True), nullable=True),
     Column("rand", Float, server_default=func.random()),
 )
 
