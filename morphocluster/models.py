@@ -35,10 +35,10 @@ class Point(UserDefinedType):
     https://www.postgresql.org/docs/current/cube.html
     """
 
-    def __init__(self, *, numpy=False) -> None:
-        super().__init__()
-
+    def __init__(self, numpy=False) -> None:
         self.numpy = numpy
+
+        super().__init__()
 
     def get_col_spec(self, **kw):
         return "CUBE"
@@ -50,16 +50,26 @@ class Point(UserDefinedType):
         return process
 
     def result_processor(self, dialect, coltype):
+
         if self.numpy:
             import numpy as np
 
-            def process_numpy(value: str):
+            def process_numpy(value):
+                if isinstance(value, memoryview):
+                    value = value.tobytes()
+
                 return np.fromstring(value[1:-1], sep=",")
 
             return process_numpy
 
-        def process_tuple(value: str):
-            return tuple(float(v) for v in value[1:-1].split(","))
+        def process_tuple(value):
+            if isinstance(value, memoryview):
+                value = value.tobytes()
+                sep = b","
+            else:
+                sep = ","
+
+            return tuple(float(v) for v in value[1:-1].split(sep))
 
         return process_tuple
 
