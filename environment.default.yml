@@ -5,7 +5,7 @@ channels:
   - defaults
 dependencies:
   - python=3.7
-  - numpy>=1.17.2
+  - numpy>=1.17.2,<1.20.0 # Avoid deprecation errors
   - pandas
   - h5py>=3.1.0
   - scikit-learn<=0.21
@@ -13,6 +13,7 @@ dependencies:
   - pip
   - hdbscan
   - nodejs
+  - openssl < 3.0.0 # OpenSSL 3.0.0 removed some encryption algorithms needed by npm (md4)
   - Pillow
   - pytorch
   - torchvision

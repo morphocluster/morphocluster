@@ -5,14 +5,20 @@ services:
       context: .
       dockerfile: docker/morphocluster/Dockerfile
     ports:
+      # Expose port 8000 (web service)
       - "8000:8000"
-      # Expose port 22 for external SSH access:
+      ## Expose port 22 for external SSH access:
       #- "8022:22"
     depends_on:
       - postgres
     volumes:
       - morphocluster-data:/data
       - ${PWD}/docker/morphocluster/authorized_keys:/authorized_keys:ro
+    environment:
+      # Store command history in the data volume
+      - HISTSIZE=-1
+      - HISTFILESIZE=-1
+      - HISTFILE=/data/.bash_history
     # # Uncomment this block to use the host's GPU inside the container
     # deploy:
     #   resources:
@@ -27,9 +33,7 @@ services:
       POSTGRES_PASSWORD: morphocluster
       POSTGRES_DB: morphocluster
     ports:
-      ## Expose Port 5432 for direct access of the database.
-      ## Remove in production!
-      - "5432:5432"
+      - "5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     # Increase shared memory to allow for big queries
