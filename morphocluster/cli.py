@@ -270,6 +270,16 @@ def init_app(app):
             print("Done.")
 
     @app.cli.command()
+    @click.argument("project_id", type=int)
+    def reset_grown(project_id: int):
+        with database.engine.connect() as conn:
+            tree = Tree(conn)
+
+            tree.reset_grown(project_id)
+
+            print("Done.")
+
+    @app.cli.command()
     @click.argument("username")
     def add_user(username):
         print("Adding user {}:".format(username))

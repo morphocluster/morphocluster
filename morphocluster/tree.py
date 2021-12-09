@@ -17,7 +17,7 @@ from sklearn.cluster import KMeans
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import text
 from sqlalchemy.sql.elements import literal_column
-from sqlalchemy.sql.expression import bindparam, literal, select
+from sqlalchemy.sql.expression import bindparam, literal, select, update
 from sqlalchemy.sql.functions import coalesce, func
 from timer_cm import Timer
 
@@ -561,6 +561,14 @@ class Tree(object):
 
         return root_id
 
+    def reset_grown(self, project_id):
+        """Reset the filled (grown) flag to false for a certain project."""
+        stmt = (
+            nodes.update().where(nodes.c.project_id == project_id).values(filled=False)
+        )
+
+        self.connection.execute(stmt)
+
     def get_projects(self, visible_only=True):
         """
         Get projects with name
@@ -1050,6 +1058,7 @@ class Tree(object):
                 objects.c.vector.dist_euclidean(p) for p in prots.prototypes_
             ]
 
+            print("Tree.recommend_objects: Querying candidates...")
             with timer.child("Query matching objects") as c:
                 # Traverse the parse in reverse
                 for parent_id in path[::-1]:
