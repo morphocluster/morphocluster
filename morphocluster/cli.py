@@ -6,6 +6,7 @@ from getpass import getpass
 import click
 import flask_migrate
 import h5py
+import numpy as np
 import pandas as pd
 import tqdm
 from etaprogress.progress import ProgressBar
@@ -127,12 +128,10 @@ def init_app(app):
         """
         for features_fn in features_fns:
             print("Loading {}...".format(features_fn))
-            with h5py.File(
-                features_fn, "r", libver="latest"
-            ) as f_features:
-                object_ids = f_features["object_id"].asstr()[:]
-                vectors = f_features["features"][:]
-            
+            with h5py.File(features_fn, "r", libver="latest") as f_features:
+                object_ids = f_features["object_id"].asstr()[:]  # type: ignore
+                vectors: np.ndarray = f_features["features"][:]  # type: ignore
+
             with database.engine.begin() as conn:
                 stmt = (
                     models.objects.update()
@@ -142,8 +141,8 @@ def init_app(app):
 
                 # TODO: Use UPDATE ... RETURNING to get the number of affected rows
 
-                bar = ProgressBar(len(object_ids), max_width=40)
-                obj_iter = iter(zip(object_ids, vectors))
+                progress = tqdm.tqdm(total=len(object_ids), unit="obj")
+                obj_iter = iter(zip(object_ids, vectors))  # type: ignore
                 while True:
                     chunk = tuple(itertools.islice(obj_iter, 1000))
                     if not chunk:
@@ -156,9 +155,8 @@ def init_app(app):
                         ],
                     )
 
-                    bar.numerator += len(chunk)
-                    print(bar, end="\r")
-                print()
+                    progress.update(len(chunk))
+                progress.close()
 
                 # TODO: In the end, print a summary of how many objects have a feature vector now.
 
