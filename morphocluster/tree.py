@@ -1515,8 +1515,9 @@ class Tree(object):
 
                             child_selector = invalid_subtree["parent_id"] == node_id
                             children = invalid_subtree.loc[child_selector]
+                            # Build collection of children. (Remove children without a vector.)
                             children_dict = MemberCollection(
-                                children.reset_index().to_dict("records"), "zero"
+                                children.reset_index().to_dict("records"), "remove"
                             )
 
                             # 2. _n_objects_deep
