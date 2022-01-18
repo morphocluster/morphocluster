@@ -1,6 +1,7 @@
 import csv
 import fnmatch
 import os.path
+from typing import Optional
 import zipfile
 
 import chardet
@@ -53,8 +54,17 @@ def ecotaxa_fix_types(dataframe):
     "archive_fn",
     type=click.Path(exists=True, dir_okay=False, readable=True, writable=True),
 )
-def fix_ecotaxa(archive_fn):
+@click.option(
+    "--encoding"
+)
+@click.option(
+    "--delimiter"
+)
+def fix_ecotaxa(archive_fn, encoding, delimiter: Optional[str]):
     """Fix EcoTaxa-style archives to be processable by MorphoCluster."""
+
+    if delimiter is not None:
+        delimiter = delimiter.replace("\\t", "\t")
 
     with zipfile.ZipFile(archive_fn, "a") as zf:
         if "index.csv" in zf.namelist():
@@ -83,19 +93,24 @@ def fix_ecotaxa(archive_fn):
 
             print(f"Loading {index_fn}...")
 
-            with zf.open(index_fn) as fp:
-                sample = fp.read(8000)
-                encoding = chardet.detect(sample)["encoding"]
-                sample = sample.decode(encoding)
-                dialect = csv.Sniffer().sniff(sample, [",", "\t", ";"])
-                print("delimiter", repr(dialect.delimiter))
+            if encoding is None or delimiter is None:
+                with zf.open(index_fn) as fp:
+                    sample = fp.read(8000)
+                    if encoding is None:
+                        encoding = chardet.detect(sample)["encoding"]
+                        print("Detected encoding:", encoding)
+                    sample = sample.decode(encoding)
+                    if delimiter is None:
+                        dialect = csv.Sniffer().sniff(sample, [",", "\t", ";"])
+                        delimiter = dialect.delimiter
+                        print("Detected delimiter:", repr(delimiter))
 
             with zf.open(index_fn) as fp:
                 dataframe = pd.read_csv(
                     fp,
                     encoding=encoding,
+                    delimiter=delimiter,
                     dtype=str,
-                    dialect=dialect,
                     usecols=["object_id", "img_file_name"],
                 )
 
