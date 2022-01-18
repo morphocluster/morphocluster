@@ -99,6 +99,12 @@ def init_app(app):
         print(f"Loading {archive_fn} into {dst_root}...")
         with database.engine.begin() as txn, zipfile.ZipFile(archive_fn) as zf:
             index = pd.read_csv(zf.open("index.csv"), usecols=["object_id", "path"])
+
+            if not index["object_id"].is_unique:
+                value_counts = index["object_id"].value_counts()
+                info = str(value_counts[value_counts > 1])
+                raise ValueError(f"object_id contains duplicate values:\n{info}")
+
             index_iter = index.itertuples()
             progress = tqdm.tqdm(total=len(index), unit="obj")
             while True:
@@ -127,12 +133,17 @@ def init_app(app):
         """
         for features_fn in features_fns:
             print("Loading {}...".format(features_fn))
-            with h5py.File(
-                features_fn, "r", libver="latest"
-            ) as f_features:
+            with h5py.File(features_fn, "r", libver="latest") as f_features:
+                n_obj, n_dim = f_features["features"].shape
+                print(f"{n_obj} objects, {n_dim} dimensions.")
+                if n_dim > 100:
+                    raise ValueError(
+                        "The features can not have more than 100 dimensions."
+                    )
+
                 object_ids = f_features["object_id"].asstr()[:]
                 vectors = f_features["features"][:]
-            
+
             with database.engine.begin() as conn:
                 stmt = (
                     models.objects.update()
