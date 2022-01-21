@@ -227,7 +227,20 @@ class Recluster:
         )
 
         # Turn cluster_labels to a tree
-        self.trees.append(Tree.from_labels(labels, dataset["object_id"]))
+        self.trees.append(
+            Tree.from_labels(
+                labels,
+                dataset["object_id"],
+                meta={
+                    "cluster": {
+                        "ignore_approved": ignore_approved,
+                        "sample_size": sample_size,
+                        "pca": pca,
+                        **kwargs,
+                    }
+                },
+            )
+        )
 
         return self
 

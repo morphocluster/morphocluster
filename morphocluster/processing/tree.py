@@ -104,7 +104,10 @@ class Tree(object):
                     meta = json.load(meta_f)
             except KeyError:
                 # No such member
-                meta = None
+                meta = {}
+
+        meta["base"] = "from_saved"
+        meta["base_fn"] = tree_fn
 
         return Tree(nodes, objects, rejected_objects, meta)
 
@@ -157,15 +160,22 @@ class Tree(object):
 
         objects = pd.concat([objects, root_objects], ignore_index=True)
 
-        return Tree(nodes, objects)
+        meta = {}
+        meta["base"] = "from_HDBSCAN"
+        meta["base_fn"] = path
+
+        return Tree(nodes, objects, meta=meta)
 
     @staticmethod
-    def from_labels(labels, object_ids) -> "Tree":
+    def from_labels(labels, object_ids, meta=None) -> "Tree":
         """
         Construct a tree from a label vector and a vector of object_ids.
 
         labels may contain -1. Then an object is assigned to root.
         """
+
+        if meta is None:
+            meta = {}
 
         labels = pd.Series(labels)
         object_ids = pd.Series(object_ids)
@@ -180,11 +190,8 @@ class Tree(object):
             if label != -1
         ]
 
-        if not nodes:
-            raise ValueError("No non-empty labels were supplied.")
-
         # Add root node
-        nodes.append({"node_id": root_id})
+        nodes.append({"node_id": root_id, "parent_id": None})
         nodes = pd.DataFrame(nodes)
 
         # Compose objects
@@ -192,7 +199,9 @@ class Tree(object):
         # Mount unlabeled objects (-1) to root
         objects.loc[objects["node_id"] == -1, "node_id"] = root_id
 
-        return Tree(nodes, objects)
+        meta["base"] = "from_labels"
+
+        return Tree(nodes, objects, meta=meta)
 
     @staticmethod
     def from_cluster_labels(cluster_labels_fn, object_ids_fn=None) -> "Tree":
@@ -230,7 +239,11 @@ class Tree(object):
 
             objects = pd.concat([objects, root_objects], ignore_index=True)
 
-        return Tree(nodes, objects)
+        meta = {}
+        meta["base"] = "from_cluster_labels"
+        meta["base_fn"] = cluster_labels_fn
+
+        return Tree(nodes, objects, meta=meta)
 
     def __init__(self, nodes=None, objects=None, rejected_objects=None, meta=None):
         if nodes is not None:
@@ -259,6 +272,9 @@ class Tree(object):
                 raise ValueError("'rejected_objects' lacks column 'object_id'.")
             if not "node_id" in rejected_objects.columns:
                 raise ValueError("'rejected_objects' lacks column 'node_id'.")
+
+        if meta is None:
+            meta = {}
 
         self.nodes = nodes
         self.objects = objects
@@ -435,6 +451,7 @@ class Tree(object):
 
         self.nodes = pd.concat((self.nodes, other_nodes), ignore_index=True, sort=False)
         self.objects = pd.concat((self_objects, other_objects), ignore_index=True)
+        self.meta.setdefault("merged", []).append(other.meta)
 
     def to_networkx(self):
         """
