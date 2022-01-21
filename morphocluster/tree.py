@@ -1367,7 +1367,7 @@ class Tree(object):
         ]
 
     def get_next_node(
-        self, node_id, leaf=False, recurse_cb=None, filter=None, preferred_first=False
+        self, node_id, leaf=False, recurse_cb=None, filter=None, preferred_first=False, order_by=None
     ):
         """
         Get the id of the next unapproved node.
@@ -1384,6 +1384,7 @@ class Tree(object):
         # First try if there are candidates below this node
         subtree = _rquery_subtree(node_id, recurse_cb)
 
+        # TODO: Could be replaced by cached values
         children = nodes.alias("children")
         n_children = (
             select([func.count()])
@@ -1392,6 +1393,14 @@ class Tree(object):
             .as_scalar()
             .label("n_children")
         )
+
+        n_objects = (
+                    select([func.count()])
+                    .select_from(nodes_objects)
+                    .where(nodes_objects.c.node_id == subtree.c.node_id)
+                    .as_scalar()
+                    .label("n_objects")
+                )
 
         stmt = select([subtree.c.node_id])
 
@@ -1406,6 +1415,15 @@ class Tree(object):
 
         stmt = stmt.order_by(subtree.c.level.desc()).limit(1)
 
+        if order_by is None:
+            pass
+        elif order_by == "largest":
+            stmt = stmt.order_by(n_objects.desc())
+        elif order_by == "smallest":
+            stmt = stmt.order_by(n_objects.asc())
+        else:
+            raise ValueError(f"Unknown order_by value: {order_by}")
+
         print(stmt)
 
         result = self.connection.execute(stmt).scalar()
@@ -1417,7 +1435,7 @@ class Tree(object):
         node = self.connection.execute(nodes.select(nodes.c.node_id == node_id)).first()
 
         if node["parent_id"]:
-            print("No unapproved children, trying parent: {}".format(node["parent_id"]))
+            print("No matching children, trying parent: {}".format(node["parent_id"]))
             return self.get_next_node(node["parent_id"], leaf, recurse_cb, filter)
 
         return None

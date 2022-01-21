@@ -92,6 +92,9 @@ class Recluster:
         else:
             self._log("load_tree")
 
+        if "approved" not in tree.nodes.columns:
+            tree.nodes["approved"] = False
+
         self.trees.append(tree)
 
         return self
@@ -107,8 +110,7 @@ class Recluster:
         for i, tree in enumerate(self.trees):
             print("Tree #{}:".format(i))
 
-            approved_nodes_selector = tree.nodes["approved"] == True
-            approved_node_ids = tree.nodes.loc[approved_nodes_selector, "node_id"]
+            approved_node_ids: pd.Series = tree.nodes.loc[tree.nodes["approved"], "node_id"]  # type: ignore
 
             approved_objects_selector = tree.objects["node_id"].isin(approved_node_ids)
 
@@ -225,7 +227,20 @@ class Recluster:
         )
 
         # Turn cluster_labels to a tree
-        self.trees.append(Tree.from_labels(labels, dataset["object_id"]))
+        self.trees.append(
+            Tree.from_labels(
+                labels,
+                dataset["object_id"],
+                meta={
+                    "cluster": {
+                        "ignore_approved": ignore_approved,
+                        "sample_size": sample_size,
+                        "pca": pca,
+                        **kwargs,
+                    }
+                },
+            )
+        )
 
         return self
 
