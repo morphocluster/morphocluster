@@ -127,23 +127,28 @@ def init_app(app):
 
     @app.cli.command()
     @click.argument("features_fns", nargs=-1)
-    def load_features(features_fns):
+    @click.option("--truncate", type=int)
+    def load_features(features_fns, truncate):
         """
         Load object features from an HDF5 file.
         """
         for features_fn in features_fns:
             print("Loading {}...".format(features_fn))
             with h5py.File(features_fn, "r", libver="latest") as f_features:
-                n_obj, n_dim = f_features["features"].shape
-                print(f"{n_obj} objects, {n_dim} dimensions.")
+                object_ids = f_features["object_id"].asstr()[:]
+                if truncate is None:
+                    vectors = f_features["features"][:]
+                else:
+                    vectors = f_features["features"][:,:truncate]
+
+                n_obj, n_dim = vectors.shape
+                print(f"Loaded {n_dim}d features for {n_obj:,d} objects.")
                 if n_dim > 100:
                     raise ValueError(
                         "The features can not have more than 100 dimensions."
                     )
 
-                object_ids = f_features["object_id"].asstr()[:]
-                vectors = f_features["features"][:]
-
+            print("Moving feature vectors to the database...")
             with database.engine.begin() as conn:
                 stmt = (
                     models.objects.update()
