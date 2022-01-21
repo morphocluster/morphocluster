@@ -410,7 +410,7 @@ export default {
                 // ... otherwise get the next unfilled node
                 return (
                     api
-                        .getNextUnfilledNode(this.project.node_id, true, true)
+                        .getNextUnfilledNode(this.project.node_id, {leaf: true, preferred_first: true})
                         // (This really needs to be nested!)
                         .then(node_id => {
                             if (node_id === null) {
@@ -458,7 +458,7 @@ export default {
 
                     return api.getNodeRecommendedObjects(
                         node_id,
-                        MAX_N_RECOMMENDATIONS
+                        {max_n: MAX_N_RECOMMENDATIONS}
                     );
                 })
                 .then(data => {

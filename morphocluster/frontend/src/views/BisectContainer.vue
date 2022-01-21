@@ -192,7 +192,7 @@ export default {
 
             // Get the URL for the cached recommendations
             var recommendationsUrlPromise = api
-                .getNodeRecommendedObjects(node_id, MAX_N_RECOMMENDATIONS)
+                .getNodeRecommendedObjects(node_id, {max_n: MAX_N_RECOMMENDATIONS})
                 .then(data => {
                     return data.links.self;
                 });

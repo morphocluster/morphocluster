@@ -14,36 +14,48 @@ export function patchNode(node_id, data) {
         });
 }
 
-export function getNextUnapprovedNode(node_id, leaf = false) {
-    return axios.get(`/api/nodes/${node_id}/next`, { params: { leaf } })
+/**
+ * Get the next unapproved node for a subtree rooted at node_id.
+ *
+ * @param params {leaf: bool}
+ */
+export function getNextUnapprovedNode(node_id, params=null) {
+    return axios.get(`/api/nodes/${node_id}/next`, { params })
         .then(response => {
             return response.data;
         });
 }
 
-export function getNextUnfilledNode(node_id, leaf = false, preferred_first = false) {
-    return axios.get(`/api/nodes/${node_id}/next_unfilled`, { params: { leaf, preferred_first } })
+/**
+ * Get the next unfilled node for a subtree rooted at node_id.
+ *
+ * @param params {leaf: bool, preferred_first: bool, order_by: string}
+ */
+export function getNextUnfilledNode(node_id, params=null) {
+    return axios.get(`/api/nodes/${node_id}/next_unfilled`, { params })
         .then(response => {
             return response.data;
         });
 }
 
-export function getNodeProgress(node_id, log = null) {
-    var params = {}
-    if (log !== null) {
-        params.log = log;
-    }
+/**
+ * Get the sorting progress for a subtree rooted at node_id.
+ *
+ * @param params {log: string}
+ */
+export function getNodeProgress(node_id, params=null) {
     return axios.get(`/api/nodes/${node_id}/progress`, { params })
         .then(response => {
             return response.data;
         });
 }
 
-export function getNodeRecommendedObjects(node_id, max_n = null) {
-    var params = {}
-    if (max_n !== null) {
-        params.max_n = max_n;
-    }
+/**
+ * Get recommended objects for node_id.
+ *
+ * @param params {max_n: int}
+ */
+export function getNodeRecommendedObjects(node_id, params = null) {
     return axios.get(`/api/nodes/${node_id}/recommended_objects`, { params })
         .then(response => {
             return response.data;

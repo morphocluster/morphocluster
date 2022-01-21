@@ -1042,9 +1042,16 @@ def node_get_next_unfilled(node_id):
     parser = reqparse.RequestParser()
     parser.add_argument("leaf", type=strtobool, default=False)
     parser.add_argument("preferred_first", type=strtobool, default=False)
+    parser.add_argument("order_by", type=str, default=None)
     arguments = parser.parse_args(strict=True)
 
     print(arguments)
+
+    order_by = arguments["order_by"]
+
+    if order_by is None:
+        # Get default value from config
+        order_by = api.config["NODE_GET_NEXT_UNFILLED_ORDER_BY"]
 
     with database.engine.connect() as connection:
         tree = Tree(connection)
@@ -1058,6 +1065,7 @@ def node_get_next_unfilled(node_id):
                 node_id,
                 leaf=arguments["leaf"],
                 preferred_first=arguments["preferred_first"],
+                order_by=order_by,
                 filter=filter,
             )
         )

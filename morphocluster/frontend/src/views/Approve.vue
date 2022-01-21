@@ -142,7 +142,7 @@ export default {
                     }
                     // ... otherwise get the next node
                     return api
-                        .getNextUnapprovedNode(this.project.node_id, true)
+                        .getNextUnapprovedNode(this.project.node_id, {leaf: true})
                         .then(node_id => {
                             if (node_id == null) {
                                 this.$refs.doneModal.show();
@@ -229,7 +229,7 @@ export default {
                     console.log(msg);
                     this.messages.unshift(msg);
                     // Update progress
-                    api.getNodeProgress(this.project.node_id, "approve")
+                    api.getNodeProgress(this.project.node_id, {log: "approve"})
                         .then(progress => {
                             this.progress = progress;
                         })
@@ -257,7 +257,7 @@ export default {
                     this.messages.unshift(`Merged ${this.node.node_id}.`);
 
                     // Update progress
-                    api.getNodeProgress(this.project.node_id, "approve")
+                    api.getNodeProgress(this.project.node_id, {log: "approve"})
                         .then(progress => {
                             this.progress = progress;
                         })
