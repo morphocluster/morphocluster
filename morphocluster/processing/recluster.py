@@ -92,6 +92,9 @@ class Recluster:
         else:
             self._log("load_tree")
 
+        if "approved" not in tree.nodes.columns:
+            tree.nodes["approved"] = False
+
         self.trees.append(tree)
 
         return self
@@ -107,8 +110,7 @@ class Recluster:
         for i, tree in enumerate(self.trees):
             print("Tree #{}:".format(i))
 
-            approved_nodes_selector = tree.nodes["approved"] == True
-            approved_node_ids = tree.nodes.loc[approved_nodes_selector, "node_id"]
+            approved_node_ids: pd.Series = tree.nodes.loc[tree.nodes["approved"], "node_id"]  # type: ignore
 
             approved_objects_selector = tree.objects["node_id"].isin(approved_node_ids)
 
