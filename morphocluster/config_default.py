@@ -19,3 +19,6 @@ PROJECT_EXPORT_DIR = "/tmp"
 SAVE_RECOMMENDATION_STATS = False
 
 DATASET_PATH = "/data"
+
+# ORDER BY clause for node_get_next_unfilled
+NODE_GET_NEXT_UNFILLED_ORDER_BY = None

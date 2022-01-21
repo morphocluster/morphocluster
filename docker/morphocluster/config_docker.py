@@ -10,3 +10,6 @@ SQLALCHEMY_DATABASE_URI = (
 )
 
 PROJECT_EXPORT_DIR = "/data/export"
+
+# ORDER BY clause for node_get_next_unfilled
+NODE_GET_NEXT_UNFILLED_ORDER_BY = "largest"
