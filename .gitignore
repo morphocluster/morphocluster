@@ -22,3 +22,4 @@ dev-data/
 *.pdf
 morphocluster/experiments/
 .code-workspace.code-workspace
+.venv/*
