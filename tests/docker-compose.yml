@@ -1,0 +1,14 @@
+version: '3'
+services:
+  postgres:
+    environment:
+      POSTGRES_USER: morphocluster
+      POSTGRES_PASSWORD: morphocluster
+      POSTGRES_DB: morphocluster
+    ports:
+      - "5432"
+    build: ../docker/postgresql
+  redis-persistent:
+    image: "redis:5-alpine"
+    ports:
+      - "6379"

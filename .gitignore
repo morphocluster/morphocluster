@@ -25,3 +25,4 @@ docker/morphocluster/authorized_keys
 mprofile_*.dat
 morphocluster/frontend/dist
 *.code-workspace
+.venv/*

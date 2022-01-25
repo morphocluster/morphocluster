@@ -11,7 +11,7 @@ setup(
         "flask>=1.0.2",
         "psycopg2-binary",
         "pandas",
-        "sqlalchemy",
+        "sqlalchemy>=1.3",
         "etaprogress",
         "h5py>=2.8.0",
         "scikit-learn",
@@ -29,10 +29,13 @@ setup(
         "match_arrays",
         "Flask-RQ2",
         "tqdm",
-        "Click",
+        "hdbscan",
+        "Click==7.1.2", # See https://github.com/morphocluster/morphocluster/issues/42
         "chardet",
     ],
-    setup_requires=["pytest-runner"],
-    tests_require=["pytest"],
+    extras_require={
+        "tests": ["pytest", "requests", "pytest-cov", "lovely-pytest-docker"],
+        "dev": ["black"],
+    },
     entry_points={"console_scripts": ["morphocluster = morphocluster.scripts:main"]},
 )

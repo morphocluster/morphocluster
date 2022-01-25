@@ -20,7 +20,11 @@ class Point(UserDefinedType):
 
     def bind_processor(self, dialect):
         def process(value):
-            return ",".join(str(v) for v in value)
+            # NULL
+            if value is None:
+                return None
+
+            return "(" + ",".join(str(v) for v in value) + ")"
 
         return process
 
@@ -30,6 +34,10 @@ class Point(UserDefinedType):
             import numpy as np
 
             def process_numpy(value):
+                # NULL
+                if value is None:
+                    return value
+
                 if isinstance(value, memoryview):
                     value = value.tobytes()
 
@@ -38,6 +46,10 @@ class Point(UserDefinedType):
             return process_numpy
 
         def process_tuple(value):
+            # NULL
+            if value is None:
+                return value
+
             if isinstance(value, memoryview):
                 value = value.tobytes()
                 sep = b","
