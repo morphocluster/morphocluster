@@ -1,15 +1,20 @@
 import itertools
 import os
+import time
 import zipfile
 from getpass import getpass
+from typing import Dict, List, Optional
+from xmlrpc.client import Boolean
 
 import click
 import flask_migrate
 import h5py
 import numpy as np
 import pandas as pd
+import sklearn.decomposition
+import sqlalchemy.engine
 import tqdm
-from etaprogress.progress import ProgressBar
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql.expression import bindparam, select
 from timer_cm import Timer
@@ -61,7 +66,7 @@ def init_app(app):
             cached_columns = list(
                 c for c in models.nodes.columns.keys() if c.startswith("_")
             )
-            values = {c: None for c in cached_columns}
+            values: Dict[str, Optional[Boolean]] = {c: None for c in cached_columns}
             values["cache_valid"] = False
             stmt = models.nodes.update().values(values)
             txn.execute(stmt)
@@ -99,7 +104,8 @@ def init_app(app):
 
         print(f"Loading {archive_fn} into {dst_root}...")
         with database.engine.begin() as txn, zipfile.ZipFile(archive_fn) as zf:
-            index = pd.read_csv(zf.open("index.csv"), usecols=["object_id", "path"])
+            with zf.open("index.csv") as f:
+                index = pd.read_csv(f, usecols=["object_id", "path"])  # type: ignore
 
             if not index["object_id"].is_unique:
                 value_counts = index["object_id"].value_counts()
@@ -129,56 +135,93 @@ def init_app(app):
     @app.cli.command()
     @click.argument("features_fns", nargs=-1)
     @click.option("--truncate", type=int)
-    def load_features(features_fns, truncate):
+    @click.option("--pca", type=int)
+    def load_features(features_fns: List[str], truncate=None, pca=None):
         """
         Load object features from an HDF5 file.
         """
+        object_ids_list = []
+        vectors_list = []
+
+        # Load all features
         for features_fn in features_fns:
             print("Loading {}...".format(features_fn))
             with h5py.File(features_fn, "r", libver="latest") as f_features:
-                object_ids = f_features["object_id"].asstr()[:]
+                object_ids_list.append(f_features["object_id"].asstr()[:])  # type: ignore
+
                 if truncate is None:
-                    vectors = f_features["features"][:]
+                    _features = f_features["features"][:]  # type: ignore
                 else:
-                    vectors = f_features["features"][:,:truncate]
+                    _features = f_features["features"][:, :truncate]  # type: ignore
 
-                n_obj, n_dim = vectors.shape
-                print(f"Loaded {n_dim}d features for {n_obj:,d} objects.")
-                if n_dim > 100:
-                    raise ValueError(
-                        "The features can not have more than 100 dimensions."
-                    )
+                vectors_list.append(_features)
 
-            print("Moving feature vectors to the database...")
-            with database.engine.begin() as conn:
-                stmt = (
-                    models.objects.update()
-                    .where(models.objects.c.object_id == bindparam("_object_id"))
-                    .values({"vector": bindparam("vector")})
+        object_ids: np.ndarray = np.concatenate(object_ids_list)  # type: ignore
+        del object_ids_list
+        vectors: np.ndarray = np.concatenate(vectors_list)  # type: ignore
+        del vectors_list
+
+        n_obj, n_dim = vectors.shape
+        print(f"Loaded {n_dim}d features for {n_obj:,d} objects.")
+
+        if pca is not None:
+            print(f"Performing PCA ({pca}d)...")
+            start = time.perf_counter()
+            pca = sklearn.decomposition.PCA(pca)
+            vectors = pca.fit_transform(vectors)
+            time_fit = time.perf_counter() - start
+            print("Dimensionality reduction took {:.0f}s".format(time_fit))
+            print("Explained variance ratio:", pca.explained_variance_ratio_.sum())
+
+        if vectors.shape[1] > 100:
+            raise ValueError(
+                "The features can not have more than 100 dimensions. Try --truncate or --pca."
+            )
+
+        print("Moving feature vectors to the database...")
+        with database.engine.begin() as conn:
+            conn: sqlalchemy.engine.Connection
+            stmt = (
+                models.objects.update()
+                .where(models.objects.c.object_id == bindparam("_object_id"))
+                .values({"vector": bindparam("vector")})
+            )
+
+            # TODO: Use UPDATE ... RETURNING to get the number of affected rows
+
+            progress = tqdm.tqdm(total=len(object_ids), unit="obj")
+            obj_iter = iter(zip(object_ids, vectors))  # type: ignore
+            while True:
+                chunk = tuple(itertools.islice(obj_iter, 1000))
+                if not chunk:
+                    break
+                conn.execute(
+                    stmt,
+                    [
+                        {"_object_id": str(object_id), "vector": vector}
+                        for (object_id, vector) in chunk
+                    ],
                 )
 
-                # TODO: Use UPDATE ... RETURNING to get the number of affected rows
+                progress.update(len(chunk))
+            progress.close()
 
-                progress = tqdm.tqdm(total=len(object_ids), unit="obj")
-                obj_iter = iter(zip(object_ids, vectors))  # type: ignore
-                while True:
-                    chunk = tuple(itertools.islice(obj_iter, 1000))
-                    if not chunk:
-                        break
-                    conn.execute(
-                        stmt,
-                        [
-                            {"_object_id": str(object_id), "vector": vector}
-                            for (object_id, vector) in chunk
-                        ],
-                    )
+            # TODO: In the end, print a summary of how many objects have a feature vector now.
+            stmt = (
+                select([func.count()])
+                .select_from(models.objects)
+                .where(models.objects.c.vector.isnot(None))
+            )
+            n_initialized = conn.execute(stmt).scalar()
 
-                    progress.update(len(chunk))
-                progress.close()
+            stmt = select([func.count()]).select_from(models.objects)
+            n_total = conn.execute(stmt).scalar()
 
-                # TODO: In the end, print a summary of how many objects have a feature vector now.
+            print(
+                f"{n_initialized:,d} out of {n_total:,d} objects ({n_initialized/n_initialized:.2%}) now have a feature vector."
+            )
 
-                print("Done.")
+            print("Done.")
 
     @app.cli.command()
     @click.argument("tree_fn")

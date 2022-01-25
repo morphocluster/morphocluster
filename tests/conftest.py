@@ -76,7 +76,7 @@ def flask_app(docker_postgres, docker_redis_persistent, session_tmp_path: pathli
         {
             "SQLALCHEMY_DATABASE_URI": docker_postgres,
             "RQ_REDIS_URL": docker_redis_persistent,
-            "DATA_DIR": str(data_dir),
+            "DATASET_PATH": str(data_dir),
         }
     )
 
@@ -128,4 +128,4 @@ def flask_cli(flask_app):
 
 @pytest.fixture(scope="session")
 def datadir():
-    return pathlib.Path(__file__).parent / "data"
+    return pathlib.Path(__file__).parent.parent / "data"
