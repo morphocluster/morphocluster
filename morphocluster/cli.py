@@ -342,31 +342,28 @@ def init_app(app):
     @click.argument("username")
     def add_user(username):
         print("Adding user {}:".format(username))
-        password = getpass("Password: ")
-        password_repeat = getpass("Retype Password: ")
+        password = click.prompt('Password', hide_input=True, confirmation_prompt=True)
 
         if not password:
             print("Password must not be empty!")
-            return
-
-        if password != password_repeat:
-            print("Passwords do not match!")
             return
 
         try:
             _add_user(username, password)
         except IntegrityError as e:
             print(e)
+        else:
+            print(f"User {username} added.")
 
     @app.cli.command()
     @click.argument("username")
     def change_user(username):
         print("Changing user {}:".format(username))
-        password = getpass("Password: ")
-        password_repeat = getpass("Retype Password: ")
 
-        if password != password_repeat:
-            print("Passwords do not match!")
+        password = click.prompt('New password', hide_input=True, confirmation_prompt=True)
+
+        if not password:
+            print("Password must not be empty!")
             return
 
         pwhash = generate_password_hash(
@@ -375,10 +372,12 @@ def init_app(app):
 
         try:
             with database.engine.connect() as conn:
-                stmt = models.users.insert({"username": username, "pwhash": pwhash})
+                stmt = models.users.update(models.users.c.username == username, {"pwhash": pwhash})
                 conn.execute(stmt)
         except IntegrityError as e:
             print(e)
+        else:
+            print(f"User {username} changed.")
 
     @app.cli.command()
     @click.argument("root_id")
