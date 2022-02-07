@@ -11,6 +11,8 @@ services:
       #- "8022:22"
     depends_on:
       - postgres
+      - redis-lru
+    restart: unless-stopped
     volumes:
       - morphocluster-data:/data
       - ${PWD}/docker/morphocluster/authorized_keys:/authorized_keys:ro
@@ -38,14 +40,19 @@ services:
       - postgres-data:/var/lib/postgresql/data
     # Increase shared memory to allow for big queries
     shm_size: '2gb'
+    restart: unless-stopped
+
   redis-rq:
     image: "redis:5-alpine"
     ports:
       - "6379"
+    restart: unless-stopped
+
   redis-lru:
     build: docker/redis-lru
     ports:
       - "6379"
+    restart: unless-stopped
 
 volumes:
   postgres-data:
