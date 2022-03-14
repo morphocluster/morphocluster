@@ -1,5 +1,7 @@
-Current (0.2.0pre)
+Current (0.2.x)
 ==================
+
+- Upgrade Dependencies (#61)
 
 - Optimize growing performance by performing distance calculations in PostgreSQL (#48)
 
