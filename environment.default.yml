@@ -4,38 +4,25 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.7
-  - numpy>=1.17.2,<1.20.0 # Avoid deprecation errors
+  # Conda packages
+  - python=3.10
+  - numpy=1.22
   - pandas
-  - h5py>=3.1.0
-  - scikit-learn<=0.21
+  - h5py=3.6
+  - scikit-learn=1.0
   - scipy
   - pip
   - hdbscan
-  - nodejs
-  - openssl < 3.0.0 # OpenSSL 3.0.0 removed some encryption algorithms needed by npm (md4)
+  - nodejs #=17
+  - openssl < 3.0.0 # OpenSSL 3.0.0 removed some encryption algorithms needed for frontend build (md4)
   - Pillow
   - pytorch
   - torchvision
+  - hiredis
   # Replace by the correction version of cudatoolkit to enable GPU feature extraction,
   # e.g. "cudatoolkit=10.2"
   - cpuonly
 
   - pip:
+    # pip packages required to run MorphoCluster but not specified by setup.py
     - gunicorn
-    - flask>=1.0.2
-    - psycopg2-binary
-    - sqlalchemy >= 1.3
-    - redis >= 3.0, < 3.1
-    - hiredis
-    - alembic
-    - Flask-SQLAlchemy
-    - flask-redis
-    - Flask-Migrate
-    - fire
-    - marshmallow>=3.0.0b20
-    - match_arrays
-    - Flask-RQ2
-    - tqdm
-    - Click==7.1.2
-    - chardet
