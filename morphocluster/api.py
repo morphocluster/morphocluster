@@ -124,10 +124,10 @@ api.register_blueprint(dataset, url_prefix="/datasets/<int:dataset_id>")
 @api.route("/datasets", methods=["GET"])
 def all_datasets():
     # TODO: Return all datasets
-    return jsonify([])
+    return jsonify([{"dataset_id": 1, "name": "Dataset 1"}])
 
 
-@dataset.route("/", methods=["GET"])
+@dataset.route("", methods=["GET"])
 def dataset_index(dataset_id):
     # TODO: Return dataset info
     return jsonify({"dataset_id": dataset_id})
@@ -162,7 +162,7 @@ project = Blueprint("projects", __name__)
 dataset.register_blueprint(project, url_prefix="/projects/<int:project_id>")
 
 
-@project.route("/", methods=["GET"])
+@project.route("", methods=["GET"])
 def get_project(dataset_id, project_id):
 
     parser = reqparse.RequestParser()
@@ -607,6 +607,8 @@ def _arrange_by_starred_sim(result, starred):
 
 @cache_serialize_page(".get_node_members")
 def _get_node_members(
+    dataset_id,
+    project_id,
     node_id,
     nodes=False,
     objects=False,
@@ -684,7 +686,7 @@ def _get_node_members(
 
 
 @project.route("/nodes/<int:node_id>/members", methods=["GET"])
-def get_node_members(node_id):
+def get_node_members(dataset_id, project_id, node_id):
     """
     Provide a collection of objects and/or children.
 
@@ -714,11 +716,13 @@ def get_node_members(node_id):
     parser.add_argument("descending", type=strtobool, default=0)
     arguments = parser.parse_args(strict=True)
 
-    return _get_node_members(node_id=node_id, **arguments)
+    return _get_node_members(
+        dataset_id=dataset_id, project_id=project_id, node_id=node_id, **arguments
+    )
 
 
 @project.route("/nodes/<int:node_id>/progress", methods=["GET"])
-def get_node_stats(node_id):
+def get_node_stats(dataset_id, project_id, node_id):
     """
     Return progress information about this node.
 
@@ -754,7 +758,7 @@ def get_node_stats(node_id):
 
 
 @project.route("/nodes/<int:node_id>/members", methods=["POST"])
-def post_node_members(node_id):
+def post_node_members(dataset_id, project_id, node_id):
     data = request.get_json()
 
     object_ids = [d["object_id"] for d in data if "object_id" in d]
@@ -771,7 +775,7 @@ def post_node_members(node_id):
 
 
 @project.route("/nodes/<int:node_id>", methods=["GET"])
-def get_node(node_id):
+def get_node(dataset_id, project_id, node_id):
     with database.engine.connect() as connection:
         tree = Tree(connection)
 
@@ -787,7 +791,7 @@ def get_node(node_id):
 
 
 @project.route("/nodes/<int:node_id>", methods=["PATCH"])
-def patch_node(node_id):
+def patch_node(dataset_id, project_id, node_id):
     with database.engine.connect() as connection:
         tree = Tree(connection)
 
@@ -820,7 +824,7 @@ def patch_node(node_id):
 
 
 @project.route("/nodes/<int:parent_id>/adopt_members", methods=["POST"])
-def node_adopt_members(parent_id):
+def node_adopt_members(dataset_id, project_id, parent_id):
     """
     Adopt a list of nodes.
 
@@ -855,7 +859,7 @@ def node_adopt_members(parent_id):
 
 
 @project.route("/nodes/<int:node_id>/accept_recommended_objects", methods=["POST"])
-def accept_recommended_objects(node_id):
+def accept_recommended_objects(dataset_id, project_id, node_id):
     """
     Accept recommended objects.
 
@@ -966,7 +970,7 @@ def _node_get_recommended_children(node_id, max_n):
 
 
 @project.route("/nodes/<int:node_id>/recommended_children", methods=["GET"])
-def node_get_recommended_children(node_id):
+def node_get_recommended_children(dataset_id, project_id, node_id):
     """
     Recommend children for this node.
 
@@ -990,7 +994,7 @@ def node_get_recommended_children(node_id):
 
 
 @cache_serialize_page(".node_get_recommended_objects", page_size=50)
-def _node_get_recommended_objects(node_id=None, max_n=None):
+def _node_get_recommended_objects(dataset_id, project_id, node_id, max_n=None):
     with database.engine.connect() as connection:
         tree = Tree(connection)
 
@@ -1000,7 +1004,7 @@ def _node_get_recommended_objects(node_id=None, max_n=None):
 
 
 @project.route("/nodes/<int:node_id>/recommended_objects", methods=["GET"])
-def node_get_recommended_objects(node_id):
+def node_get_recommended_objects(dataset_id, project_id, node_id):
     """
     Recommend objects for this node.
 
@@ -1021,11 +1025,13 @@ def node_get_recommended_objects(node_id):
     # Limit max_n
     arguments.max_n = max(arguments.max_n, 1000)
 
-    return _node_get_recommended_objects(node_id=node_id, **arguments)
+    return _node_get_recommended_objects(
+        dataset_id=dataset_id, project_id=project_id, node_id=node_id, **arguments
+    )
 
 
 @project.route("/nodes/<int:node_id>/tip", methods=["GET"])
-def node_get_tip(node_id):
+def node_get_tip(dataset_id, project_id, node_id):
     with database.engine.connect() as connection:
         tree = Tree(connection)
 
@@ -1033,7 +1039,7 @@ def node_get_tip(node_id):
 
 
 @project.route("/nodes/<int:node_id>/next", methods=["GET"])
-def node_get_next(node_id):
+def node_get_next(dataset_id, project_id, node_id):
     parser = reqparse.RequestParser()
     parser.add_argument("leaf", type=strtobool, default=False)
     arguments = parser.parse_args(strict=True)
@@ -1060,7 +1066,7 @@ def node_get_next(node_id):
 
 
 @project.route("/nodes/<int:node_id>/next_unfilled", methods=["GET"])
-def node_get_next_unfilled(node_id):
+def node_get_next_unfilled(dataset_id, project_id, node_id):
     parser = reqparse.RequestParser()
     parser.add_argument("leaf", type=strtobool, default=False)
     parser.add_argument("preferred_first", type=strtobool, default=False)
@@ -1094,7 +1100,7 @@ def node_get_next_unfilled(node_id):
 
 
 @project.route("/nodes/<int:node_id>/n_sorted", methods=["GET"])
-def node_get_n_sorted(node_id):
+def node_get_n_sorted(dataset_id, project_id, node_id):
     with database.engine.connect() as connection:
         tree = Tree(connection)
 
@@ -1106,7 +1112,7 @@ def node_get_n_sorted(node_id):
 
 
 @project.route("/nodes/<int:node_id>/merge_into", methods=["POST"])
-def post_node_merge_into(node_id):
+def post_node_merge_into(dataset_id, project_id, node_id):
     """
     Merge a node into another node.
 
@@ -1136,7 +1142,7 @@ def post_node_merge_into(node_id):
 
 
 @project.route("/nodes/<int:node_id>/classify", methods=["POST"])
-def post_node_classify(node_id):
+def post_node_classify(dataset_id, project_id, node_id):
     """
     Classify the members of a node into their starred siblings.
 

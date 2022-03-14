@@ -1,15 +1,15 @@
 <template>
     <div id="bisect-container">
         <nav class="navbar navbar-expand-lg navbar-light bg-dark">
-            <router-link class="navbar-brand text-light" to="/">MorphoCluster</router-link>
+            <router-link class="navbar-brand text-light" to="/"
+                >MorphoCluster</router-link
+            >
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav mr-auto">
                     <li class="nav-item nav-link text-light" v-if="project">
-                        {{project.name}}
+                        {{ project.name }}
                     </li>
-                    <li class="nav-item nav-link  text-light">
-                        Bisect
-                    </li>
+                    <li class="nav-item nav-link text-light">Bisect</li>
                     <!-- <li class="nav-item  nav-link text-light" v-if="current_data">
                         {{current_data.node.name}}
                     </li> -->
@@ -17,16 +17,30 @@
             </div>
         </nav>
         <!-- The core component -->
-        <DummyComponent class="core-component" v-if="current_data" :key="current_key" :data="current_data" />
+        <DummyComponent
+            class="core-component"
+            v-if="current_data"
+            :key="current_key"
+            :data="current_data"
+        />
         <div class="spinner-container" v-else>
             <spinner></spinner>
         </div>
-        <b-modal ref="doneModal" lazy centered no-fade header-bg-variant="success" title="Bisection done">
+        <b-modal
+            ref="doneModal"
+            lazy
+            centered
+            no-fade
+            header-bg-variant="success"
+            title="Bisection done"
+        >
             <div class="d-block text-center">
                 Bisection is done for this project.
             </div>
             <footer slot="modal-footer">
-                <b-button variant="primary" :to="{name: 'projects'}">Back to projects</b-button>
+                <b-button variant="primary" :to="{ name: 'projects' }"
+                    >Back to projects</b-button
+                >
             </footer>
         </b-modal>
     </div>
@@ -48,6 +62,7 @@ const MAX_N_RECOMMENDATIONS = 100000;
 
 export default {
     name: "bisect",
+    props: { dataset_id: Number },
     data() {
         return {
             project: null,
@@ -55,17 +70,17 @@ export default {
             project_wp_promises: [],
 
             current_key: 0,
-            current_data: null
+            current_data: null,
         };
     },
     components: {
         MessageLog,
         Spinner,
-        DummyComponent
+        DummyComponent,
     },
     mixins: [mixins],
     watch: {
-        $route: "initialize"
+        $route: "initialize",
     },
     created() {
         this.initialize();
@@ -80,7 +95,7 @@ export default {
 
             var p;
 
-            p = new Promise(resolve => {
+            p = new Promise((resolve) => {
                 if (
                     this.project &&
                     this.project.project_id == this.$route.params.project_id
@@ -128,8 +143,8 @@ export default {
                     name: "bisect",
                     params: {
                         project_id: this.project.project_id,
-                        node_id: node_id
-                    }
+                        node_id: node_id,
+                    },
                 };
 
                 this.$router.replace(to);
@@ -138,7 +153,7 @@ export default {
                 throw null;
             });
 
-            p = p.then(node_id => {
+            p = p.then((node_id) => {
                 console.log("node_id is now known:", node_id);
                 return node_id;
             });
@@ -146,7 +161,7 @@ export default {
             //TODO: Go on.
             // Now we need to get the working package promise with the node_id from the queue and provide the component with the correct data after resolution.
 
-            p.catch(err => {
+            p.catch((err) => {
                 if (err === null) {
                     console.log("No error.");
                 } else {
@@ -161,14 +176,14 @@ export default {
             this.project = null;
 
             var projectPromise = api
-                .getProject(project_id, true)
-                .then(project => {
+                .getProject(this.dataset_id, project_id, true)
+                .then((project) => {
                     this.project = project;
                 });
 
             var queuePromise = api
-                .getUnfilledNodes(project_id)
-                .then(unfilled_nodes => {
+                .getUnfilledNodes(this.dataset_id, project_id)
+                .then((unfilled_nodes) => {
                     this.project_loading_queue = unfilled_nodes;
                 });
             return Promise.all([projectPromise, queuePromise]);
@@ -182,25 +197,32 @@ export default {
             console.log(`Loading working package for ${node_id}...`);
 
             // Load the node
-            var nodePromise = api.getNode(node_id);
+            var nodePromise = api.getNode(this.dataset_id, node_id);
 
             // Get the URL for the cached members
             var membersUrl = `/api/nodes/${node_id}/members?objects=1&nodes=0&arrange_by=random&page=0`;
-            var membersUrlPromise = axios.get(membersUrl).then(response => {
+            var membersUrlPromise = axios.get(membersUrl).then((response) => {
                 return response.data.links.self;
             });
 
             // Get the URL for the cached recommendations
             var recommendationsUrlPromise = api
-                .getNodeRecommendedObjects(node_id, {max_n: MAX_N_RECOMMENDATIONS})
-                .then(data => {
+                .getNodeRecommendedObjects(
+                    this.dataset_id,
+                    this.project_id,
+                    node_id,
+                    {
+                        max_n: MAX_N_RECOMMENDATIONS,
+                    }
+                )
+                .then((data) => {
                     return data.links.self;
                 });
 
             var allPromise = Promise.all([
                 nodePromise,
                 membersUrlPromise,
-                recommendationsUrlPromise
+                recommendationsUrlPromise,
             ]);
 
             // Put promise into collection
@@ -214,7 +236,7 @@ export default {
             return allPromise;
         },
 
-        membersOk: function() {
+        membersOk: function () {
             this.rec_interval_left = this.rec_current_page + 1;
 
             if (!this.found_right) {
@@ -229,7 +251,7 @@ export default {
 
             this.showNext();
         },
-        membersNotOk: function() {
+        membersNotOk: function () {
             this.rec_interval_right = this.rec_current_page;
             this.found_right = true;
 
@@ -243,7 +265,7 @@ export default {
                     frac * this.rec_interval_right
             );
         },
-        showNext: function() {
+        showNext: function () {
             console.log(
                 this.rec_current_page,
                 this.rec_interval_left,
@@ -259,14 +281,14 @@ export default {
 
             axios
                 .get(`${this.rec_base_url}&page=${this.rec_current_page}`)
-                .then(response => {
+                .then((response) => {
                     console.log(
                         response.data.data,
                         shuffle(response.data.data)
                     );
                     this.rec_members = shuffle(response.data.data);
                 })
-                .catch(e => {
+                .catch((e) => {
                     this.axiosErrorHandler(e);
                 });
         },
@@ -283,6 +305,8 @@ export default {
             var node = this.node;
 
             api.nodeAcceptRecommendations(
+                this.dataset_id,
+                this.project_id,
                 node.node_id,
                 this.rec_request_id,
                 this.rejected_members,
@@ -292,7 +316,12 @@ export default {
                     console.log("Saved all recommendations.");
                 })
                 .then(() => {
-                    return api.patchNode(node.node_id, { filled: true });
+                    return api.patchNode(
+                        this.dataset,
+                        this.node_id,
+                        node.node_id,
+                        { filled: true }
+                    );
                 })
                 .then(() => {
                     console.log("Saved.");
@@ -301,7 +330,7 @@ export default {
                     this.saving_total_ms = Date.now() - this.saving_start_ms;
                     this.messages.unshift(`Saved ${node.node_id}.`);
                 })
-                .catch(e => {
+                .catch((e) => {
                     this.messages.unshift(`Error saving ${node.node_id}.`);
                     console.log(e);
                 });
@@ -321,7 +350,7 @@ export default {
         next() {
             this.$router.push({
                 name: "bisect",
-                params: { project_id: this.project.project_id }
+                params: { project_id: this.project.project_id },
             });
         },
         keypress(event) {
@@ -345,8 +374,8 @@ export default {
                 console.log("next");
                 this.next();
             }
-        }
-    }
+        },
+    },
 };
 </script>
 

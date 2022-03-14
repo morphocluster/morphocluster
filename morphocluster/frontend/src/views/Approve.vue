@@ -1,57 +1,119 @@
 <template>
     <div id="approve">
         <nav class="navbar navbar-expand-lg navbar-light bg-dark">
-            <router-link class="navbar-brand text-light" to="/">MorphoCluster</router-link>
+            <router-link class="navbar-brand text-light" to="/"
+                >MorphoCluster</router-link
+            >
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav mr-auto">
                     <li class="nav-item nav-link text-light" v-if="project">
-                        {{project.name}}
+                        {{ project.name }}
                     </li>
-                    <li class="nav-item nav-link  text-light">
-                        Approve
-                    </li>
-                    <li class="nav-item  nav-link text-light" v-if="node">
-                        {{node.name}}
+                    <li class="nav-item nav-link text-light">Approve</li>
+                    <li class="nav-item nav-link text-light" v-if="node">
+                        {{ node.name }}
                     </li>
                 </ul>
             </div>
         </nav>
         <div v-if="loading">Loading...</div>
         <div id="node-info">
-            <div class="info-hint mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html title="All members of this node, most extreme appearance first."/>
+            <div
+                class="info-hint mdi mdi-dark mdi-information-outline"
+                v-b-tooltip.hover.html
+                title="All members of this node, most extreme appearance first."
+            />
             <!--<node-header :node="node" v-if="node" />-->
 
             <div class="row" v-if="node_members">
-                <div v-for="m of node_members" :key="getUniqueId(m)" class="col col-2">
-                    <member-preview :member="m" :controls="member_controls" v-on:moveup="moveupMember" />
+                <div
+                    v-for="m of node_members"
+                    :key="getUniqueId(m)"
+                    class="col col-2"
+                >
+                    <member-preview
+                        :member="m"
+                        :controls="member_controls"
+                        v-on:moveup="moveupMember"
+                    />
                 </div>
             </div>
-            <infinite-loading v-if="node" @infinite="updateMembers" spinner="circles">
+            <infinite-loading
+                v-if="node"
+                @infinite="updateMembers"
+                spinner="circles"
+            >
                 <div slot="no-more" />
             </infinite-loading>
         </div>
-        <div id="progress" v-if="progress" v-b-tooltip.hover :title="progress.leaves_n_approved_objects.toLocaleString('en-US') + ' / ' + progress.leaves_n_objects.toLocaleString('en-US')">
-            <div :style="{flexGrow: progress.leaves_n_approved_objects}" class="bg-success" />
-            <div :style="{flexGrow: progress.leaves_n_objects - progress.leaves_n_approved_objects}" class="bg-danger" />
+        <div
+            id="progress"
+            v-if="progress"
+            v-b-tooltip.hover
+            :title="
+                progress.leaves_n_approved_objects.toLocaleString('en-US') +
+                ' / ' +
+                progress.leaves_n_objects.toLocaleString('en-US')
+            "
+        >
+            <div
+                :style="{ flexGrow: progress.leaves_n_approved_objects }"
+                class="bg-success"
+            />
+            <div
+                :style="{
+                    flexGrow:
+                        progress.leaves_n_objects -
+                        progress.leaves_n_approved_objects,
+                }"
+                class="bg-danger"
+            />
         </div>
         <div id="decision">
-            <b-button id="btn-approve" variant="success" @click.prevent="approve(true)" v-b-tooltip.hover.html title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>">
-                <i class="mdi mdi-check-all" /><i class="mdi mdi-flag" /> Approve + Flag
+            <b-button
+                id="btn-approve"
+                variant="success"
+                @click.prevent="approve(true)"
+                v-b-tooltip.hover.html
+                title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>"
+            >
+                <i class="mdi mdi-check-all" /><i class="mdi mdi-flag" />
+                Approve + Flag
             </b-button>
-            <b-button id="btn-approve" variant="success" @click.prevent="approve(false)" v-b-tooltip.hover.html title="All members look alike. Approve. <kbd>A</kbd>">
+            <b-button
+                id="btn-approve"
+                variant="success"
+                @click.prevent="approve(false)"
+                v-b-tooltip.hover.html
+                title="All members look alike. Approve. <kbd>A</kbd>"
+            >
                 <i class="mdi mdi-check-all" /> Approve
             </b-button>
-            <b-button id="btn-merge" variant="danger" @click.prevent="merge" v-b-tooltip.hover.html title="Members are too dissimilar. Merge into parent. <kbd>M</kbd>">
+            <b-button
+                id="btn-merge"
+                variant="danger"
+                @click.prevent="merge"
+                v-b-tooltip.hover.html
+                title="Members are too dissimilar. Merge into parent. <kbd>M</kbd>"
+            >
                 <i class="mdi mdi-call-merge" /> Merge into parent
             </b-button>
         </div>
         <message-log class="bg-light" :messages="messages" />
-        <b-modal ref="doneModal" centered no-fade header-bg-variant="success" title="Approval done">
+        <b-modal
+            ref="doneModal"
+            centered
+            no-fade
+            header-bg-variant="success"
+            title="Approval done"
+        >
             <div class="d-block text-center">
                 Approval is done for this project.
             </div>
             <footer slot="modal-footer">
-                <b-button variant="primary" :to="{name: 'projects'}">Back to projects</b-button>
+                <b-button variant="primary" :to="{ name: 'projects' }"
+                    >Back to projects</b-button
+                >
             </footer>
         </b-modal>
     </div>
@@ -84,9 +146,9 @@ export default {
                 {
                     event: "moveup",
                     icon: "mdi-arrow-up",
-                    title: "Move this member to the parent node."
-                }
-            ]
+                    title: "Move this member to the parent node.",
+                },
+            ],
         };
     },
     created() {
@@ -102,12 +164,13 @@ export default {
         MemberPreview,
         MessageLog,
         NodeHeader,
-        InfiniteLoading
+        InfiniteLoading,
     },
     mixins: [mixins],
     watch: {
-        $route: "initialize"
+        $route: "initialize",
     },
+    props: { dataset_id: Number },
     methods: {
         initialize() {
             this.loading = true;
@@ -117,7 +180,7 @@ export default {
 
             const project_id = parseInt(this.$route.params.project_id);
 
-            var projectLoaded = new Promise(resolve => {
+            var projectLoaded = new Promise((resolve) => {
                 if (this.project && this.project.project_id == project_id) {
                     console.log("Project was already loaded.");
                     resolve();
@@ -125,12 +188,14 @@ export default {
                     console.log("Loading project.");
                     this.project = null;
                     this.progress = null;
-                    api.getProject(project_id, true).then(project => {
-                        this.project = project;
-                        console.log(project);
-                        this.progress = project.progress;
-                        resolve();
-                    });
+                    api.getProject(this.dataset_id, project_id, true).then(
+                        (project) => {
+                            this.project = project;
+                            console.log(project);
+                            this.progress = project.progress;
+                            resolve();
+                        }
+                    );
                 }
             });
 
@@ -142,8 +207,15 @@ export default {
                     }
                     // ... otherwise get the next node
                     return api
-                        .getNextUnapprovedNode(this.project.node_id, {leaf: true})
-                        .then(node_id => {
+                        .getNextUnapprovedNode(
+                            this.dataset_id,
+                            this.project.project_id,
+                            this.project.node_id,
+                            {
+                                leaf: true,
+                            }
+                        )
+                        .then((node_id) => {
                             if (node_id == null) {
                                 this.$refs.doneModal.show();
                                 return null;
@@ -151,16 +223,17 @@ export default {
                             const to = {
                                 name: "approve",
                                 params: {
+                                    dataset_id: this.dataset_id,
                                     project_id: project_id,
-                                    node_id: node_id
-                                }
+                                    node_id: node_id,
+                                },
                             };
 
                             this.$router.replace(to);
                             return node_id;
                         });
                 })
-                .then(node_id => {
+                .then((node_id) => {
                     if (node_id == null) {
                         return;
                     }
@@ -169,14 +242,16 @@ export default {
                         return;
                     }
                     console.log(`Loading node ${node_id}...`);
-                    return api.getNode(node_id).then(node => {
-                        this.node = node;
-                    });
+                    return api
+                        .getNode(this.dataset_id, this.project_id, node_id)
+                        .then((node) => {
+                            this.node = node;
+                        });
                 })
                 .then(() => {
                     this.loading = false;
                 })
-                .catch(e => {
+                .catch((e) => {
                     this.axiosErrorHandler(e);
                 });
         },
@@ -200,7 +275,7 @@ export default {
 
             axios
                 .get(`${this.members_url}&page=${this.page}`)
-                .then(response => {
+                .then((response) => {
                     this.node_members = this.node_members.concat(
                         response.data.data
                     );
@@ -217,64 +292,91 @@ export default {
                         $state.complete();
                     }
                 })
-                .catch(e => {
+                .catch((e) => {
                     this.axiosErrorHandler(e);
                 });
         },
-        approve(preferred=false) {
+        approve(preferred = false) {
             console.log("Approve");
-            api.patchNode(this.node.node_id, { approved: true, preferred: preferred })
+            api.patchNode(
+                this.dataset_id,
+                this.node.project_id,
+                this.node.node_id,
+                {
+                    approved: true,
+                    preferred: preferred,
+                }
+            )
                 .then(() => {
                     const msg = `Approved ${this.node.node_id}.`;
                     console.log(msg);
                     this.messages.unshift(msg);
                     // Update progress
-                    api.getNodeProgress(this.project.node_id, {log: "approve"})
-                        .then(progress => {
+                    api.getNodeProgress(
+                        this.dataset_id,
+                        this.project.project_id,
+                        this.project.node_id,
+                        {
+                            log: "approve",
+                        }
+                    )
+                        .then((progress) => {
                             this.progress = progress;
                         })
-                        .catch(e => {
+                        .catch((e) => {
                             this.axiosErrorHandler(e);
                         });
 
                     const to = {
                         name: "approve",
                         params: {
-                            project_id: this.project.project_id
-                        }
+                            project_id: this.project.project_id,
+                        },
                     };
 
                     this.$router.push(to);
                 })
-                .catch(e => {
+                .catch((e) => {
                     this.axiosErrorHandler(e);
                 });
         },
         merge() {
             // TODO
-            api.mergeNodeInto(this.node.node_id, this.node.parent_id)
+            api.mergeNodeInto(
+                this.dataset_id,
+                this.project_id,
+                this.node.node_id,
+                this.node.parent_id
+            )
                 .then(() => {
                     this.messages.unshift(`Merged ${this.node.node_id}.`);
 
                     // Update progress
-                    api.getNodeProgress(this.project.node_id, {log: "approve"})
-                        .then(progress => {
+                    api.getNodeProgress(
+                        this.dataset_id,
+                        this.project.project_id,
+                        this.project.node_id,
+                        {
+                            log: "approve",
+                        }
+                    )
+                        .then((progress) => {
                             this.progress = progress;
                         })
-                        .catch(e => {
+                        .catch((e) => {
                             this.axiosErrorHandler(e);
                         });
 
                     const to = {
                         name: "approve",
                         params: {
-                            project_id: this.project.project_id
-                        }
+                            project_id: this.project.project_id,
+                        },
                     };
 
                     this.$router.push(to);
                 })
-                .catch(e => {
+                .catch((e) => {
                     this.axiosErrorHandler(e);
                 });
         },
@@ -300,18 +402,24 @@ export default {
             console.log("Remove", this.getUniqueId(member));
 
             // TODO: Also reject members.
-            api.nodeAdoptMembers(this.node.parent_id, [member])
+            api.nodeAdoptMembers(
+                this.dataset_id,
+                this.project_id,
+                this.node.parent_id,
+                [member]
+            )
                 .then(() => {
                     // Remove from current recommendations
                     var index = this.node_members.indexOf(member);
                     if (index > -1) {
                         this.node_members.splice(index, 1);
                     }
-                }).catch(e => {
+                })
+                .catch((e) => {
                     this.axiosErrorHandler(e);
                 });
-        }
-    }
+        },
+    },
 };
 </script>
 
