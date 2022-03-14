@@ -91,8 +91,9 @@ The web application runs in a Docker container.
 Prerequisites
 ~~~~~~~~~~~~~
 
-- `Docker Compose <https://docs.docker.com/compose/install/>`_
-- The above steps were tested on Linux.
+- `Docker <https://docs.docker.com/engine/install/>`_ (Version 20 or higher)
+- `Docker Compose <https://docs.docker.com/compose/install/>`_ (Version 1.25 or higher)
+- The above steps were only tested on Linux.
 
 GPU processing
 ~~~~~~~~~~~~~~
