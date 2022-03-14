@@ -1,4 +1,4 @@
 . /opt/conda/etc/profile.d/conda.sh
-conda activate base
+micromamba activate base
 
 export FLASK_APP=morphocluster

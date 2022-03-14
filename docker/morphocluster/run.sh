@@ -3,8 +3,8 @@
 cp /authorized_keys /root/.ssh/authorized_keys
 chmod 600 /root/.ssh/authorized_keys
 
-. /opt/conda/etc/profile.d/conda.sh
-conda activate base
+# . /opt/conda/etc/profile.d/conda.sh
+micromamba activate base
 
 export FLASK_APP=morphocluster
 
