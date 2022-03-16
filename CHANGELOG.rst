@@ -1,5 +1,8 @@
-Current (0.2.0pre)
+Current (0.2.x)
 ==================
+
+0.2.0
+=====
 
 - Optimize growing performance by performing distance calculations in PostgreSQL (#48)
 
