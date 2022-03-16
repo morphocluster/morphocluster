@@ -17,8 +17,8 @@ Creating the test environment
 Branches
 --------
 
-The current stable branch is `0.2.x`.
+The current stable branch is ``0.2.x``.
 
-Development happens on `master`.
+Development happens on ``master``.
 
-`maintenance/0.1.x` is for older setups.
+``maintenance/0.1.x`` is for older setups.
