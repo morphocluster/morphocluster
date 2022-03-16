@@ -401,8 +401,8 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
 
     # If a request_id is given, load the result from the cache
     if request_id is not None:
+        cache_key = "{}:{}".format(func.__name__, request_id)
         try:
-            cache_key = "{}:{}".format(func.__name__, request_id)
             print("Loading cache key {}...".format(cache_key))
             page_result = redis_lru.lindex(cache_key, page)
 
