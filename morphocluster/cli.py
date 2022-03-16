@@ -95,7 +95,8 @@ def init_app(app):
 
     @app.cli.command()
     @click.argument("archive_fn")
-    def load_objects(archive_fn):
+    @click.option("--skip-existing/--no-skip-existing")
+    def load_objects(archive_fn: str, skip_existing: bool):
         """Load an archive of objects into the database."""
 
         batch_size = 1000
@@ -111,6 +112,13 @@ def init_app(app):
                 value_counts = index["object_id"].value_counts()
                 info = str(value_counts[value_counts > 1])
                 raise ValueError(f"object_id contains duplicate values:\n{info}")
+
+            if skip_existing:
+                # Remove entries from index that were already inserted into the database
+                print("Filtering existing entries...")
+                stmt = select([models.objects.c.object_id])
+                object_ids = txn.execute(stmt).scalars().all()
+                index = index[~index["object_id"].isin(object_ids)]
 
             index_iter = index.itertuples()
             progress = tqdm.tqdm(total=len(index), unit="obj")
