@@ -1,3 +1,5 @@
+import os
+
 # Redis (LRU for caching)
 REDIS_LRU_URL = "redis://redis-lru:6379/0"
 
@@ -9,7 +11,7 @@ SQLALCHEMY_DATABASE_URI = (
     "postgresql://morphocluster:morphocluster@postgres/morphocluster"
 )
 
-PROJECT_EXPORT_DIR = "/data/export"
+PROJECT_EXPORT_DIR = os.environ.get("PROJECT_EXPORT_DIR", "/data/export")
 
 # ORDER BY clause for node_get_next_unfilled
 NODE_GET_NEXT_UNFILLED_ORDER_BY = "largest"
