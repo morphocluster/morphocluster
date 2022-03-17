@@ -144,12 +144,16 @@ def init_app(app):
     @click.argument("features_fns", nargs=-1)
     @click.option("--truncate", type=int)
     @click.option("--pca", type=int)
-    def load_features(features_fns: List[str], truncate=None, pca=None):
+    @click.option("--replace/--no-replace", help="Clear previous features before importing.")
+    def load_features(features_fns: List[str], truncate: Optional[int], pca: Optional[int], replace: bool):
         """
         Load object features from an HDF5 file.
         """
         object_ids_list = []
         vectors_list = []
+
+        if not features_fns:
+            return
 
         # Load all features
         for features_fn in features_fns:
@@ -189,6 +193,12 @@ def init_app(app):
         print("Moving feature vectors to the database...")
         with database.engine.begin() as conn:
             conn: sqlalchemy.engine.Connection
+
+            if replace:
+                print("Clearing previous features...")
+                stmt = models.objects.update().values({"vector": None})
+                conn.execute(stmt)
+
             stmt = (
                 models.objects.update()
                 .where(models.objects.c.object_id == bindparam("_object_id"))
