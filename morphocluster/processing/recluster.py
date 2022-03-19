@@ -80,6 +80,29 @@ class Recluster:
 
         return self
 
+    def init_tree(self):
+        """
+        Initialize tree from dataset.
+
+        Can be used if new objects were added.
+        """
+
+        if self.dataset is None:
+            raise ValueError("No dataset loaded.")
+
+        labels = np.full(len(self.dataset["object_id"]), -1)
+
+        tree = Tree.from_labels(
+            labels,
+            self.dataset["object_id"],
+        )
+
+        tree.nodes["approved"] = False
+
+        self.trees.append(tree)
+
+        return self
+
     def load_tree(self, tree: Union[Tree, Any]):
         """
         Load an existing cluster tree.

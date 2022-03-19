@@ -155,13 +155,25 @@ def features(model_fn, archive_fn, output_fn, normalize, batch_size):
 @click.option("--method", type=click.Choice(["eom", "leaf"]), default="leaf")
 @click.option("--sample-size", type=int, default=None)
 @click.option("--pca", type=int, default=None)
+@click.option("--init-tree/--no-init-tree", help="Initialize tree from dataset.")
 def cluster(
-    features_fns, result_fn, tree_fn, min_cluster_size, min_samples, method, sample_size, pca
+    features_fns,
+    result_fn,
+    tree_fn,
+    min_cluster_size,
+    min_samples,
+    method,
+    sample_size,
+    pca,
+    init_tree: bool,
 ):
     rc = Recluster()
 
     for fn in features_fns:
         rc.load_features(fn)
+
+    if init_tree:
+        rc.init_tree()
 
     if tree_fn is not None:
         rc.load_tree(tree_fn)
