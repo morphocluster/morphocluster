@@ -15,3 +15,5 @@ PROJECT_EXPORT_DIR = os.environ.get("PROJECT_EXPORT_DIR", "/data/export")
 
 # ORDER BY clause for node_get_next_unfilled
 NODE_GET_NEXT_UNFILLED_ORDER_BY = "largest"
+
+PREFERRED_URL_SCHEME = os.environ.get("PREFERRED_URL_SCHEME", None)
