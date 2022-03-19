@@ -15,3 +15,24 @@ html, body {
 	right: 1em;
 	/*color: gray;*/
 }
+
+/* Dark/Light Mode */
+:root {
+	--background-color: white;
+	--color: black;
+	
+}
+
+:root.dark-mode {
+	--background-color: black;
+	--color: white;
+}
+
+body {
+	color: var(--color);
+	background-color: var(--background-color);
+}
+
+table {
+	color: var(--color);
+}
