@@ -31,6 +31,7 @@ setup(
         "tqdm",
         "hdbscan",
         "chardet",
+        "environs", # For envvar parsing
     ],
     extras_require={
         "tests": ["pytest", "requests", "pytest-cov", "lovely-pytest-docker"],

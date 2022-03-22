@@ -1,3 +1,8 @@
+from environs import Env
+
+_env = Env()
+_env.read_env()
+
 # Redis (LRU for caching)
 REDIS_LRU_URL = "redis://redis-lru:6379/0"
 
@@ -22,3 +27,6 @@ DATASET_PATH = "/data"
 
 # ORDER BY clause for node_get_next_unfilled
 NODE_GET_NEXT_UNFILLED_ORDER_BY = "largest"
+
+# Show the title (object_id, node_id) of cluster members
+FRONTEND_SHOW_MEMBER_TITLE = _env.bool("FRONTEND_SHOW_MEMBER_TITLE", default=True)
