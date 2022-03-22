@@ -1,7 +1,7 @@
 <template>
   <div class="member-preview card" :style="style">
     <div class="member-header" :title="title">
-        <!-- <div class="member-title" >{{title}}</div> -->
+        <div class="member-title" v-if="show_title">{{title}}</div>
       <div class="member-controls">
         <i
           v-for="c of controls"
@@ -27,6 +27,7 @@ export default {
   props: ["member", "controls"],
   data() {
     return {
+      show_title: !!window.config.FRONTEND_SHOW_MEMBER_TITLE
     };
   },
   methods: {

@@ -1,3 +1,8 @@
+from environs import Env
+
+_env = Env()
+_env.read_env()
+
 # Redis (LRU for caching)
 # REDIS_LRU_URL = ...
 
@@ -19,3 +24,5 @@ PROJECT_EXPORT_DIR = "/tmp"
 SAVE_RECOMMENDATION_STATS = False
 
 DATASET_PATH = "/data"
+
+FRONTEND_SHOW_MEMBER_TITLE = _env.bool("FRONTEND_SHOW_MEMBER_TITLE", default=True)
