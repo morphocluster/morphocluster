@@ -25,4 +25,5 @@ SAVE_RECOMMENDATION_STATS = False
 
 DATASET_PATH = "/data"
 
+# Show the title (object_id, node_id) of cluster members
 FRONTEND_SHOW_MEMBER_TITLE = _env.bool("FRONTEND_SHOW_MEMBER_TITLE", default=True)
