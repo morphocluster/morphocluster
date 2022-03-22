@@ -31,6 +31,7 @@ setup(
         "tqdm",
         "Click",
         "chardet",
+        "environs", # For envvar parsing
     ],
     setup_requires=["pytest-runner"],
     tests_require=["pytest"],
