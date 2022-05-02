@@ -1367,7 +1367,13 @@ class Tree(object):
         ]
 
     def get_next_node(
-        self, node_id, leaf=False, recurse_cb=None, filter=None, preferred_first=False, order_by=None
+        self,
+        node_id,
+        leaf=False,
+        recurse_cb=None,
+        filter=None,
+        preferred_first=False,
+        order_by=None,
     ):
         """
         Get the id of the next unapproved node.
@@ -1395,12 +1401,12 @@ class Tree(object):
         )
 
         n_objects = (
-                    select([func.count()])
-                    .select_from(nodes_objects)
-                    .where(nodes_objects.c.node_id == subtree.c.node_id)
-                    .as_scalar()
-                    .label("n_objects")
-                )
+            select([func.count()])
+            .select_from(nodes_objects)
+            .where(nodes_objects.c.node_id == subtree.c.node_id)
+            .as_scalar()
+            .label("n_objects")
+        )
 
         stmt = select([subtree.c.node_id])
 
@@ -1542,9 +1548,9 @@ class Tree(object):
 
                             child_selector = invalid_subtree["parent_id"] == node_id
                             children = invalid_subtree.loc[child_selector]
-                            # Build collection of children. (Remove children without a vector.)
+                            # Build collection of children. (Set centroid of children without a vector to zero to allow alignment with cardinalities.)
                             children_dict = MemberCollection(
-                                children.reset_index().to_dict("records"), "remove"
+                                children.reset_index().to_dict("records"), "zero"
                             )
 
                             # 2. _n_objects_deep
