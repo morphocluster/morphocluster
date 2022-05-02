@@ -39,6 +39,27 @@ from morphocluster.tree import Tree
 
 api = Blueprint("api", __name__)
 
+from werkzeug.exceptions import HTTPException
+
+@api.errorhandler(HTTPException)
+def handle_exception(e):
+    """Return JSON instead of HTML for HTTP errors."""
+    data = {
+        "code": e.code,
+        "name": e.name,
+        "description": e.description,
+    }
+
+    # flask_restful.abort populates the data attribute
+    data.update(getattr(e, "data", {}))
+
+    # start with the correct headers and status code from the error
+    response = e.get_response()
+    # replace the body with JSON
+    response.data = json.dumps(data)
+    response.content_type = "application/json"
+    return response
+
 
 def batch(iterable, n=1):
     """
