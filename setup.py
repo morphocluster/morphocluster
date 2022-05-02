@@ -32,6 +32,7 @@ setup(
         "hdbscan",
         "Click==7.1.2", # See https://github.com/morphocluster/morphocluster/issues/42
         "chardet",
+        "environs", # For envvar parsing
     ],
     extras_require={
         "tests": ["pytest", "requests", "pytest-cov", "lovely-pytest-docker"],

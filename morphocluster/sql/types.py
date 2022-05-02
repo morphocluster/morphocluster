@@ -65,3 +65,6 @@ class Point(UserDefinedType):
             return self.op("<->", return_type=Float)(other)
 
     comparator_factory = Comparator
+    
+    # Statements using this type are safe to cache.
+    cache_ok = True

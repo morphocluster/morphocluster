@@ -1,7 +1,7 @@
 <template>
     <div class="member-preview card" :style="style">
-        <div class="member-header">
-            <div class="member-title" :title="title">{{ title }}</div>
+        <div class="member-header" :title="title">
+            <div class="member-title" v-if="show_title">{{ title }}</div>
             <div class="member-controls">
                 <i
                     v-for="c of controls"
@@ -26,7 +26,9 @@ export default {
     name: "member-preview",
     props: ["member", "controls"],
     data() {
-        return {};
+        return {
+            show_title: !!window.config.FRONTEND_SHOW_MEMBER_TITLE,
+        };
     },
     methods: {},
     mounted() {},
@@ -67,7 +69,7 @@ export default {
     border-top-left-radius: calc(0.25rem - 1px);
     padding-top: 3px;
     height: auto;
-    display: flex;
+    /* display: flex; */
 }
 
 .member-body {
@@ -94,6 +96,12 @@ export default {
     max-height: 150px;
     margin: 0 auto;
     display: block;
+}
+
+.member-controls {
+    font-size: x-large;
+    /* margin-left: auto; */
+    float: right;
 }
 
 .member-controls i {

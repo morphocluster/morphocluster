@@ -1,3 +1,8 @@
+from environs import Env
+
+_env = Env()
+_env.read_env()
+
 # Redis (LRU for caching)
 # REDIS_LRU_URL = ...
 
@@ -24,3 +29,6 @@ DATASET_PATH = "/data"
 NODE_GET_NEXT_UNFILLED_ORDER_BY = None
 
 PREFERRED_URL_SCHEME = None
+
+# Show the title (object_id, node_id) of cluster members
+FRONTEND_SHOW_MEMBER_TITLE = _env.bool("FRONTEND_SHOW_MEMBER_TITLE", default=True)
