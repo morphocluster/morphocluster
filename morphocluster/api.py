@@ -5,6 +5,7 @@ Created on 19.03.2018
 """
 import json
 import os
+import traceback
 import uuid
 import warnings
 import zlib
@@ -41,9 +42,11 @@ api = Blueprint("api", __name__)
 
 from werkzeug.exceptions import HTTPException
 
+
 @api.errorhandler(HTTPException)
 def handle_exception(e):
     """Return JSON instead of HTML for HTTP errors."""
+
     data = {
         "code": e.code,
         "name": e.name,
@@ -52,6 +55,9 @@ def handle_exception(e):
 
     # flask_restful.abort populates the data attribute
     data.update(getattr(e, "data", {}))
+
+    # Store traceback
+    data["traceback"] = traceback.format_exc()
 
     # start with the correct headers and status code from the error
     response = e.get_response()
