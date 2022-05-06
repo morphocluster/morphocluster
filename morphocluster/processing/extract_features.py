@@ -1,14 +1,10 @@
 """Extract features for a EcoTaxa-formatted dataset.
 """
-import csv
-import fnmatch
-import io
-import multiprocessing
 import threading
+from typing import Optional
 import zipfile
 from collections import OrderedDict
 
-import chardet
 import h5py
 import numpy as np
 import pandas as pd
@@ -19,7 +15,7 @@ import torchvision.transforms.functional as F
 from PIL import Image, ImageOps
 from torch.nn.functional import avg_pool2d
 from torchvision import models
-from torchvision.transforms import Resize, ToTensor
+from torchvision.transforms import Resize, ToTensor, Normalize
 from tqdm import tqdm
 
 
@@ -276,7 +272,7 @@ class ArchiveDataset(torch.utils.data.Dataset):
         print("Done.")
 
     def __getitem__(self, index):
-        object_id, path = self.dataframe.iloc[index][["object_id", "path"]]
+        object_id, path = self.dataframe.iloc[index][["object_id", "path"]] # type: ignore
 
         with self.lock:
             with self.archive.open(path) as fp:
@@ -382,23 +378,16 @@ class Model(nn.Module):
 
 
 def extract_features(
-    model_parameters_fn: str,
     archive_fn: str,
     features_fn: str,
+    parameters_fn: Optional[str],
     normalize=True,
     batch_size=1024,
     # num_workers=0, # ERROR: Parallelization does not work with zip files.
     cuda=True,
+    input_mean=(0, 0, 0),
+    input_std=(1, 1, 1),
 ):
-    """
-    model_parameters_fn = "/data1/mschroeder/NoveltyDetection/Results/CrossVal/2018-02-06-12-39-56/split-2/model_state.pth"
-    archive_fn = "/data-ssd/mschroeder/Datasets/generic_zooscan_peru_kosmos_2017/export.zip"
-    features_fn = (
-        "/data-ssd/mschroeder/Datasets/generic_zooscan_peru_kosmos_2017/features.h5"
-    )
-    normalize = True
-    """
-
     use_cuda = cuda and torch.cuda.is_available()
 
     if use_cuda:
@@ -407,19 +396,28 @@ def extract_features(
     else:
         map_location = torch.device("cpu")
 
-    parameters = torch.load(model_parameters_fn, map_location=map_location)
-    in_channels = parameters["features.conv1.weight"].shape[1]
-    n_classes = parameters["classifier.weight"].shape[0]
+    if parameters_fn is not None:
+        parameters = torch.load(parameters_fn, map_location=map_location)
+        in_channels = parameters["features.conv1.weight"].shape[1]
+        n_classes = parameters["classifier.weight"].shape[0]
+        pretrained = False
+    else:
+        print("Using pretrained model.")
+        parameters = None
+        in_channels = None # Leave model unchanged
+        pretrained = True # Use pretrained weights
+        n_classes = None # Leave model unchanged
 
     model = Model(
-        "resnet18", pretrained=False, in_channels=in_channels, num_classes=n_classes
+        "resnet18", pretrained=pretrained, in_channels=in_channels, num_classes=n_classes
     )
 
-    if "features.feature_bottleneck.weight" in parameters:
-        bottleneck = parameters["features.feature_bottleneck.weight"].shape[0]
-        model.add_feature_bottleneck(bottleneck)
+    if parameters is not None:
+        if "features.feature_bottleneck.weight" in parameters:
+            bottleneck = parameters["features.feature_bottleneck.weight"].shape[0]
+            model.add_feature_bottleneck(bottleneck)
 
-    model.load_state_dict(parameters)
+        model.load_state_dict(parameters)
 
     if use_cuda:
         model = model.cuda()
@@ -430,8 +428,10 @@ def extract_features(
             PadQuadratic(128, value=(255, 255, 255)),
             Resize(128),
             ToTensor(),
+            Normalize(input_mean, input_std)
         ]
     )
+
 
     dataset = ArchiveDataset(archive_fn, transform)
 
@@ -445,6 +445,7 @@ def extract_features(
 
     model.eval()
 
+    print("Calculating features...")
     with torch.no_grad(), h5py.File(features_fn, "w") as f_features:
         n_objects = len(dataset)
         n_features = model.num_features
