@@ -126,20 +126,26 @@ def fix_ecotaxa(archive_fn, encoding, delimiter: Optional[str]):
         print("Writing result...")
         zf.writestr("index.csv", index.to_csv(index=False))
 
+def _validate_mean_std(ctx, param, value: str):
+    try:
+        return tuple(map(float, value.split(",")))
+    except ValueError:
+        raise click.BadParameter('pass a comma-separated list (e.g. 0.5,0.2,0.3)')
 
 @main.command()
-@click.argument("model_fn", type=click.Path(exists=True, dir_okay=False))
 @click.argument("archive_fn", type=click.Path(exists=True, dir_okay=False))
 @click.argument("output_fn", type=click.Path(exists=False, dir_okay=False))
-@click.option("--normalize/--no-normalize", default=True)
-@click.option("--batch-size", type=int, default=512)
-# @click.option("--num-workers", type=int, default=0)
-def features(model_fn, archive_fn, output_fn, normalize, batch_size):
+@click.option("--parameters-fn", type=click.Path(exists=True, dir_okay=False), default=None, help="Model parameter file. (If not provided, ImageNet-parameters will be used.)")
+@click.option("--normalize/--no-normalize", default=True, help="Normalize features")
+@click.option("--batch-size", type=int, default=512, help="Batch size. Tune to use GPU to capacity.")
+@click.option("--input-mean", callback=_validate_mean_std, help="Mean color value of input images. Pass a comma-separated list of values.", default="0,0,0")
+@click.option("--input-std", callback=_validate_mean_std, help="Stdev of color values of input images. Pass a comma-separated list of values.", default="1,1,1")
+def features(archive_fn, output_fn, parameters_fn, normalize, batch_size, input_mean, input_std):
     """
     Extract features from an EcoTaxa export (or compatible) archive.
     """
 
-    extract_features(model_fn, archive_fn, output_fn, normalize, batch_size)
+    extract_features(archive_fn, output_fn, parameters_fn, normalize, batch_size, input_mean, input_std)
 
 
 @main.command()
