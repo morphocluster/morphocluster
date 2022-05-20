@@ -79,6 +79,17 @@
                             v-if="'progress' in data.item"
                             :max="data.item.progress.n_objects_deep"
                             class="mb-1"
+                            :title="`${Humanize.compactInteger(
+                                data.item.progress.leaves_n_approved_objects,
+                                1
+                            )} / ${Humanize.compactInteger(
+                                data.item.progress.n_objects_deep,
+                                1
+                            )} (${Math.round(
+                                (data.item.progress.leaves_n_approved_objects /
+                                    data.item.progress.n_objects_deep) *
+                                    100
+                            )}%) objects in validated clusters`"
                         >
                             <b-progress-bar
                                 variant="success"
@@ -86,19 +97,6 @@
                                     data.item.progress.leaves_n_approved_objects
                                 "
                                 v-b-tooltip.hover
-                                :title="`${Humanize.compactInteger(
-                                    data.item.progress
-                                        .leaves_n_approved_objects,
-                                    1
-                                )} / ${Humanize.compactInteger(
-                                    data.item.progress.n_objects_deep,
-                                    1
-                                )} (${Math.round(
-                                    (data.item.progress
-                                        .leaves_n_approved_objects /
-                                        data.item.progress.n_objects_deep) *
-                                        100
-                                )}%) objects in validated clusters`"
                             />
                         </b-progress>
                     </template>
