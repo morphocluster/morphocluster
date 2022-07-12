@@ -63,19 +63,21 @@ The web application runs in a Docker container.
 
       # 1. Calculate deep learning image features.
       # Using the GPU (see below) will considerably speed this up.
-      $ morphocluster features model_state.pth archive.zip features.h5
+      # If --parameters-fn is not supplied, ImageNet-trained model weights will be used.
+      # --input-mean and --input-std should then be supplied with the estimated mean color values.
+      $ morphocluster features [--parameters-fn model_state.pth] [--input-mean 0.9,0.9,0.9] [--input-std 1,1,1] archive.zip features.h5
 
       # 2a. Cluster the features.
-      $ morphocluster cluster --min-cluster-size 128 features.h5 tree-128.zip
+      $ morphocluster cluster [--pca 64] --min-cluster-size 128 features.h5 tree-128.zip
 
       # 2b. When repeating the clustering in the next iteration of the MorphoCluster process, supply the previously exported tree and reduce the cluster size.
-      $ morphocluster cluster --min-cluster-size 64 features.h5 tree-64.zip --tree /data/export/2020-05-15-10-34-34--3--tree-128.zip
+      $ morphocluster cluster [--pca 64] --min-cluster-size 64 features.h5 tree-64.zip --tree /data/export/2020-05-15-10-34-34--3--tree-128.zip
 
       # 3. Import objects into the web application
       flask load-objects archive.zip
 
       # 4. Import features into the web application
-      flask load-features features.h5
+      flask load-features [--pca 64] features.h5
 
       # 5. Import project into the web application
       flask load-project tree.zip

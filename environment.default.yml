@@ -39,3 +39,4 @@ dependencies:
     - tqdm
     - Click==7.1.2
     - chardet
+    - werkzeug < 2.1 #See https://github.com/morphocluster/morphocluster/issues/66

@@ -5,6 +5,7 @@ Created on 19.03.2018
 """
 import json
 import os
+import traceback
 import uuid
 import warnings
 import zlib
@@ -87,9 +88,9 @@ def batch(iterable, n=1):
 
 
 def json_converter(value):
-    if isinstance(value, np.floating):
-        return float(o)
-    if isinstance(value, np.integer):
+    if isinstance(value, np.floating):  # type: ignore
+        return float(value)
+    if isinstance(value, np.integer):  # type: ignore
         return int(value)
     if isinstance(value, np.bool):
         return bool(value)

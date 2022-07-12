@@ -44,9 +44,11 @@
                         >
                     </template>
                     <template v-slot:cell(progress)="data">
+                        <!-- validated / grown clusters -->
                         <b-progress
                             v-if="'progress' in data.item"
                             :max="data.item.progress.leaves_n_nodes"
+                            class="mb-1"
                         >
                             <b-progress-bar
                                 variant="success"
@@ -54,7 +56,7 @@
                                     data.item.progress.leaves_n_filled_nodes
                                 "
                                 v-b-tooltip.hover
-                                :title="`${data.item.progress.leaves_n_filled_nodes} / ${data.item.progress.leaves_n_nodes} filled up`"
+                                :title="`${data.item.progress.leaves_n_filled_nodes} / ${data.item.progress.leaves_n_nodes} clusters grown`"
                             />
                             <b-progress-bar
                                 variant="warning"
@@ -63,7 +65,38 @@
                                     data.item.progress.leaves_n_filled_nodes
                                 "
                                 v-b-tooltip.hover
-                                :title="`${data.item.progress.leaves_n_approved_nodes} / ${data.item.progress.leaves_n_nodes} approved`"
+                                :title="`${Humanize.compactInteger(
+                                    data.item.progress.leaves_n_approved_nodes,
+                                    1
+                                )} / ${Humanize.compactInteger(
+                                    data.item.progress.leaves_n_nodes,
+                                    1
+                                )} clusters validated`"
+                            />
+                        </b-progress>
+                        <!-- objects in clusters -->
+                        <b-progress
+                            v-if="'progress' in data.item"
+                            :max="data.item.progress.n_objects_deep"
+                            class="mb-1"
+                            :title="`${Humanize.compactInteger(
+                                data.item.progress.leaves_n_approved_objects,
+                                1
+                            )} / ${Humanize.compactInteger(
+                                data.item.progress.n_objects_deep,
+                                1
+                            )} (${Math.round(
+                                (data.item.progress.leaves_n_approved_objects /
+                                    data.item.progress.n_objects_deep) *
+                                    100
+                            )}%) objects in validated clusters`"
+                        >
+                            <b-progress-bar
+                                variant="success"
+                                :value="
+                                    data.item.progress.leaves_n_approved_objects
+                                "
+                                v-b-tooltip.hover
                             />
                         </b-progress>
                     </template>
@@ -151,6 +184,7 @@
 import * as api from "@/helpers/api.js";
 
 import DarkModeControl from "@/components/DarkModeControl.vue";
+import Humanize from "humanize-plus";
 
 export default {
     name: "projects",
@@ -170,6 +204,8 @@ export default {
             save_project_id: null,
             save_saving: false,
             alerts: [],
+            // Make Humanize available in template:
+            Humanize,
         };
     },
     methods: {
