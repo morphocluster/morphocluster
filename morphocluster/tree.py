@@ -17,15 +17,15 @@ from sklearn.cluster import KMeans
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import text
 from sqlalchemy.sql.elements import literal_column
-from sqlalchemy.sql.expression import bindparam, literal, select, update
+from sqlalchemy.sql.expression import bindparam, literal, select
 from sqlalchemy.sql.functions import coalesce, func
 from timer_cm import Timer
+from tqdm import tqdm
 
-from _functools import reduce
 from morphocluster import processing
 from morphocluster.classifier import Classifier
 from morphocluster.extensions import database
-from morphocluster.helpers import combine_covariances, seq2array
+from morphocluster.helpers import seq2array
 from morphocluster.member import MemberCollection
 from morphocluster.models import (
     nodes,
@@ -174,11 +174,10 @@ class Tree(object):
             # Lock project
             self.lock_project(project_id)
 
-            bar = ProgressBar(len(tree.nodes) + len(tree.objects), max_width=40)
+            progress_bar = tqdm(total=len(tree.nodes) + len(tree.objects), unit_scale=True)
 
             def progress_cb(nadd):
-                bar.numerator += nadd
-                print(bar, end="\r")
+                progress_bar.update(nadd)
 
             for node in tree.topological_order():
                 name = (
@@ -213,9 +212,10 @@ class Tree(object):
 
                 # Update progress bar
                 progress_cb(1)
+            progress_bar.close()
             print()
 
-        print("Done after {}s.".format(bar._eta.elapsed))
+        print("Done after {}s.".format(progress_bar.format_dict["elapsed"]))
 
         return project_id
 
