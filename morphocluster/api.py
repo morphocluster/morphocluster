@@ -41,9 +41,19 @@ api = Blueprint("api", __name__)
 
 from werkzeug.exceptions import HTTPException
 
+def _complex2repr(o):
+    if isinstance(o, (int,str, float)):
+        return o
+
+    if isinstance(o, (list, tuple)):
+        return [_complex2repr(v) for v in o]
+
+    return repr(o)
+
 @api.errorhandler(HTTPException)
 def handle_exception(e):
     """Return JSON instead of HTML for HTTP errors."""
+
     data = {
         "code": e.code,
         "name": e.name,
@@ -52,6 +62,12 @@ def handle_exception(e):
 
     # flask_restful.abort populates the data attribute
     data.update(getattr(e, "data", {}))
+
+    # Store traceback
+    data["traceback"] = traceback.format_exc()
+
+    # Convert all complex values to their representation
+    data = {k: _complex2repr(v) for k,v in data.items()}
 
     # start with the correct headers and status code from the error
     response = e.get_response()
