@@ -1,14 +1,21 @@
 import axios from "axios";
 
-export function getNode(node_id) {
-    return axios.get(`/api/nodes/${node_id}`)
+export function getDatasets() {
+    return axios.get(`/api/datasets`, { params: {} })
         .then(response => {
             return response.data;
         });
 }
 
-export function patchNode(node_id, data) {
-    return axios.patch(`/api/nodes/${node_id}`, data)
+export function getNode(dataset_id, project_id, node_id) {
+    return axios.get(`/api/datasets/${dataset_id}/projects/${project_id}/nodes/${node_id}`)
+        .then(response => {
+            return response.data;
+        });
+}
+
+export function patchNode(dataset_id, project_id, node_id, data) {
+    return axios.patch(`/api/datasets/${dataset_id}/projects/${project_id}/nodes/${node_id}`, data)
         .then(response => {
             return response.data;
         });
@@ -19,8 +26,8 @@ export function patchNode(node_id, data) {
  *
  * @param params {leaf: bool}
  */
-export function getNextUnapprovedNode(node_id, params=null) {
-    return axios.get(`/api/nodes/${node_id}/next`, { params })
+export function getNextUnapprovedNode(dataset_id, project_id, node_id, params = null) {
+    return axios.get(`/api/datasets/${dataset_id}/projects/${project_id}/nodes/${node_id}/next`, { params })
         .then(response => {
             return response.data;
         });
@@ -31,8 +38,8 @@ export function getNextUnapprovedNode(node_id, params=null) {
  *
  * @param params {leaf: bool, preferred_first: bool, order_by: string}
  */
-export function getNextUnfilledNode(node_id, params=null) {
-    return axios.get(`/api/nodes/${node_id}/next_unfilled`, { params })
+export function getNextUnfilledNode(dataset_id, project_id, node_id, params = null) {
+    return axios.get(`/api/datasets/${dataset_id}/projects/${project_id}/nodes/${node_id}/next_unfilled`, { params })
         .then(response => {
             return response.data;
         });
@@ -43,8 +50,8 @@ export function getNextUnfilledNode(node_id, params=null) {
  *
  * @param params {log: string}
  */
-export function getNodeProgress(node_id, params=null) {
-    return axios.get(`/api/nodes/${node_id}/progress`, { params })
+export function getNodeProgress(dataset_id, project_id, node_id, params = null) {
+    return axios.get(`/api/datasets/${dataset_id}/projects/${project_id}/nodes/${node_id}/progress`, { params })
         .then(response => {
             return response.data;
         });
@@ -55,57 +62,57 @@ export function getNodeProgress(node_id, params=null) {
  *
  * @param params {max_n: int}
  */
-export function getNodeRecommendedObjects(node_id, params = null) {
-    return axios.get(`/api/nodes/${node_id}/recommended_objects`, { params })
+export function getNodeRecommendedObjects(dataset_id, project_id, node_id, params = null) {
+    return axios.get(`/api/datasets/${dataset_id}/projects/${project_id}/nodes/${node_id}/recommended_objects`, { params })
         .then(response => {
             return response.data;
         });
 }
 
-export function mergeNodeInto(node_id, dest_node_id) {
+export function mergeNodeInto(dataset_id, project_id, node_id, dest_node_id) {
     const data = { dest_node_id };
     console.log(data)
-    return axios.post(`/api/nodes/${node_id}/merge_into`, data);
+    return axios.post(`/api/datasets/${dataset_id}/projects/${project_id}/nodes/${node_id}/merge_into`, data);
 }
 
 // Project
 
-export function getProjects(include_progress = false) {
-    return axios.get(`/api/projects`, { params: { include_progress } })
+export function getProjects(dataset_id, include_progress = false) {
+    return axios.get(`/api/datasets/${dataset_id}/projects`, { params: { include_progress } })
         .then(response => {
             return response.data;
         });
 }
 
-export function getProject(project_id, include_progress = false) {
-    return axios.get(`/api/projects/${project_id}`, { params: { include_progress } })
+export function getProject(dataset_id, project_id, include_progress = false) {
+    return axios.get(`/api/datasets/${dataset_id}/projects/${project_id}`, { params: { include_progress } })
         .then(response => {
             return response.data;
         });
 }
 
-export function saveProject(project_id) {
-    return axios.post(`/api/projects/${project_id}/save`)
+export function saveProject(dataset_id, project_id) {
+    return axios.post(`/api/datasets/${dataset_id}/projects/${project_id}/save`)
         .then(response => {
             return response.data;
         });
 }
 
-export function nodeAdoptMembers(node_id, members) {
+export function nodeAdoptMembers(dataset_id, project_id, node_id, members) {
     if (!Array.isArray(members)) {
         members = [members];
     }
 
-    return axios.post(`/api/nodes/${node_id}/adopt_members`, { members: members });
+    return axios.post(`/api/datasets/${dataset_id}/projects/${project_id}/nodes/${node_id}/adopt_members`, { members: members });
 }
 
-export function nodeAcceptRecommendations(node_id, request_id, rejected_members, last_page, log_data = null) {
-    return axios.post(`/api/nodes/${node_id}/accept_recommended_objects`,
+export function nodeAcceptRecommendations(dataset_id, project_id, node_id, request_id, rejected_members, last_page, log_data = null) {
+    return axios.post(`/api/datasets/${dataset_id}/projects/${project_id}/nodes/${node_id}/accept_recommended_objects`,
         { request_id, rejected_members, last_page, log_data });
 }
 
-export function getUnfilledNodes(project_id) {
-    return axios.get(`/api/projects/${project_id}/unfilled_nodes`).then(response => {
+export function getUnfilledNodes(dataset_id, project_id) {
+    return axios.get(`/api/datasets/${dataset_id}/projects/${project_id}/unfilled_nodes`).then(response => {
         return response.data;
     });
 }

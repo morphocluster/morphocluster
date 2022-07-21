@@ -1,6 +1,6 @@
 <template>
     <div class="container">
-         {{project}}
+        {{ project }}
     </div>
 </template>
 
@@ -10,33 +10,30 @@ import { EventBus } from "@/event-bus.js";
 
 export default {
     name: "project",
-    props: {"project_id": Number},
+    props: { dataset_id: Number, project_id: Number },
     components: {},
     data() {
         return {
             project: null,
         };
     },
-    methods: {
-
-    },
+    methods: {},
     mounted() {
         // Load node info
         axios
             .get(`/api/projects/${this.project_id}`)
-            .then(response => {
+            .then((response) => {
                 this.project = response.data;
                 console.log(response.data);
 
                 EventBus.$emit("set-title", this.project.name);
             })
-            .catch(e => {
+            .catch((e) => {
                 console.log(e);
             });
-    }
+    },
 };
 </script>
 
 <style>
-
 </style>
