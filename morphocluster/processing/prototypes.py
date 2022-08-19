@@ -52,6 +52,7 @@ class Prototypes:
         if self.clusterer.n_clusters == 1:
             self.prototypes_ = np.mean(X, axis=0)[np.newaxis, :]
             self.support_ = np.array([X.shape[0]])
+            self._validate()
 
             return
 
@@ -59,13 +60,19 @@ class Prototypes:
         if X.shape[0] <= self.clusterer.n_clusters:
             self.prototypes_ = X.copy()
             self.support_ = np.ones(X.shape[0])
+            self._validate()
 
             return
 
         labels = self.clusterer.fit_predict(X)
 
         self.prototypes_ = self.clusterer.cluster_centers_
-        self.support_ = np.bincount(labels)
+        self.support_ = np.bincount(labels, minlength=self.prototypes_.shape[0])
+        self._validate()
+
+    def _validate(self):
+        """Validate that prototypes and support match."""
+        assert self.prototypes_.shape[0] == self.support_.shape[0], f"Prototype shape ({self.prototypes_.shape}) does not support shape ({self.support_.shape})"
 
     def transform(self, X, metric="euclidean", **kwargs):
         """

@@ -61,6 +61,7 @@ export default {
 <style scoped>
 .member-preview {
     margin-bottom: 15px;
+    color: black;
 }
 
 .member-header {
@@ -68,11 +69,12 @@ export default {
     border-top-left-radius: calc(0.25rem - 1px);
     padding-top: 3px;
     height: auto;
-    /*display: flex;*/
+    /* display: flex; */
 }
 
 .member-body {
-    background-color: white;
+    /*background-color: white;*/
+    background-color: var(--background-color);
 }
 
 .member-title {

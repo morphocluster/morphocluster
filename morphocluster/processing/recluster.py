@@ -80,6 +80,29 @@ class Recluster:
 
         return self
 
+    def init_tree(self):
+        """
+        Initialize tree from dataset.
+
+        Can be used if new objects were added.
+        """
+
+        if self.dataset is None:
+            raise ValueError("No dataset loaded.")
+
+        labels = np.full(len(self.dataset["object_id"]), -1)
+
+        tree = Tree.from_labels(
+            labels,
+            self.dataset["object_id"],
+        )
+
+        tree.nodes["approved"] = False
+
+        self.trees.append(tree)
+
+        return self
+
     def load_tree(self, tree: Union[Tree, Any]):
         """
         Load an existing cluster tree.
@@ -173,7 +196,13 @@ class Recluster:
             "object_id": dataset_object_id[dataset_selector].reset_index(drop=True),
         }
 
-    def cluster(self, ignore_approved=True, sample_size=None, pca=None, **kwargs):
+    def cluster(
+        self,
+        ignore_approved=True,
+        sample_size=None,
+        pca: Optional[int] = None,
+        **kwargs,
+    ):
         """
         Cluster the data.
         """
@@ -191,11 +220,11 @@ class Recluster:
         if pca is not None:
             print(f"Performing PCA ({pca})...")
             start = time.perf_counter()
-            pca = sklearn.decomposition.PCA(pca)
-            features = pca.fit_transform(features)
+            _pca = sklearn.decomposition.PCA(pca)
+            features = _pca.fit_transform(features)
             time_fit = time.perf_counter() - start
             print("Dimensionality reduction took {:.0f}s".format(time_fit))
-            print("Explained variance ratio:", pca.explained_variance_ratio_.sum())
+            print("Explained variance ratio:", _pca.explained_variance_ratio_.sum())
 
         print("Feature shape:", features.shape)
         print("Arguments:", kwargs)

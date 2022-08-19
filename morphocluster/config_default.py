@@ -28,5 +28,7 @@ DATASET_PATH = "/data"
 # ORDER BY clause for node_get_next_unfilled
 NODE_GET_NEXT_UNFILLED_ORDER_BY = "largest"
 
+PREFERRED_URL_SCHEME = None
+
 # Show the title (object_id, node_id) of cluster members
 FRONTEND_SHOW_MEMBER_TITLE = _env.bool("FRONTEND_SHOW_MEMBER_TITLE", default=True)

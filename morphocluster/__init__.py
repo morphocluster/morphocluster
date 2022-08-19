@@ -28,15 +28,25 @@ def create_app(test_config=None):
 
     settings_file = os.environ.get("MORPHOCLUSTER_SETTINGS")
     if settings_file:
-        app.config.from_pyfile(os.path.join(app.root_path, settings_file))
+        app.config.from_pyfile(os.path.join(app.root_path, settings_file))  # type: ignore
 
     if test_config is not None:
         app.config.update(test_config)
 
     os.makedirs(app.config["PROJECT_EXPORT_DIR"], exist_ok=True)
 
+    # Fix url_for if behind reverse proxy
+    from morphocluster.reverse_proxied import ReverseProxied
+
+    app.wsgi_app = ReverseProxied(app.wsgi_app, app.config)
+
     # Register extensions
-    from morphocluster.extensions import database, migrate, redis_lru, rq
+    from morphocluster.extensions import (
+        database,
+        migrate,
+        redis_lru,
+        rq,
+    )
 
     database.init_app(app)
     redis_lru.init_app(app)
@@ -120,12 +130,12 @@ def create_app(test_config=None):
     def require_auth():
         # exclude 404 errors and static routes
         # uses split to handle blueprint static routes as well
-        if not request.endpoint or request.endpoint.rsplit(".", 1)[-1] == "static":
+        if not request.endpoint or request.endpoint.rsplit(".", 1)[-1] == "static":  # type: ignore
             return
 
         auth = request.authorization
 
-        success = check_auth(auth.username, auth.password) if auth else None
+        success = check_auth(auth.username, auth.password) if auth else None  # type: ignore
 
         if not auth or not success:
             if success is False:

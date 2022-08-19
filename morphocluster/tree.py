@@ -17,15 +17,15 @@ from sklearn.cluster import KMeans
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import text
 from sqlalchemy.sql.elements import literal_column
-from sqlalchemy.sql.expression import bindparam, literal, select, update
+from sqlalchemy.sql.expression import bindparam, literal, select
 from sqlalchemy.sql.functions import coalesce, func
 from timer_cm import Timer
+from tqdm import tqdm
 
-from _functools import reduce
 from morphocluster import processing
 from morphocluster.classifier import Classifier
 from morphocluster.extensions import database
-from morphocluster.helpers import combine_covariances, seq2array
+from morphocluster.helpers import seq2array
 from morphocluster.member import MemberCollection
 from morphocluster.models import (
     nodes,
@@ -174,11 +174,10 @@ class Tree(object):
             # Lock project
             self.lock_project(project_id)
 
-            bar = ProgressBar(len(tree.nodes) + len(tree.objects), max_width=40)
+            progress_bar = tqdm(total=len(tree.nodes) + len(tree.objects), unit_scale=True)
 
             def progress_cb(nadd):
-                bar.numerator += nadd
-                print(bar, end="\r")
+                progress_bar.update(nadd)
 
             for node in tree.topological_order():
                 name = (
@@ -213,9 +212,10 @@ class Tree(object):
 
                 # Update progress bar
                 progress_cb(1)
+            progress_bar.close()
             print()
 
-        print("Done after {}s.".format(bar._eta.elapsed))
+        print("Done after {}s.".format(progress_bar.format_dict["elapsed"]))
 
         return project_id
 
@@ -1367,7 +1367,13 @@ class Tree(object):
         ]
 
     def get_next_node(
-        self, node_id, leaf=False, recurse_cb=None, filter=None, preferred_first=False, order_by=None
+        self,
+        node_id,
+        leaf=False,
+        recurse_cb=None,
+        filter=None,
+        preferred_first=False,
+        order_by=None,
     ):
         """
         Get the id of the next unapproved node.
@@ -1395,12 +1401,12 @@ class Tree(object):
         )
 
         n_objects = (
-                    select([func.count()])
-                    .select_from(nodes_objects)
-                    .where(nodes_objects.c.node_id == subtree.c.node_id)
-                    .as_scalar()
-                    .label("n_objects")
-                )
+            select([func.count()])
+            .select_from(nodes_objects)
+            .where(nodes_objects.c.node_id == subtree.c.node_id)
+            .as_scalar()
+            .label("n_objects")
+        )
 
         stmt = select([subtree.c.node_id])
 
@@ -1542,9 +1548,9 @@ class Tree(object):
 
                             child_selector = invalid_subtree["parent_id"] == node_id
                             children = invalid_subtree.loc[child_selector]
-                            # Build collection of children. (Remove children without a vector.)
+                            # Build collection of children. (Set centroid of children without a vector to zero to allow alignment with cardinalities.)
                             children_dict = MemberCollection(
-                                children.reset_index().to_dict("records"), "remove"
+                                children.reset_index().to_dict("records"), "zero"
                             )
 
                             # 2. _n_objects_deep

@@ -93,9 +93,86 @@ def init_app(app):
             database.metadata.drop_all(txn, tables=affected_tables)
             database.metadata.create_all(txn, tables=affected_tables)
 
+    def _load_new_objects(
+        index: pd.DataFrame, batch_size: int, conn, zf: zipfile.ZipFile, dst_root: str
+    ):
+        if not index.size:
+            return
+
+        print(f"Loading {len(index):,d} new objects...")
+        index_iter = index.itertuples()
+        progress = tqdm.tqdm(total=len(index), unit="obj", unit_scale=True)
+        while True:
+            chunk = tuple(
+                row._asdict() for row in itertools.islice(index_iter, batch_size)
+            )
+            if not chunk:
+                break
+
+            chunk_len = len(chunk)
+
+            conn.execute(
+                models.objects.insert(),  # pylint: disable=no-value-for-parameter
+                [dict(row) for row in chunk],
+            )
+
+            for row in chunk:
+                zf.extract(row["path"], dst_root)
+
+            progress.update(chunk_len)
+        progress.close()
+
+    def _update_existing_objects(
+        index: pd.DataFrame, batch_size: int, conn, zf: zipfile.ZipFile, dst_root: str
+    ):
+        if not index.size:
+            return
+
+        stmt = (
+            models.objects.update()
+            .where(models.objects.c.object_id == bindparam("_object_id"))
+            .values({"path": bindparam("path")})
+        )
+
+        print(f"Updating {len(index):,d} existing objects...")
+        index_iter = index.itertuples()
+        progress = tqdm.tqdm(total=len(index), unit="obj", unit_scale=True)
+        while True:
+            chunk = tuple(
+                row._asdict() for row in itertools.islice(index_iter, batch_size)
+            )
+            if not chunk:
+                break
+
+            chunk_len = len(chunk)
+
+            # Update path
+            conn.execute(
+                stmt,
+                [
+                    {"_object_id": str(row["object_id"]), "path": row["path"]}
+                    for row in chunk
+                ],
+            )
+
+            for row in chunk:
+                zf.extract(row["path"], dst_root)
+
+                if row["path"] != row["path_old"]:
+                    try:
+                        os.remove(row["path_old"])
+                    except FileNotFoundError:
+                        print("Missing previous image:", row["path_old"])
+                        pass
+
+            progress.update(chunk_len)
+        progress.close()
+
     @app.cli.command()
     @click.argument("archive_fn")
-    def load_objects(archive_fn):
+    @click.option("--add/--no-add", help="Add new objects", default=True)
+    @click.option("--update/--no-update", help="Update existing objects", default=True)
+    def load_objects(archive_fn: str, add: bool, update: bool):
         """Load an archive of objects into the database."""
 
         batch_size = 1000
@@ -103,45 +180,50 @@ def init_app(app):
         dst_root = app.config["DATASET_PATH"]
 
         print(f"Loading {archive_fn} into {dst_root}...")
-        with database.engine.begin() as txn, zipfile.ZipFile(archive_fn) as zf:
+        with database.engine.begin() as conn, zipfile.ZipFile(archive_fn) as zf:
             with zf.open("index.csv") as f:
-                index = pd.read_csv(f, usecols=["object_id", "path"])  # type: ignore
+                index: pd.DataFrame = pd.read_csv(f, usecols=["object_id", "path"])  # type: ignore
 
             if not index["object_id"].is_unique:
                 value_counts = index["object_id"].value_counts()
                 info = str(value_counts[value_counts > 1])
                 raise ValueError(f"object_id contains duplicate values:\n{info}")
 
-            index_iter = index.itertuples()
-            progress = tqdm.tqdm(total=len(index), unit="obj")
-            while True:
-                chunk = tuple(
-                    row._asdict() for row in itertools.islice(index_iter, batch_size)
-                )
-                if not chunk:
-                    break
-                txn.execute(
-                    models.objects.insert(),  # pylint: disable=no-value-for-parameter
-                    [dict(row) for row in chunk],
-                )
+            # Divide index into new and existing objects
+            print("Filtering existing entries...")
+            stmt = select([models.objects.c.object_id, models.objects.c.path])
+            existing = pd.read_sql(stmt, conn)
 
-                for row in chunk:
-                    zf.extract(row["path"], dst_root)
+            mask_existing = index["object_id"].isin(existing["object_id"])
+            index_new = index[~mask_existing]
+            index_update = index.merge(
+                existing, how="inner", on="object_id", suffixes=(None, "_old")
+            )
 
-                progress.update(len(chunk))
-            progress.close()
+            print(f"{len(existing):,d} objects already present in the database.")
+
+            if add:
+                _load_new_objects(index_new, batch_size, conn, zf, dst_root)
+
+            if update:
+                _update_existing_objects(index_update, batch_size, conn, zf, dst_root)
+
             print("Done.")
 
     @app.cli.command()
     @click.argument("features_fns", nargs=-1)
     @click.option("--truncate", type=int)
     @click.option("--pca", type=int)
-    def load_features(features_fns: List[str], truncate=None, pca=None):
+    @click.option("--replace/--no-replace", help="Clear previous features before importing.")
+    def load_features(features_fns: List[str], truncate: Optional[int], pca: Optional[int], replace: bool):
         """
         Load object features from an HDF5 file.
         """
         object_ids_list = []
         vectors_list = []
+
+        if not features_fns:
+            return
 
         # Load all features
         for features_fn in features_fns:
@@ -181,6 +263,12 @@ def init_app(app):
         print("Moving feature vectors to the database...")
         with database.engine.begin() as conn:
             conn: sqlalchemy.engine.Connection
+
+            if replace:
+                print("Clearing previous features...")
+                stmt = models.objects.update().values({"vector": None})
+                conn.execute(stmt)
+
             stmt = (
                 models.objects.update()
                 .where(models.objects.c.object_id == bindparam("_object_id"))

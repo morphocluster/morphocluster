@@ -5,6 +5,7 @@ Created on 19.03.2018
 """
 import json
 import os
+import traceback
 import uuid
 import warnings
 import zlib
@@ -36,6 +37,43 @@ from morphocluster.tree import Tree
 
 api = Blueprint("api", __name__)
 
+from werkzeug.exceptions import HTTPException
+
+def _complex2repr(o):
+    if isinstance(o, (int,str, float)):
+        return o
+
+    if isinstance(o, (list, tuple)):
+        return [_complex2repr(v) for v in o]
+
+    return repr(o)
+
+@api.errorhandler(HTTPException)
+def handle_exception(e):
+    """Return JSON instead of HTML for HTTP errors."""
+
+    data = {
+        "code": e.code,
+        "name": e.name,
+        "description": e.description,
+    }
+
+    # flask_restful.abort populates the data attribute
+    data.update(getattr(e, "data", {}))
+
+    # Store traceback
+    data["traceback"] = traceback.format_exc()
+
+    # Convert all complex values to their representation
+    data = {k: _complex2repr(v) for k,v in data.items()}
+
+    # start with the correct headers and status code from the error
+    response = e.get_response()
+    # replace the body with JSON
+    response.data = json.dumps(data)
+    response.content_type = "application/json"
+    return response
+
 
 def batch(iterable, n=1):
     """
@@ -47,9 +85,9 @@ def batch(iterable, n=1):
 
 
 def json_converter(value):
-    if isinstance(value, np.floating):
-        return float(o)
-    if isinstance(value, np.integer):
+    if isinstance(value, np.floating):  # type: ignore
+        return float(value)
+    if isinstance(value, np.integer):  # type: ignore
         return int(value)
     if isinstance(value, np.bool):
         return bool(value)
@@ -402,8 +440,8 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
 
     # If a request_id is given, load the result from the cache
     if request_id is not None:
+        cache_key = "{}:{}".format(func.__name__, request_id)
         try:
-            cache_key = "{}:{}".format(func.__name__, request_id)
             print("Loading cache key {}...".format(cache_key))
             page_result = redis_lru.lindex(cache_key, page)
 
