@@ -1,5 +1,6 @@
 module.exports = {
     baseUrl: "/frontend",
+
     devServer: {
         proxy: {
             '/labeling': {
@@ -23,5 +24,9 @@ module.exports = {
                 changeOrigin: true
             }
         }
-    }
+    },
+
+    transpileDependencies: [
+      'vuetify'
+    ]
 }
