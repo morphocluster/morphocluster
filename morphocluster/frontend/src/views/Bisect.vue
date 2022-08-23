@@ -183,10 +183,10 @@
             centered
             no-fade
             header-bg-variant="success"
-            title="Growing done"
+            title="Bisection done"
         >
             <div class="d-block text-center">
-                Growing is done for this project.
+                Bisection is done for this project.
             </div>
             <footer slot="modal-footer">
                 <b-button variant="primary" :to="{ name: 'projects' }"
@@ -270,7 +270,7 @@ export default {
             turtle_mode_auto_changed: false,
 
             /* Accepted members */
-            accepted_members_page: [],
+            accepted_members: [],
 
             /* Sorting effort */
             log_data: {
@@ -312,13 +312,11 @@ export default {
             } else {
                 console.log("Turtle mode off.");
             }
-        },
-        not_ok_tooltip: function () {
-            // Show tooltip when not_ok_tooltip changed
+
             Vue.nextTick(() => {
                 this.$root.$emit("bv::show::tooltip", "button-not-ok");
             });
-        }
+        },
     },
     created() {
         this.initialize();
@@ -343,7 +341,7 @@ export default {
             return this.rec_n_pages - this.rec_interval_right;
         },
         not_ok_tooltip() {
-            if (this.accepted_members_page.length) {
+            if (this.turtle_mode) {
                 return "<strong>All</strong> visible recommendations <strong>do not match</strong> without exception. Save all as rejected and proceed. <kbd>J</kbd>";
             }
             return "<strong>Some</strong> visible recommendations do not match. Decrease right limit. <kbd>J</kbd>";
@@ -508,10 +506,12 @@ export default {
                 });
         },
         membersOk: function () {
-            // Increase number of decisions
+            // Increase umber of decisions
             this.log_data.n_accept_page++;
 
             this.rec_interval_left = this.rec_current_page + 1;
+
+            this.accepted_members = [];
 
             this.updateCurrentPage();
 
@@ -521,7 +521,7 @@ export default {
             // Increase umber of decisions
             this.log_data.n_reject_page++;
 
-            if (this.accepted_members_page.length) {
+            if (this.accepted_members.length) {
                 // If there are accepted members, reject all remaining and proceed like in membersOk
                 var remaining_members = this.rec_members.map(this.getUniqueId);
 
@@ -529,6 +529,7 @@ export default {
                 this.rejected_members.push(...remaining_members);
 
                 this.rec_interval_left = this.rec_current_page + 1;
+                this.accepted_members = [];
             } else {
                 this.rec_interval_right = this.rec_current_page;
                 this.found_right = true;
@@ -575,8 +576,6 @@ export default {
                 this.saveResult();
                 return;
             }
-
-            this.accepted_members_page = [];
 
             axios
                 .get(`${this.rec_base_url}&page=${this.rec_current_page}`)
@@ -685,9 +684,9 @@ export default {
             // Enable turtle mode
             this.autoEnableTurtleMode();
 
-            this.accepted_members_page.push(this.getUniqueId(member));
+            this.accepted_members.push(this.getUniqueId(member));
             this.messages.unshift(
-                `Accepted ${this.accepted_members_page.length} objects.`
+                `Accepted ${this.accepted_members.length} objects.`
             );
         },
         next() {
