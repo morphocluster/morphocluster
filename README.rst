@@ -19,7 +19,7 @@ Installation (Web Application)
 
 The web application runs in a Docker container.
 
-0. Clone the morphocluster repository: ``git clone https://github.com/morphocluster/morphocluster.git``
+0. Clone the morphocluster repository and checkout the current stable branch: ``git clone -b 0.2.x https://github.com/morphocluster/morphocluster.git``
 1. Decide where to store the data, e.g. ``/data/morphocluster``, and create the required directories, e.g. ``mkdir -p /data/morphocluster/{postgres,data}``.
    Make a copy of ``docker-compose.default.yml`` in the same directory, name it ``docker-compose.yml`` and edit the relevant parts (e.g. paths).
    Make a copy of ``environment.default.yml`` in the same directory, name it ``environment.yml`` and edit the relevant parts (e.g. for CUDA).
@@ -93,8 +93,9 @@ The web application runs in a Docker container.
 Prerequisites
 ~~~~~~~~~~~~~
 
-- `Docker Compose <https://docs.docker.com/compose/install/>`_
-- The above steps were tested on Linux.
+- `Docker <https://docs.docker.com/engine/install/>`_ (Version 20 or higher)
+- `Docker Compose <https://docs.docker.com/compose/install/>`_ (Version 1.25 or higher)
+- The above steps were only tested on Linux.
 
 GPU processing
 ~~~~~~~~~~~~~~

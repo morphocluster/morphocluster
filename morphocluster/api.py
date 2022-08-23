@@ -24,11 +24,8 @@ from flask import request
 from flask.blueprints import Blueprint
 from flask.helpers import url_for
 from flask_restful import reqparse
-from flask_rq2.job import FlaskJob
-from marshmallow import ValidationError
 from redis.exceptions import RedisError
-from rq.queue import Queue
-from sklearn.manifold.isomap import Isomap
+from sklearn.manifold import Isomap
 from timer_cm import Timer
 
 from morphocluster import background, models
@@ -291,7 +288,11 @@ def save_project(project_id):
 
         tree.export_tree(root_id, tree_fn)
 
-        return jsonify({"tree_fn": tree_fn,})
+        return jsonify(
+            {
+                "tree_fn": tree_fn,
+            }
+        )
 
 
 # ===============================================================================

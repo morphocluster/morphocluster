@@ -1,5 +1,6 @@
-FROM continuumio/miniconda3
+FROM mambaorg/micromamba
 WORKDIR /code
+USER root
 
 # supervisor is required to run multiple processes in parallel
 RUN apt-get update --fix-missing && \
@@ -12,29 +13,32 @@ RUN apt-get update --fix-missing && \
 RUN mkdir /var/run/sshd
 RUN mkdir /root/.ssh && chmod 700 /root/.ssh
 
-COPY docker/morphocluster/run.sh docker/wait-for environment.yml docker/morphocluster/activate ./
-
-COPY docker/morphocluster/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY environment*.yml /tmp
 
 # Install all required packages at this stage to avoid reinstalling them later when the code changes
-RUN conda config --set notify_outdated_conda false && \
-    conda env create -f environment.yml && \
-    conda clean -y --all
+RUN --mount=type=cache,target=/opt/conda/pkg \
+    micromamba config set always_copy true && \
+    if [ -f "/tmp/environment.yml" ]; then \
+    echo "Using environment.yml..." && \
+    umask 0002 && micromamba install -n base -y -f /tmp/environment.yml;\
+    elif [ -f "/tmp/environment.default.yml" ]; then \
+    echo "Using environment.default.yml..." && \
+    umask 0002 && micromamba install -n base -y -f /tmp/environment.default.yml; \
+    fi
+
+# Activate environment for subsequent RUN commands:
+ARG MAMBA_DOCKERFILE_ACTIVATE=1
 
 # Install the application
 COPY versioneer.py setup.py setup.cfg MANIFEST.in README.rst ./
 COPY tests ./tests
 COPY morphocluster ./morphocluster
 COPY migrations ./migrations
-RUN . /opt/conda/etc/profile.d/conda.sh && \
-    conda activate morphocluster && \
-    echo Installing packages... && \
+RUN echo Installing packages... && \
     pip install -e .
 
 # Build frontend
-RUN . /opt/conda/etc/profile.d/conda.sh && \
-    conda activate morphocluster && \
-    cd morphocluster/frontend  && \
+RUN cd morphocluster/frontend  && \
     echo Building frontend... && \
     echo NPM version: `npm --version` && \
     npm ci && \
@@ -42,6 +46,9 @@ RUN . /opt/conda/etc/profile.d/conda.sh && \
 
 #COPY --from=build_frontend /frontend/dist morphocluster/frontend/dist
 
-COPY docker/morphocluster/config_docker.py morphocluster/
+COPY docker/wait-for docker/morphocluster/run.sh docker/morphocluster/activate ./
+COPY docker/morphocluster/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+RUN echo -e "export FLASK_APP=morphocluster\n" >> ~/.bashrc
 
 CMD ["/code/run.sh"]

@@ -22,3 +22,15 @@ The current stable branch is ``0.2.x``.
 Development happens on ``master``.
 
 ``maintenance/0.1.x`` is for older setups.
+
+
+Development environment
+-----------------------
+
+The repository contains a `.devcontainer` configuration for `VS Code <https://code.visualstudio.com/>`_.
+This provides a standardized development environment.
+
+We suggest setting `DOCKER_BUILDKIT=1` and `COMPOSE_DOCKER_CLI_BUILD=1` in your host environment so that you benefit from package caching when rebuilding the docker containers.
+
+To tear down the build environment, do `docker-compose down --project-name morphocluster -v --rmi all`.
+This removes all data outside the project tree.

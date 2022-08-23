@@ -1,0 +1,38 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
+// https://github.com/microsoft/vscode-dev-containers/tree/v0.224.2/containers/python-3-miniconda-postgres
+{
+	"name": "MorphoCluster Dev",
+	"dockerComposeFile": [
+		"../docker-compose.default.yml",
+		"docker-compose.extend.yml"
+	],
+	"service": "app",
+	"runServices": [
+		"app"
+	],
+	"workspaceFolder": "/morphocluster",
+	// Set *default* container specific settings.json values on container create.
+	"settings": {
+		"python.defaultInterpreterPath": "/opt/conda/bin/python",
+		"python.linting.enabled": true,
+		"python.linting.pylintEnabled": true,
+		"editor.formatOnSave": true,
+		// activateEnvironment is unneccessary for our setup:
+		"python.terminal.activateEnvironment": false,
+	},
+	// Add the IDs of extensions you want installed when the container is created.
+	"extensions": [
+		"ms-python.python",
+		"ms-python.vscode-pylance",
+		"eamodio.gitlens",
+	],
+	// Use root user
+	"remoteUser": "root",
+	"features": {
+		"git": "latest",
+		"git-lfs": "latest"
+	},
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": "chmod -R a+rwX /data && pip install -e /morphocluster[dev] && (flask add-user dev --password dev || true)",
+	//"postStartCommand": "git config --global user.email \"${localEnv:VSCODE_CONTAINER_GIT_EMAIL}\" && git config --global user.name \"${localEnv:VSCODE_CONTAINER_GIT_USER}\""
+}

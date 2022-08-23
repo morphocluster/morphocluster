@@ -13,10 +13,10 @@ setup(
         "pandas",
         "sqlalchemy>=1.3",
         "etaprogress",
-        "h5py>=2.8.0",
+        "h5py>=3.1.0",
         "scikit-learn",
         "scipy",
-        "redis >= 3.0, < 3.1",
+        "redis>=3.5.0",
         "hiredis",
         "flask-restful",
         "alembic",
@@ -30,7 +30,6 @@ setup(
         "Flask-RQ2",
         "tqdm",
         "hdbscan",
-        "Click==7.1.2", # See https://github.com/morphocluster/morphocluster/issues/42
         "chardet",
         "environs", # For envvar parsing
     ],

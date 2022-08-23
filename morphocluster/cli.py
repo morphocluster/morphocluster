@@ -428,9 +428,9 @@ def init_app(app):
 
     @app.cli.command()
     @click.argument("username")
-    def add_user(username):
+    @click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True)
+    def add_user(username, password):
         print("Adding user {}:".format(username))
-        password = click.prompt('Password', hide_input=True, confirmation_prompt=True)
 
         if not password:
             print("Password must not be empty!")
@@ -445,10 +445,9 @@ def init_app(app):
 
     @app.cli.command()
     @click.argument("username")
-    def change_user(username):
+    @click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True)
+    def change_user(username, password):
         print("Changing user {}:".format(username))
-
-        password = click.prompt('New password', hide_input=True, confirmation_prompt=True)
 
         if not password:
             print("Password must not be empty!")
@@ -460,7 +459,9 @@ def init_app(app):
 
         try:
             with database.engine.connect() as conn:
-                stmt = models.users.update(models.users.c.username == username, {"pwhash": pwhash})
+                stmt = models.users.update(
+                    models.users.c.username == username, {"pwhash": pwhash}
+                )
                 conn.execute(stmt)
         except IntegrityError as e:
             print(e)

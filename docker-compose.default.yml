@@ -21,6 +21,7 @@ services:
       - HISTSIZE=-1
       - HISTFILESIZE=-1
       - HISTFILE=/data/.bash_history
+      - FLASK_APP=morphocluster
     # # Uncomment this block to use the host's GPU inside the container
     # deploy:
     #   resources:
