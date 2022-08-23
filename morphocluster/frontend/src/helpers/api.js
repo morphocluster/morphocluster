@@ -14,6 +14,13 @@ export function patchNode(node_id, data) {
         });
 }
 
+export function createNode(data) {
+    return axios.post(`/api/nodes`, data)
+        .then(response => {
+            return response.data;
+        });
+}
+
 /**
  * Get the next unapproved node for a subtree rooted at node_id.
  *

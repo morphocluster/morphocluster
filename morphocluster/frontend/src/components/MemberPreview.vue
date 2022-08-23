@@ -1,5 +1,5 @@
 <template>
-    <div class="member-preview card" :style="style">
+    <div class="member-preview card" :style="style" @dblclick="doOpen">
         <div class="member-header" :title="title">
             <div class="member-title" v-if="show_title">{{ title }}</div>
             <div class="member-controls">
@@ -30,7 +30,16 @@ export default {
             show_title: !!window.config.FRONTEND_SHOW_MEMBER_TITLE,
         };
     },
-    methods: {},
+    methods: {
+        doOpen() {
+            const target = "object_id" in this.member
+                ? {name: 'object', params: {object_id: this.member.object_id}}
+                : {name: 'node', params: {node_id: this.member.node_id}};
+
+            // Open in new tab
+            window.open(this.$router.resolve(target).href, '_blank');
+        }
+    },
     mounted() {},
     computed: {
         title: function () {
