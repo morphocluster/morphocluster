@@ -174,7 +174,9 @@ class Tree(object):
             # Lock project
             self.lock_project(project_id)
 
-            progress_bar = tqdm(total=len(tree.nodes) + len(tree.objects), unit_scale=True)
+            progress_bar = tqdm(
+                total=len(tree.nodes) + len(tree.objects), unit_scale=True
+            )
 
             def progress_cb(nadd):
                 progress_bar.update(nadd)
@@ -948,9 +950,29 @@ class Tree(object):
         if limit is not None:
             stmt = stmt.limit(limit)
 
-        result = self.connection.execute(stmt, node_id=node_id).fetchall()
+        result = self.connection.execute(stmt).fetchall()
 
         return [dict(r) for r in result]
+
+    def get_object(self, object_id):
+        """
+        Get object by ID.
+        """
+        stmt = select([objects]).where(objects.c.object_id == object_id).limit(1)
+
+        obj = self.connection.execute(stmt).one()
+
+        stmt = (
+            select([nodes.c.node_id, nodes.c.project_id, nodes.c.name, projects.c.name.label("project_name")])
+            .select_from(nodes.join(nodes_objects).join(projects))
+            .where(nodes_objects.c.object_id == object_id)
+            .where(projects.c.visible)
+            .order_by(nodes.c.project_id.desc())
+        )
+
+        nds = self.connection.execute(stmt).all()
+
+        return dict(obj, nodes=[dict(p) for p in nds])
 
     def get_n_objects(self, node_id):
         stmt = (

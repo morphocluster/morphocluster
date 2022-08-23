@@ -11,14 +11,18 @@ Vue.use(BootstrapVue);
 // Custom styles
 import './assets/styles.css'
 
+import vuetify from './plugins/vuetify'
+
 Vue.config.productionTip = false
 
 new Vue({
   router,
   render: h => h(App),
+  vuetify,
+
   data() {
     return {
       config: window.config,
     };
-  },
+  }
 }).$mount('#app')

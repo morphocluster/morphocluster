@@ -42,6 +42,18 @@ var router = new Router({
       props: (route) => ({ project_id: parseInt(route.params.project_id) }),
     },
     {
+      name: 'object',
+      path: '/object/:object_id',
+      component: () => import(/* webpackChunkName: "object" */ './views/Object.vue'),
+      props: (route) => ({ object_id: route.params.object_id }),
+    },
+    {
+      name: 'node',
+      path: '/p/:project_id/node/:node_id',
+      component: () => import(/* webpackChunkName: "node" */ './views/Node.vue'),
+      props: (route) => ({ project_id: parseInt(route.params.project_id), node_id: parseInt(route.params.node_id) }),
+    },
+    {
       path: '/',
       redirect: '/p'
     },

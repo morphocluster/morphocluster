@@ -42,14 +42,16 @@ api = Blueprint("api", __name__)
 
 from werkzeug.exceptions import HTTPException
 
+
 def _complex2repr(o):
-    if isinstance(o, (int,str, float)):
+    if isinstance(o, (int, str, float)):
         return o
 
     if isinstance(o, (list, tuple)):
         return [_complex2repr(v) for v in o]
 
     return repr(o)
+
 
 @api.errorhandler(HTTPException)
 def handle_exception(e):
@@ -68,7 +70,7 @@ def handle_exception(e):
     data["traceback"] = traceback.format_exc()
 
     # Convert all complex values to their representation
-    data = {k: _complex2repr(v) for k,v in data.items()}
+    data = {k: _complex2repr(v) for k, v in data.items()}
 
     # start with the correct headers and status code from the error
     response = e.get_response()
@@ -214,6 +216,25 @@ def get_subtree(node_id):
 
 
 # ===============================================================================
+# /objects
+# ===============================================================================
+def _object_view(obj):
+    result = {k: v for k, v in obj.items() if k not in {"vector", "rand"}}
+    # result["nodes"] = [n for n in result["nodes"]]
+    return result
+
+
+@api.route("/objects/<object_id>", methods=["GET"])
+def get_object(object_id):
+
+    with database.engine.connect() as connection:
+        tree = Tree(connection)
+        result = tree.get_object(object_id)
+
+        return jsonify(_object_view(result))
+
+
+# ===============================================================================
 # /projects
 # ===============================================================================
 @api.route("/projects", methods=["GET"])
@@ -291,7 +312,11 @@ def save_project(project_id):
 
         tree.export_tree(root_id, tree_fn)
 
-        return jsonify({"tree_fn": tree_fn,})
+        return jsonify(
+            {
+                "tree_fn": tree_fn,
+            }
+        )
 
 
 # ===============================================================================
@@ -327,8 +352,6 @@ def create_node():
         if project_id is None:
             # Retrieve project_id for the parent_id
             project_id = tree.get_node(parent_id)["project_id"]
-
-        print(data)
 
         with connection.begin():
             node_id = tree.create_node(
