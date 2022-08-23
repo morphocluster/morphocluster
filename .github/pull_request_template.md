@@ -8,3 +8,4 @@ Closes #xxxx
 - [ ] JavaScript
   - [ ] Builds
 - [ ] Successful manual test
+- [ ] Changelog
