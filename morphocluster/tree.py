@@ -7,12 +7,13 @@ import csv
 import itertools
 import os
 import warnings
-from genericpath import commonprefix
 from numbers import Integral
+from typing import Iterable, Mapping, Optional
 
 import numpy as np
 import pandas as pd
 from etaprogress.progress import ProgressBar
+from genericpath import commonprefix
 from sklearn.cluster import KMeans
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import text
@@ -152,6 +153,12 @@ def _rquery_subtree(node_id, recurse_cb=None):
     return q
 
 
+def _compute_flags(mapping: Mapping, names: Iterable[str]):
+    return {
+        k: bool(mapping[k]) for k in names if k in mapping and pd.notnull(mapping[k])
+    }
+
+
 class Tree(object):
     """
     A tree as represented by the database.
@@ -174,7 +181,9 @@ class Tree(object):
             # Lock project
             self.lock_project(project_id)
 
-            progress_bar = tqdm(total=len(tree.nodes) + len(tree.objects), unit_scale=True)
+            progress_bar = tqdm(
+                total=len(tree.nodes) + len(tree.objects), unit_scale=True
+            )
 
             def progress_cb(nadd):
                 progress_bar.update(nadd)
@@ -189,21 +198,18 @@ class Tree(object):
                 object_ids = tree.objects_for_node(node["node_id"])[
                     "object_id"
                 ].tolist()
-                parent_id = (
+
+                tree_parent_id = (
                     int(node["parent_id"]) if pd.notnull(node["parent_id"]) else None
                 )
 
-                flag_names = ("approved", "starred", "filled")
-                flags = {
-                    k: bool(node[k])
-                    for k in flag_names
-                    if k in node and pd.notnull(node[k])
-                }
+                flags = _compute_flags(node, ("approved", "starred", "filled"))  # type: ignore
 
+                # Create node with objects
                 self.create_node(
                     project_id,
                     orig_node_id=int(node["node_id"]),
-                    orig_parent=parent_id,
+                    orig_parent=tree_parent_id,
                     object_ids=object_ids,
                     name=name,
                     progress_cb=progress_cb,
@@ -218,6 +224,90 @@ class Tree(object):
         print("Done after {}s.".format(progress_bar.format_dict["elapsed"]))
 
         return project_id
+
+    def update_project(self, project_id, tree):
+        """
+        Update a project from a saved tree.
+        """
+
+        if not isinstance(tree, processing.Tree):
+            tree = processing.Tree.from_saved(tree)
+
+        with self.connection.begin():
+            root_id = self.get_root_id(project_id)
+
+            # Lock project
+            self.lock_project(project_id)
+
+            tree_root_id = tree.get_root_id()
+
+            progress_bar = tqdm(total=len(tree.nodes), unit_scale=True)
+
+            for node in tree.topological_order():
+                name = (
+                    node["name"]
+                    if "name" in node and pd.notnull(node["name"])
+                    else None
+                )
+
+                object_ids = tree.objects_for_node(node["node_id"])[
+                    "object_id"
+                ].tolist()
+
+                tree_parent_id = (
+                    int(node["parent_id"]) if pd.notnull(node["parent_id"]) else None
+                )
+
+                flags = _compute_flags(node, ("approved", "starred", "filled"))  # type: ignore
+
+                # Were updating an existing project
+                if tree_parent_id is None:
+                    # Do not change root when updating
+                    print("Skipping root.")
+                else:
+                    # Calculate parent
+                    if tree_parent_id == tree_root_id:
+                        # If tree parent is tree root, use supplied root_id
+                        parent_cfg = dict(parent_id=root_id)
+                    else:
+                        # If node further down, use orig_parent
+                        parent_cfg = dict(orig_parent=tree_parent_id)
+
+                    # Create new node without creating new objects
+                    new_node_id = self.create_node(
+                        project_id,
+                        orig_node_id=int(node["node_id"]),
+                        name=name,
+                        **parent_cfg,
+                        **flags,
+                    )
+
+                    # Relocate objects (but take only from root)
+                    self.relocate_objects(object_ids, new_node_id, src_node_id=root_id)
+
+                # Update progress bar
+                progress_bar.update()
+            progress_bar.close()
+            print()
+
+        print("Done after {}s.".format(progress_bar.format_dict["elapsed"]))
+
+        return project_id
+
+    def get_orig_node_id_offset(self, project_id):
+        """
+        Calculate the offset for new clusters.
+
+        This is max(orig_id) + 1
+        """
+        stmt = select([func.max(nodes.c.orig_id)]).where(
+            nodes.c.project_id == project_id
+        )
+        result = self.connection.execute(stmt).scalar()
+
+        if result is None:
+            return 0
+        return result + 1
 
     def lock_project(self, project_id):
         """
@@ -701,6 +791,7 @@ class Tree(object):
 
         node_id = result.inserted_primary_key[0]
 
+        # Insert objects
         if object_ids is not None:
             object_ids = iter(object_ids)
             while True:
@@ -1185,9 +1276,12 @@ class Tree(object):
 
             self.invalidate_nodes(nodes_to_invalidate, unapprove)
 
-    def relocate_objects(self, object_ids, node_id, unapprove=False):
+    def relocate_objects(self, object_ids, node_id, unapprove=False, src_node_id=None):
         """
         Relocate an object to another node.
+
+        Args:
+            src_node_id: If not None, transfer only objects from this node.
 
         TODO: This is slow!
         """
@@ -1217,6 +1311,10 @@ class Tree(object):
                     & (nodes_objects.c.project_id == project_id)
                 )
             )
+
+            if src_node_id is not None:
+                stmt = stmt.where(nodes_objects.c.node_id == src_node_id)
+
             old_node_ids = [
                 r["node_id"] for r in self.connection.execute(stmt).fetchall()
             ]
@@ -1230,6 +1328,10 @@ class Tree(object):
                     & (nodes_objects.c.project_id == project_id)
                 )
             )
+
+            if src_node_id is not None:
+                stmt = stmt.where(nodes_objects.c.node_id == src_node_id)
+
             self.connection.execute(stmt)
 
             # # Return distinct old `parent_id`s
