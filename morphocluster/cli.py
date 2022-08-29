@@ -20,7 +20,7 @@ from sqlalchemy.sql.expression import bindparam, select
 from timer_cm import Timer
 from werkzeug.security import generate_password_hash
 
-from morphocluster import models
+from morphocluster import models, processing
 from morphocluster.extensions import database
 from morphocluster.tree import Tree
 
@@ -329,6 +329,45 @@ def init_app(app):
             with conn.begin():
                 print("Loading {}...".format(tree_fn))
                 project_id = tree.load_project(project_name, tree_fn)
+                root_id = tree.get_root_id(project_id)
+
+                if consolidate:
+                    print("Consolidating ...")
+                    tree.consolidate_node(root_id)
+
+            print("Root ID: {}".format(root_id))
+            print("Project ID: {}".format(project_id))
+
+    @app.cli.command()
+    @click.argument("tree_fn")
+    @click.argument("project_id")
+    @click.option("--consolidate/--no-consolidate", default=True)
+    @click.option("--with-offset/--without-offset", default=False)
+    def update_project(tree_fn, project_id, consolidate, with_offset):
+        """
+        Load a project from a saved tree.
+        """
+
+        with database.engine.connect() as conn:
+            tree = Tree(conn)
+
+            with conn.begin():
+                project = tree.get_project(project_id)
+                project_str = f"{project['name']} ({project['project_id']})"
+
+                if not click.confirm(f"Update {project_str} with {tree_fn}?"):
+                    return
+
+                print(f"Updating {project_str} with {tree_fn}...")
+                saved_tree = processing.Tree.from_saved(tree_fn)
+
+                # Apply offset
+                if with_offset:
+                    offset = tree.get_orig_node_id_offset(project['project_id']) - saved_tree.nodes["node_id"].min()
+                    saved_tree.offset_node_ids(offset)
+
+                project_id = tree.update_project(project['project_id'], saved_tree)
+                
                 root_id = tree.get_root_id(project_id)
 
                 if consolidate:

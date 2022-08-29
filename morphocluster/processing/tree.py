@@ -605,6 +605,10 @@ class Tree(object):
         result_mask = ~objects["label"].isna()
         return objects.loc[result_mask, ["object_id", "label"]].reset_index(drop=True)
 
+    def offset_node_ids(self, offset):
+        self.nodes["node_id"] += offset
+        self.nodes.loc[pd.notna(self.nodes["parent_id"]), "parent_id"] += offset
+
 
 if __name__ == "__main__":
     sys.exit(fire.Fire(Tree))
