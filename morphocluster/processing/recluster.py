@@ -9,7 +9,8 @@ import hdbscan
 import numpy as np
 import pandas as pd
 import sklearn.decomposition
-
+import sklearn.metrics
+import sklearn.neighbors
 from morphocluster.processing import Tree
 
 
@@ -196,11 +197,51 @@ class Recluster:
             "object_id": dataset_object_id[dataset_selector].reset_index(drop=True),
         }
 
+    def _subsample_unexplored(self, keep_frac: float, dataset):
+        if not self.trees:
+            return dataset
+
+        tree = self.merge_trees()
+
+        # Assemble training set from the features and node_ids of approved objects
+        objects = (
+            pd.DataFrame({"object_id": self.dataset["object_id"]})
+            .merge(tree.objects, how="left", on="object_id")
+            .merge(tree.nodes[["node_id", "approved"]], how="left", on="node_id")
+        )
+        mask = objects["approved"] & ~pd.isna(objects["node_id"])
+        X_train = self.dataset["features"][mask]
+        y_train = objects.loc[mask, "node_id"]
+
+        # Train NearestCentroidClassifier
+        clf = sklearn.neighbors.NearestCentroid()
+        clf.fit(X_train, y_train)
+        del X_train
+        del y_train
+
+        # Assemble eval set from dataset
+        X_eval = dataset["features"]
+
+        # Calculate the distance of every object in dataset to the existing cluster centroids
+        _, distances = sklearn.metrics.pairwise_distances_argmin_min(
+            X_eval, clf.centroids_
+        )
+
+        # Retain only the fraction with the largest distances
+        thr = np.quantile(distances, 1 - keep_frac)
+        mask = distances >= thr
+
+        return {
+            "features": dataset["features"][mask],
+            "object_id": dataset["object_id"][mask].reset_index(drop=True),
+        }
+
     def cluster(
         self,
         ignore_approved=True,
         sample_size=None,
         pca: Optional[int] = None,
+        keep_unexplored: Optional[float] = None,
         **kwargs,
     ):
         """
@@ -212,6 +253,14 @@ class Recluster:
         else:
             dataset = self.dataset
 
+        if keep_unexplored is not None:
+            assert (
+                0 <= keep_unexplored <= 1
+            ), f"keep_unexplored needs to be in range (0,1), got {keep_unexplored}"
+
+            print(f"Subsampling unexplored data ({keep_unexplored:.3f})...")
+            dataset = self._subsample_unexplored(keep_unexplored, dataset)
+
         if sample_size is not None:
             print("Subsampling dataset ({:,d})...".format(sample_size))
             dataset = _subsample_dataset(sample_size, dataset)
@@ -221,10 +270,13 @@ class Recluster:
             print(f"Performing PCA ({pca})...")
             start = time.perf_counter()
             _pca = sklearn.decomposition.PCA(pca)
+            print("Feature shape:", features.shape)
             features = _pca.fit_transform(features)
             time_fit = time.perf_counter() - start
             print("Dimensionality reduction took {:.0f}s".format(time_fit))
-            print("Explained variance ratio:", _pca.explained_variance_ratio_.sum())
+            print(
+                f"Explained variance ratio: {_pca.explained_variance_ratio_.sum():.2%}"
+            )
 
         print("Feature shape:", features.shape)
         print("Arguments:", kwargs)
