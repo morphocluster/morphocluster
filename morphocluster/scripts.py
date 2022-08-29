@@ -162,6 +162,7 @@ def features(archive_fn, output_fn, parameters_fn, normalize, batch_size, input_
 @click.option("--sample-size", type=int, default=None)
 @click.option("--pca", type=int, default=None)
 @click.option("--init-tree/--no-init-tree", help="Initialize tree from dataset.")
+@click.option("--keep-unexplored", type=float, default=None)
 def cluster(
     features_fns,
     result_fn,
@@ -172,6 +173,7 @@ def cluster(
     sample_size,
     pca,
     init_tree: bool,
+    keep_unexplored: Optional[float]
 ):
     rc = Recluster()
 
@@ -190,6 +192,7 @@ def cluster(
         cluster_selection_method=method,
         sample_size=sample_size,
         pca=pca,
+        keep_unexplored=keep_unexplored,
     )
 
     rc.save(result_fn)
