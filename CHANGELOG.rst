@@ -6,6 +6,8 @@ Current (0.2.x)
 
 - Make clustering more explorative by removing a fraction of the dataset that is closest to already validated clusters (#72)
 
+- Introduce `flask update-project` command to update an existing project with new clusters (#75)
+
 0.2.0
 =====
 
