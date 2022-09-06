@@ -1094,9 +1094,14 @@ def node_get_next_unfilled(node_id):
     with database.engine.connect() as connection:
         tree = Tree(connection)
 
+        # Consolidate whole tree to populate cached values
+        node = tree.get_node(node_id)
+        root_id = tree.get_root_id(node["project_id"])
+        tree.consolidate_node(root_id, depth="full")
+
         # Filter descendants that are approved and unfilled
         def filter(subtree):
-            return (subtree.c.approved == True) & (subtree.c.filled == False)
+            return (subtree.c.approved == True) & (subtree.c.filled == False) & (subtree.c._prototypes != None)
 
         return jsonify(
             tree.get_next_node(
