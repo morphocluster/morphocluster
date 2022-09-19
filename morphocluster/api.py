@@ -39,14 +39,16 @@ api = Blueprint("api", __name__)
 
 from werkzeug.exceptions import HTTPException
 
+
 def _complex2repr(o):
-    if isinstance(o, (int,str, float)):
+    if isinstance(o, (int, str, float)):
         return o
 
     if isinstance(o, (list, tuple)):
         return [_complex2repr(v) for v in o]
 
     return repr(o)
+
 
 @api.errorhandler(HTTPException)
 def handle_exception(e):
@@ -65,7 +67,7 @@ def handle_exception(e):
     data["traceback"] = traceback.format_exc()
 
     # Convert all complex values to their representation
-    data = {k: _complex2repr(v) for k,v in data.items()}
+    data = {k: _complex2repr(v) for k, v in data.items()}
 
     # start with the correct headers and status code from the error
     response = e.get_response()
@@ -113,7 +115,7 @@ def jsonify(*args, **kwargs):
 
 def log(connection, action, node_id=None, reverse_action=None, data=None):
     auth = request.authorization
-    username = auth.username if auth is not None else None
+    username = auth.username if auth is not None else None  # type: ignore
 
     stmt = models.log.insert(
         {
@@ -130,7 +132,7 @@ def log(connection, action, node_id=None, reverse_action=None, data=None):
 
 @api.record
 def record(state):
-    api.config = state.app.config
+    api.config = state.app.config  # type: ignore
 
 
 @api.after_request
@@ -193,7 +195,7 @@ def get_tree_root():
 
 @api.route("/tree/<int:node_id>", methods=["GET"])
 def get_subtree(node_id):
-    flags = {k: request.args.get(k, 0, strtobool) for k in ("supertree",)}
+    flags = {k: request.args.get(k, 0, strtobool) for k in ("supertree",)}  # type: ignore
 
     with database.engine.connect() as connection:
         tree = Tree(connection)
@@ -280,7 +282,7 @@ def save_project(project_id):
         root_id = tree.get_root_id(project_id)
 
         tree_fn = os.path.join(
-            api.config["PROJECT_EXPORT_DIR"],
+            api.config["PROJECT_EXPORT_DIR"],  # type: ignore
             "{:%Y-%m-%d-%H-%M-%S}--{}--{}.zip".format(
                 datetime.now(), project["project_id"], project["name"]
             ),
@@ -288,11 +290,7 @@ def save_project(project_id):
 
         tree.export_tree(root_id, tree_fn)
 
-        return jsonify(
-            {
-                "tree_fn": tree_fn,
-            }
-        )
+        return jsonify({"tree_fn": tree_fn})
 
 
 # ===============================================================================
@@ -314,7 +312,7 @@ def create_node():
 
     with database.engine.connect() as connection:
         tree = Tree(connection)
-        data = request.get_json()
+        data = request.get_json()  # type: ignore
 
         object_ids = [m["object_id"] for m in data["members"] if "object_id" in m]
         node_ids = [m["node_id"] for m in data["members"] if "node_id" in m]
@@ -553,7 +551,7 @@ def cache_serialize_page(endpoint, **kwargs):
             # ===================================================================
             # Construct response
             # ===================================================================
-            response = Response(result, mimetype=api.config["JSONIFY_MIMETYPE"])
+            response = Response(result, mimetype=api.config["JSONIFY_MIMETYPE"])  # type: ignore
 
             # =======================================================================
             # Generate Link response header
@@ -1095,9 +1093,18 @@ def node_get_next_unfilled(node_id):
     with database.engine.connect() as connection:
         tree = Tree(connection)
 
+        # Consolidate whole tree to populate cached values
+        node = tree.get_node(node_id)
+        root_id = tree.get_root_id(node["project_id"])
+        tree.consolidate_node(root_id, depth="full")
+
         # Filter descendants that are approved and unfilled
         def filter(subtree):
-            return (subtree.c.approved == True) & (subtree.c.filled == False)
+            return (
+                (subtree.c.approved == True)
+                & (subtree.c.filled == False)
+                & (subtree.c._prototypes != None)
+            )
 
         return jsonify(
             tree.get_next_node(

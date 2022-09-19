@@ -1143,7 +1143,7 @@ class Tree(object):
 
             prots: Prototypes = node["_prototypes"]
             if prots is None:
-                raise TreeError("Node has no prototypes!")
+                raise TreeError(f"Node {node_id} has no prototypes!")
 
             distances_expression = [
                 objects.c.vector.dist_euclidean(p) for p in prots.prototypes_

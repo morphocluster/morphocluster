@@ -1,6 +1,3 @@
-import os
-import tempfile
-
 import pytest
 from requests.auth import _basic_auth_str
 

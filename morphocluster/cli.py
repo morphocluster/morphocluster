@@ -101,7 +101,7 @@ def init_app(app):
 
         print(f"Loading {len(index):,d} new objects...")
         index_iter = index.itertuples()
-        progress = tqdm.tqdm(total=len(index), unit="obj", unit_scale=True)
+        progress = tqdm.tqdm(total=len(index), unit_scale=True)
         while True:
             chunk = tuple(
                 row._asdict() for row in itertools.islice(index_iter, batch_size)
@@ -136,7 +136,7 @@ def init_app(app):
 
         print(f"Updating {len(index):,d} existing objects...")
         index_iter = index.itertuples()
-        progress = tqdm.tqdm(total=len(index), unit="obj", unit_scale=True)
+        progress = tqdm.tqdm(total=len(index), unit_scale=True)
         while True:
             chunk = tuple(
                 row._asdict() for row in itertools.islice(index_iter, batch_size)
@@ -214,8 +214,15 @@ def init_app(app):
     @click.argument("features_fns", nargs=-1)
     @click.option("--truncate", type=int)
     @click.option("--pca", type=int)
-    @click.option("--replace/--no-replace", help="Clear previous features before importing.")
-    def load_features(features_fns: List[str], truncate: Optional[int], pca: Optional[int], replace: bool):
+    @click.option(
+        "--clear/--no-clear", help="Clear previous features before importing."
+    )
+    def load_features(
+        features_fns: List[str],
+        truncate: Optional[int],
+        pca: Optional[int],
+        clear: bool,
+    ):
         """
         Load object features from an HDF5 file.
         """
@@ -264,7 +271,7 @@ def init_app(app):
         with database.engine.begin() as conn:
             conn: sqlalchemy.engine.Connection
 
-            if replace:
+            if clear:
                 print("Clearing previous features...")
                 stmt = models.objects.update().values({"vector": None})
                 conn.execute(stmt)
@@ -277,7 +284,7 @@ def init_app(app):
 
             # TODO: Use UPDATE ... RETURNING to get the number of affected rows
 
-            progress = tqdm.tqdm(total=len(object_ids), unit="obj")
+            progress = tqdm.tqdm(total=len(object_ids), unit_scale=True)
             obj_iter = iter(zip(object_ids, vectors))  # type: ignore
             while True:
                 chunk = tuple(itertools.islice(obj_iter, 1000))
@@ -363,11 +370,14 @@ def init_app(app):
 
                 # Apply offset
                 if with_offset:
-                    offset = tree.get_orig_node_id_offset(project['project_id']) - saved_tree.nodes["node_id"].min()
+                    offset = (
+                        tree.get_orig_node_id_offset(project["project_id"])
+                        - saved_tree.nodes["node_id"].min()
+                    )
                     saved_tree.offset_node_ids(offset)
 
-                project_id = tree.update_project(project['project_id'], saved_tree)
-                
+                project_id = tree.update_project(project["project_id"], saved_tree)
+
                 root_id = tree.get_root_id(project_id)
 
                 if consolidate:

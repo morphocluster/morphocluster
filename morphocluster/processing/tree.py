@@ -7,6 +7,7 @@ import json
 import os
 import sys
 from io import StringIO
+from typing import Dict
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import fire
@@ -276,10 +277,10 @@ class Tree(object):
         if meta is None:
             meta = {}
 
-        self.nodes = nodes
-        self.objects = objects
-        self.rejected_objects = rejected_objects
-        self.meta = meta
+        self.nodes: pd.DataFrame = nodes
+        self.objects: pd.DataFrame = objects
+        self.rejected_objects: pd.DataFrame = rejected_objects
+        self.meta: Dict = meta
 
     def save(self, tree_fn, meta=None):
         """
