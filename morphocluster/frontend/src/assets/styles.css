@@ -36,3 +36,7 @@ body {
 table {
 	color: var(--color);
 }
+
+.modal-dialog {
+	color: black;
+}
