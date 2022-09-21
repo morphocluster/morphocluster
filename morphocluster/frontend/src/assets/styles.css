@@ -6,7 +6,7 @@ html, body {
 
 .tooltip kbd {
 	background-color: #f7f7f9;
-	color: black;
+	color: #212529;
 }
 
 .info-hint {
@@ -19,13 +19,12 @@ html, body {
 /* Dark/Light Mode */
 :root {
 	--background-color: white;
-	--color: black;
-	
+	--color: #212529;
 }
 
 :root.dark-mode {
 	--background-color: black;
-	--color: white;
+	--color: #f7f7f9;
 }
 
 body {
@@ -33,7 +32,7 @@ body {
 	background-color: var(--background-color);
 }
 
-table {
+table, .table {
 	color: var(--color);
 }
 
