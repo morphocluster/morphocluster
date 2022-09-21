@@ -1700,23 +1700,28 @@ class Tree(object):
                             # 4. _centroid
                             with t.child("_centroid"):
                                 _centroid = []
+                                _centroid_support = 0
 
                                 if len(objects_) > 0:
                                     # Object mean, weighted with number of objects
-                                    obj_mean = np.sum(objects_.vectors, axis=0)
-                                    obj_mean /= np.linalg.norm(obj_mean)
-                                    _centroid.append(_n_objects * obj_mean)
+                                    _centroid.append(np.sum(objects_.vectors, axis=0))
+                                    _centroid_support += len(objects_)
+
                                 if len(children_dict) > 0:
+                                    # Children mean
+                                    cardinalities = children_dict.cardinalities
                                     children_mean = np.sum(
-                                        children_dict.cardinalities[:, np.newaxis]
+                                        cardinalities[:, np.newaxis]
                                         * children_dict.vectors,
                                         axis=0,
                                     )
                                     _centroid.append(children_mean)
+                                    _centroid_support += cardinalities.sum()
 
-                                if len(_centroid) > 0:
-                                    _centroid = np.sum(_centroid, axis=0)
-                                    _centroid /= np.linalg.norm(_centroid)
+                                if len(_centroid) > 0 and _centroid_support > 0:
+                                    _centroid = (
+                                        np.sum(_centroid, axis=0) / _centroid_support
+                                    )
                                 else:
                                     _centroid = None
 
