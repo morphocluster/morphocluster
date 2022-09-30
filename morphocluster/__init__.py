@@ -2,23 +2,44 @@
 Create the MorphoCluster app.
 """
 
-from flask import Flask
 import os
+
+from flask import Flask, has_request_context, request
+import logging
 
 from ._version import get_versions
 
 __version__ = get_versions()["version"]
 del get_versions
 
+from flask.logging import default_handler
+
+class RequestFormatter(logging.Formatter):
+    def format(self, record):
+        if has_request_context():
+            record.url = request.url
+            record.remote_addr = request.remote_addr
+        else:
+            record.url = None
+            record.remote_addr = None
+
+        return super().format(record)
+
+formatter = RequestFormatter(
+    '[%(asctime)s] %(remote_addr)s requested %(url)s\n'
+    '%(levelname)s in %(module)s: %(message)s'
+)
+default_handler.setFormatter(formatter)
+
 
 def create_app(test_config=None):
     """Create and configure an instance of the Flask application."""
 
-    from flask import Response, abort, redirect, render_template, request, url_for
-
     # Enable fault handler for meaningful stack traces when a worker is killed
     import faulthandler
 
+    from flask import (Response, redirect,
+                       render_template, url_for)
     faulthandler.enable()
 
     app = Flask(__name__, instance_relative_config=True)
@@ -41,12 +62,7 @@ def create_app(test_config=None):
     app.wsgi_app = ReverseProxied(app.wsgi_app, app.config)
 
     # Register extensions
-    from morphocluster.extensions import (
-        database,
-        migrate,
-        redis_lru,
-        rq,
-    )
+    from morphocluster.extensions import database, migrate, redis_lru, rq
 
     database.init_app(app)
     redis_lru.init_app(app)
@@ -110,8 +126,9 @@ def create_app(test_config=None):
     # ===============================================================================
     # Authentication
     # ===============================================================================
-    from morphocluster import models
     from werkzeug.security import check_password_hash
+
+    from morphocluster import models
 
     def check_auth(username, password):
         # Retrieve entry from the database
