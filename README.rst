@@ -21,11 +21,11 @@ The web application runs in a Docker container.
 
 0. Clone the morphocluster repository and checkout the current stable branch: ``git clone -b 0.2.x https://github.com/morphocluster/morphocluster.git``
 1. Decide where to store the data, e.g. ``/data/morphocluster``, and create the required directories, e.g. ``mkdir -p /data/morphocluster/{postgres,data}``.
-   Make a copy of ``docker-compose.default.yml`` in the same directory, name it ``docker-compose.yml`` and edit the relevant parts (e.g. paths).
+2. Make a copy of ``docker-compose.default.yml`` in the repository folder, name it ``docker-compose.yml`` and edit the relevant parts (e.g. paths).
    Make a copy of ``environment.default.yml`` in the same directory, name it ``environment.yml`` and edit the relevant parts (e.g. for CUDA).
-2. Open a shell in the repository folder and build environment: ``docker-compose up --build``
+3. Open a shell in the repository folder and build environment: ``docker-compose up --build``
    This will take a long while when run for the first time.
-3. In a new terminal, connect to the MorphoCluster container and set it up:
+4. In a new terminal, connect to the MorphoCluster container and set it up:
 
    .. code:: sh
 
@@ -41,7 +41,7 @@ The web application runs in a Docker container.
       Password: <hidden>
       Retype Password: <hidden>
 
-4. Data preparation.
+5. Data preparation.
    MorphoCluster accepts input data in ZIP files containing the image files and an ``index.csv`` file with two columns:
    ``object_id`` (a unique identifier for every object) and ``path`` (image file path inside the archive).
    `EcoTaxa <https://ecotaxa.obs-vlfr.fr/>`_ export files have to be converted (see below).
@@ -84,10 +84,10 @@ The web application runs in a Docker container.
 
    Keep in mind that the paths are *inside* the Docker container, not on the host.
 
-5. Connect to the MorphoCluster service using the browser (http://localhost:8000/).
+6. Connect to the MorphoCluster service using the browser (http://localhost:8000/).
    Validate and Grow the found clusters and save the result.
    It will be placed in ``/data/export/`` in the container.
-6. Repeat clustering, tree import, validation and growing.
+7. Repeat clustering, tree import, validation and growing.
 
 
 Prerequisites
