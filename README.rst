@@ -23,13 +23,13 @@ The web application runs in a Docker container.
 1. Decide where to store the data, e.g. ``/data/morphocluster``, and create the required directories, e.g. ``mkdir -p /data/morphocluster/{postgres,data}``.
 2. Make a copy of ``docker-compose.default.yml`` in the repository folder, name it ``docker-compose.yml`` and edit the relevant parts (e.g. paths).
    Make a copy of ``environment.default.yml`` in the same directory, name it ``environment.yml`` and edit the relevant parts (e.g. for CUDA).
-3. Open a shell in the repository folder and build environment: ``docker-compose up --build``
+3. Open a shell in the repository folder and build environment: ``sudo docker-compose up --build``
    This will take a long while when run for the first time.
 4. In a new terminal, connect to the MorphoCluster container and set it up:
 
    .. code:: sh
 
-      $ docker-compose exec morphocluster bash
+      $ sudo docker-compose exec morphocluster bash
 
       # Activate conda environment
       (base) root@abc123...:/code# . ./activate
@@ -51,7 +51,7 @@ The web application runs in a Docker container.
    .. code:: sh
 
       # Connect to MorphoCluster container and set up the environment (if not done before)
-      $ docker-compose exec morphocluster bash
+      $ sudo docker-compose exec morphocluster bash
       (base) root@abc123...:/code# . ./activate
       (morphocluster) root@abc123...:/code#
 
@@ -103,7 +103,7 @@ GPU processing
 By default, MorphoCluster uses the CPU to calculate deep learning image features.
 It is strongly advisable to use the GPU for that to speed up feature extraction dramatically.
 To enable feature extraction on the GPU, modify ``environment.yml`` to exclude ``cpuonly`` and include the correct ``cudatoolkit`` version.
-This has to be done before running ``docker-compose up --build``.
+This has to be done before running ``sudo docker-compose up --build``.
 Read about the `requirements for running CUDA containers <https://github.com/NVIDIA/nvidia-docker/wiki/CUDA>`_.
 
 Currently, ``docker-compose`` does not directly support NVIDIA docker (see `#1073 <https://github.com/NVIDIA/nvidia-docker/issues/1073>`_, `#6691 <https://github.com/docker/compose/issues/6691>`_). 
