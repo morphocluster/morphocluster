@@ -623,6 +623,12 @@ export default {
                     return api.patchNode(node.node_id, { filled: true });
                 })
                 .then(() => {
+                    // Update progress
+                    api.getNodeProgress(node.node_id, {
+                        log: "grow",
+                    });
+                })
+                .then(() => {
                     console.log("Saved.");
                     this.saving = false;
                     this.saved = true;

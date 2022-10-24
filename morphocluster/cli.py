@@ -518,23 +518,16 @@ def init_app(app):
             print(f"User {username} changed.")
 
     @app.cli.command()
-    @click.argument("root_id")
-    @click.argument("classification_fn")
-    def export_classifications(root_id, classification_fn):
+    @click.argument("project_id")
+    @click.argument("labels_fn")
+    @click.option("--clean-name/--no-clean-name", default=True)
+    def export_labels(project_id, labels_fn, clean_name):
         with database.engine.connect() as conn:
             tree = Tree(conn)
-            tree.export_classifications(root_id, classification_fn)
-
-    @app.cli.command()
-    @click.argument("node_id")
-    @click.argument("filename")
-    def export_direct_objects(node_id, filename):
-        with database.engine.connect() as conn, open(filename, "w") as f:
-            tree = Tree(conn)
-
-            f.writelines(
-                "{}\n".format(o["object_id"]) for o in tree.get_objects(node_id)
-            )
+            root_id = tree.get_root_id(project_id)
+            processing_tree = tree.dump_tree(root_id)
+            df = processing_tree.to_flat(clean_name=clean_name)
+            df.to_csv(labels_fn, index=False)
 
     @app.cli.command()
     @click.argument("filename")

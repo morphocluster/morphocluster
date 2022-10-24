@@ -28,7 +28,14 @@ DATASET_PATH = "/data"
 # ORDER BY clause for node_get_next_unfilled
 NODE_GET_NEXT_UNFILLED_ORDER_BY = "largest"
 
-PREFERRED_URL_SCHEME = None
+## Flask configuration
+# https://flask.palletsprojects.com/en/2.2.x/config/#PREFERRED_URL_SCHEME
+PREFERRED_URL_SCHEME = _env.str("PREFERRED_URL_SCHEME", default=None)
 
+# https://flask.palletsprojects.com/en/2.2.x/config/#TRAP_BAD_REQUEST_ERRORS
+TRAP_BAD_REQUEST_ERRORS = _env.bool("TRAP_BAD_REQUEST_ERRORS", default=False)
+
+## Frontend configuration
+## Accessible as window.config.<key>
 # Show the title (object_id, node_id) of cluster members
 FRONTEND_SHOW_MEMBER_TITLE = _env.bool("FRONTEND_SHOW_MEMBER_TITLE", default=True)
