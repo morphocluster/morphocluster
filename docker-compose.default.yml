@@ -1,13 +1,14 @@
 version: '3'
 services:
   morphocluster:
-    build:
-      context: .
-      dockerfile: docker/morphocluster/Dockerfile
+    # build:
+    #   context: .
+    #   dockerfile: docker/morphocluster/Dockerfile
+    image: morphocluster/morphocluster:0.2.1
     ports:
       # Expose port 8000 (web service)
       - "8000:8000"
-      ## Expose port 22 for external SSH access:
+      ## TODO: Expose port 22 for external SSH access:
       #- "8022:22"
     depends_on:
       - postgres
@@ -22,7 +23,7 @@ services:
       - HISTFILESIZE=-1
       - HISTFILE=/data/.bash_history
       - FLASK_APP=morphocluster
-    # # Uncomment this block to use the host's GPU inside the container
+    # # TODO: Uncomment this block to use the host's GPU inside the container
     # deploy:
     #   resources:
     #     reservations:
@@ -30,7 +31,7 @@ services:
     #         - capabilities:
     #           - gpu
   postgres:
-    build: docker/postgresql
+    image: postgres:12-alpine
     environment:
       POSTGRES_USER: morphocluster
       POSTGRES_PASSWORD: morphocluster
@@ -39,6 +40,7 @@ services:
       - "5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgresql/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
     # Increase shared memory to allow for big queries
     shm_size: '2gb'
     restart: unless-stopped
@@ -50,25 +52,23 @@ services:
     restart: unless-stopped
 
   redis-lru:
-    build: docker/redis-lru
+    image: "redis:5-alpine"
     ports:
       - "6379"
+    volumes:
+      - ./docker/redis-lru/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
     restart: unless-stopped
 
 volumes:
+  # We use a named volume so that the data is not lost if the image is rebuilt
   postgres-data:
-    ## Example: Store PostgreSQL data in a host directory
-    # driver: local
-    # driver_opts:
-    #   o: bind
-    #   type: none
-    #    
-    #   # Replace with your own configuration
-    #   device: /data/morphocluster/data
+
   morphocluster-data:
-    ## Example: Store application data in a host directory
-    # driver: local
-    # driver_opts:
-    #   o: bind
-    #   type: none
-    #   device: /data/morphocluster/data
+    # Example: Store application data in a host directory
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      # TODO: Change to the actual directory
+      device: ./data
