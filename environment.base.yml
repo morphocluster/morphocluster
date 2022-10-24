@@ -13,15 +13,13 @@ dependencies:
   - scipy
   - pip
   - hdbscan
-  - nodejs #=17
-  - openssl < 3.0.0 # OpenSSL 3.0.0 removed some encryption algorithms needed for frontend build (md4)
+  # - nodejs #=17
+  # - openssl < 3.0.0 # OpenSSL 3.0.0 removed some encryption algorithms needed for frontend build (md4)
   - Pillow
   - pytorch
   - torchvision
   - hiredis
-  # Replace by the correction version of cudatoolkit to enable GPU feature extraction,
-  # e.g. "cudatoolkit=10.2"
-  - cpuonly
+  - joblib==1.1.0 # See https://github.com/scikit-learn-contrib/hdbscan/issues/562
 
   - pip:
     # pip packages required to run MorphoCluster but not specified by setup.py

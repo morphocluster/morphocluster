@@ -1,3 +1,24 @@
+FROM python:3 as build-env
+ARG MORPHOCLUSTER_CUDA=no
+
+WORKDIR /build-env
+COPY docker/morphocluster/build-env /build-env
+COPY environment*.yml ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+RUN python build.py
+
+FROM node:18-alpine as build-frontend
+WORKDIR /frontend
+COPY morphocluster/frontend /frontend
+
+# See https://github.com/vuejs/vue-cli/issues/6770
+RUN export NODE_OPTIONS=--openssl-legacy-provider && \
+    echo Building frontend... && \
+    echo NPM version: `npm --version` && \
+    npm ci && \
+    npm run build
+
 FROM mambaorg/micromamba
 WORKDIR /code
 USER root
@@ -13,18 +34,12 @@ RUN apt-get update --fix-missing && \
 RUN mkdir /var/run/sshd
 RUN mkdir /root/.ssh && chmod 700 /root/.ssh
 
-COPY environment*.yml /tmp
+COPY --from=build-env /build-env/environment.yml /tmp
 
 # Install all required packages at this stage to avoid reinstalling them later when the code changes
-RUN --mount=type=cache,target=/opt/conda/pkg \
+RUN --mount=type=cache,target=/opt/conda/pkgs \
     micromamba config set always_copy true && \
-    if [ -f "/tmp/environment.yml" ]; then \
-    echo "Using environment.yml..." && \
-    umask 0002 && micromamba install -n base -y -f /tmp/environment.yml;\
-    elif [ -f "/tmp/environment.default.yml" ]; then \
-    echo "Using environment.default.yml..." && \
-    umask 0002 && micromamba install -n base -y -f /tmp/environment.default.yml; \
-    fi
+    umask 0002 && micromamba install -n base -y -f /tmp/environment.yml;
 
 # Activate environment for subsequent RUN commands:
 ARG MAMBA_DOCKERFILE_ACTIVATE=1
@@ -37,18 +52,17 @@ COPY migrations ./migrations
 RUN echo Installing packages... && \
     pip install -e .
 
-# Build frontend
-RUN cd morphocluster/frontend  && \
-    echo Building frontend... && \
-    echo NPM version: `npm --version` && \
-    npm ci && \
-    npm run build
-
-#COPY --from=build_frontend /frontend/dist morphocluster/frontend/dist
+COPY --from=build-frontend /frontend/dist morphocluster/frontend/dist
 
 COPY docker/wait-for docker/morphocluster/run.sh docker/morphocluster/activate ./
 COPY docker/morphocluster/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-RUN echo -e "export FLASK_APP=morphocluster\n" >> ~/.bashrc
+ENV FLASK_APP=morphocluster
+
+# Enable bash completion
+RUN _FLASK_COMPLETE=bash_source flask > ~/.flask-complete.bash && \
+    echo -e ". ~/.flask-complete.bash\n" >> ~/.bashrc && \
+    _MORPHOCLUSTER_COMPLETE=bash_source morphocluster > ~/.morphocluster-complete.bash && \
+    echo -e ". ~/.morphocluster-complete.bash\n" >> ~/.bashrc
 
 CMD ["/code/run.sh"]
