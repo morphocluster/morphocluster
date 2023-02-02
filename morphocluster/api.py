@@ -219,7 +219,7 @@ def get_subtree(node_id):
 def get_projects():
 
     parser = reqparse.RequestParser()
-    parser.add_argument("include_progress", type=strtobool, default=0)
+    parser.add_argument("include_progress", type=strtobool, default=0, location="args")
     arguments = parser.parse_args(strict=True)
 
     with database.engine.connect() as connection:
@@ -239,7 +239,7 @@ def get_projects():
 def get_project(project_id):
 
     parser = reqparse.RequestParser()
-    parser.add_argument("include_progress", type=strtobool, default=0)
+    parser.add_argument("include_progress", type=strtobool, default=0, location="args")
     arguments = parser.parse_args(strict=True)
 
     with database.engine.connect() as connection:
@@ -720,13 +720,13 @@ def get_node_members(node_id):
     """
 
     parser = reqparse.RequestParser()
-    parser.add_argument("nodes", type=strtobool, default=0)
-    parser.add_argument("objects", type=strtobool, default=0)
-    parser.add_argument("arrange_by", default="")
-    parser.add_argument("page", type=int, default=0)
-    parser.add_argument("request_id", default=None)
-    parser.add_argument("starred_first", type=strtobool, default=1)
-    parser.add_argument("descending", type=strtobool, default=0)
+    parser.add_argument("nodes", type=strtobool, default=0, location="args")
+    parser.add_argument("objects", type=strtobool, default=0, location="args")
+    parser.add_argument("arrange_by", default="", location="args")
+    parser.add_argument("page", type=int, default=0, location="args")
+    parser.add_argument("request_id", default=None, location="args")
+    parser.add_argument("starred_first", type=strtobool, default=1, location="args")
+    parser.add_argument("descending", type=strtobool, default=0, location="args")
     arguments = parser.parse_args(strict=True)
 
     return _get_node_members(node_id=node_id, **arguments)
@@ -748,7 +748,7 @@ def get_node_stats(node_id):
     """
 
     parser = reqparse.RequestParser()
-    parser.add_argument("log", default=None)
+    parser.add_argument("log", default=None, location="args")
     arguments = parser.parse_args(strict=True)
 
     with database.engine.connect() as connection:
@@ -993,9 +993,9 @@ def node_get_recommended_children(node_id):
         request_id (str, optional): Identification string for the current request collection.
     """
     parser = reqparse.RequestParser()
-    parser.add_argument("page", type=int, default=0)
-    parser.add_argument("max_n", type=int, default=100)
-    parser.add_argument("request_id", default=None)
+    parser.add_argument("page", type=int, default=0, location="args")
+    parser.add_argument("max_n", type=int, default=100, location="args")
+    parser.add_argument("request_id", default=None, location="args")
     arguments = parser.parse_args(strict=True)
 
     # Limit max_n
@@ -1028,9 +1028,9 @@ def node_get_recommended_objects(node_id):
         max_n (int): Maximum number of recommended objects.
     """
     parser = reqparse.RequestParser()
-    parser.add_argument("page", type=int, default=0)
-    parser.add_argument("max_n", type=int, default=100)
-    parser.add_argument("request_id", default=None)
+    parser.add_argument("page", type=int, default=0, location="args")
+    parser.add_argument("max_n", type=int, default=100, location="args")
+    parser.add_argument("request_id", default=None, location="args")
     arguments = parser.parse_args(strict=True)
 
     # Limit max_n
@@ -1050,7 +1050,7 @@ def node_get_tip(node_id):
 @api.route("/nodes/<int:node_id>/next", methods=["GET"])
 def node_get_next(node_id):
     parser = reqparse.RequestParser()
-    parser.add_argument("leaf", type=strtobool, default=False)
+    parser.add_argument("leaf", type=strtobool, default=False, location="args")
     arguments = parser.parse_args(strict=True)
 
     print(arguments)
@@ -1077,9 +1077,11 @@ def node_get_next(node_id):
 @api.route("/nodes/<int:node_id>/next_unfilled", methods=["GET"])
 def node_get_next_unfilled(node_id):
     parser = reqparse.RequestParser()
-    parser.add_argument("leaf", type=strtobool, default=False)
-    parser.add_argument("preferred_first", type=strtobool, default=False)
-    parser.add_argument("order_by", type=str, default=None)
+    parser.add_argument("leaf", type=strtobool, default=False, location="args")
+    parser.add_argument(
+        "preferred_first", type=strtobool, default=False, location="args"
+    )
+    parser.add_argument("order_by", type=str, default=None, location="args")
     arguments = parser.parse_args(strict=True)
 
     print(arguments)
