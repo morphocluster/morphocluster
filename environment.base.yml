@@ -13,8 +13,6 @@ dependencies:
   - scipy
   - pip
   - hdbscan
-  # - nodejs #=17
-  # - openssl < 3.0.0 # OpenSSL 3.0.0 removed some encryption algorithms needed for frontend build (md4)
   - Pillow
   - pytorch
   - torchvision
@@ -24,3 +22,4 @@ dependencies:
   - pip:
     # pip packages required to run MorphoCluster but not specified by setup.py
     - gunicorn
+    - werkzeug < 2.1 #See https://github.com/morphocluster/morphocluster/issues/66

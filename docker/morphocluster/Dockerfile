@@ -1,5 +1,10 @@
+# Build the micromamba environment file
 FROM python:3 as build-env
+
+# Configure CUDA environment
 ARG MORPHOCLUSTER_CUDA=no
+# Image metadata
+ARG MORPHOCLUSTER_VERSION=unversioned
 
 WORKDIR /build-env
 COPY docker/morphocluster/build-env /build-env
@@ -8,6 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 RUN python build.py
 
+# Build the frontend
 FROM node:18-alpine as build-frontend
 WORKDIR /frontend
 COPY morphocluster/frontend /frontend
@@ -19,9 +25,16 @@ RUN export NODE_OPTIONS=--openssl-legacy-provider && \
     npm ci && \
     npm run build
 
+# Main image
 FROM mambaorg/micromamba
 WORKDIR /code
 USER root
+
+# Labels
+# see https://github.com/opencontainers/image-spec/blob/main/annotations.md
+LABEL org.opencontainers.image.title=MorphoCluster
+LABEL org.opencontainers.image.version=${MORPHOCLUSTER_VERSION}
+LABEL org.opencontainers.image.source=https://github.com/morphocluster/morphocluster/
 
 # supervisor is required to run multiple processes in parallel
 RUN apt-get update --fix-missing && \

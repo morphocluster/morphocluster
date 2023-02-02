@@ -7,7 +7,7 @@ if MORPHOCLUSTER_CUDA == "no":
     update = {"dependencies": ["cpuonly"]}
 else:
     update = {"dependencies": [f"cudatoolkit={MORPHOCLUSTER_CUDA}"]}
-   
+
 with open("environment.update.yml", "w") as f:
     yaml.dump(update, f)
 

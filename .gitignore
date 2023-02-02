@@ -26,3 +26,4 @@ mprofile_*.dat
 morphocluster/frontend/dist
 *.code-workspace
 .venv/*
+data/

@@ -34,3 +34,9 @@ We suggest setting `DOCKER_BUILDKIT=1` and `COMPOSE_DOCKER_CLI_BUILD=1` in your 
 
 To tear down the build environment, do `docker-compose down --project-name morphocluster -v --rmi all`.
 This removes all data outside the project tree.
+
+Building the image
+------------------
+
+Run `./build_docker.sh` to build the docker image.
+Prepend with `MORPHOCLUSTER_CUDA=10.2` for CUDA 10.2 support.
