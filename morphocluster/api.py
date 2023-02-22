@@ -220,7 +220,7 @@ def get_projects():
 
     parser = reqparse.RequestParser()
     parser.add_argument("include_progress", type=strtobool, default=0, location="args")
-    arguments = parser.parse_args(strict=True)
+    arguments = parser.parse_args(strict=False)
 
     with database.engine.connect() as connection:
         tree = Tree(connection)
@@ -240,7 +240,7 @@ def get_project(project_id):
 
     parser = reqparse.RequestParser()
     parser.add_argument("include_progress", type=strtobool, default=0, location="args")
-    arguments = parser.parse_args(strict=True)
+    arguments = parser.parse_args(strict=False)
 
     with database.engine.connect() as connection:
         tree = Tree(connection)
@@ -727,7 +727,7 @@ def get_node_members(node_id):
     parser.add_argument("request_id", default=None, location="args")
     parser.add_argument("starred_first", type=strtobool, default=1, location="args")
     parser.add_argument("descending", type=strtobool, default=0, location="args")
-    arguments = parser.parse_args(strict=True)
+    arguments = parser.parse_args(strict=False)
 
     return _get_node_members(node_id=node_id, **arguments)
 
@@ -749,7 +749,7 @@ def get_node_stats(node_id):
 
     parser = reqparse.RequestParser()
     parser.add_argument("log", default=None, location="args")
-    arguments = parser.parse_args(strict=True)
+    arguments = parser.parse_args(strict=False)
 
     with database.engine.connect() as connection:
         tree = Tree(connection)
@@ -996,7 +996,7 @@ def node_get_recommended_children(node_id):
     parser.add_argument("page", type=int, default=0, location="args")
     parser.add_argument("max_n", type=int, default=100, location="args")
     parser.add_argument("request_id", default=None, location="args")
-    arguments = parser.parse_args(strict=True)
+    arguments = parser.parse_args(strict=False)
 
     # Limit max_n
     arguments.max_n = max(arguments.max_n, 1000)
@@ -1031,7 +1031,7 @@ def node_get_recommended_objects(node_id):
     parser.add_argument("page", type=int, default=0, location="args")
     parser.add_argument("max_n", type=int, default=100, location="args")
     parser.add_argument("request_id", default=None, location="args")
-    arguments = parser.parse_args(strict=True)
+    arguments = parser.parse_args(strict=False)
 
     # Limit max_n
     arguments.max_n = max(arguments.max_n, 1000)
@@ -1051,7 +1051,7 @@ def node_get_tip(node_id):
 def node_get_next(node_id):
     parser = reqparse.RequestParser()
     parser.add_argument("leaf", type=strtobool, default=False, location="args")
-    arguments = parser.parse_args(strict=True)
+    arguments = parser.parse_args(strict=False)
 
     print(arguments)
 
@@ -1082,7 +1082,7 @@ def node_get_next_unfilled(node_id):
         "preferred_first", type=strtobool, default=False, location="args"
     )
     parser.add_argument("order_by", type=str, default=None, location="args")
-    arguments = parser.parse_args(strict=True)
+    arguments = parser.parse_args(strict=False)
 
     print(arguments)
 
