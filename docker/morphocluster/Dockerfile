@@ -32,7 +32,9 @@ RUN . /opt/conda/etc/profile.d/conda.sh && \
     pip install -e .
 
 # Build frontend
+# --openssl-legacy-provider to support some encryption algorithms needed by npm (md4) in OpenSSL 3.0.0
 RUN . /opt/conda/etc/profile.d/conda.sh && \
+    export NODE_OPTIONS=--openssl-legacy-provider && \
     conda activate morphocluster && \
     cd morphocluster/frontend  && \
     echo Building frontend... && \
