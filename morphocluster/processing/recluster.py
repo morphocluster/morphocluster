@@ -307,6 +307,11 @@ class Recluster:
             ),
         )
 
+        # Apply offset to labels to avoid duplicate `node_id`s
+        # (This needs to be done early, as the result might be handled without merging it to the base tree.)
+        offset = max(t.nodes["node_id"].max() for t in self.trees) + 1
+        labels += offset
+
         # Turn cluster_labels to a tree
         self.trees.append(
             Tree.from_labels(
