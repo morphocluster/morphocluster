@@ -89,6 +89,13 @@ The web application runs in a Docker container.
    It will be placed in ``/data/export/`` in the container.
 6. Repeat clustering, tree import, validation and growing.
 
+Flowchart
+~~~~~~~~~
+
+.. image:: doc/flow.png
+   :width: 80%
+   :align: center
+
 
 Prerequisites
 ~~~~~~~~~~~~~
