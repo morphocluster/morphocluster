@@ -11,7 +11,7 @@ setup(
         "flask>=1.0.2",
         "psycopg2-binary",
         "pandas",
-        "sqlalchemy>=1.3",
+        "sqlalchemy>=1.3,<2.0",
         "etaprogress",
         "h5py>=3.1.0",
         "scikit-learn",

@@ -29,6 +29,14 @@ FROM mambaorg/micromamba
 WORKDIR /code
 USER root
 
+# TODO: Drop SSH
+# supervisor is required to run multiple processes in parallel
+RUN apt-get update --fix-missing && \
+    apt-get install -y supervisor netcat rsync && \
+    apt-get -qq --no-install-recommends install openssh-server && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 # Image metadata
 ARG MORPHOCLUSTER_VERSION=unversioned
 
@@ -37,13 +45,6 @@ ARG MORPHOCLUSTER_VERSION=unversioned
 LABEL org.opencontainers.image.title=MorphoCluster
 LABEL org.opencontainers.image.version=${MORPHOCLUSTER_VERSION}
 LABEL org.opencontainers.image.source=https://github.com/morphocluster/morphocluster/
-
-# supervisor is required to run multiple processes in parallel
-RUN apt-get update --fix-missing && \
-    apt-get install -y supervisor netcat rsync && \
-    apt-get -qq --no-install-recommends install openssh-server && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
 
 # Setup SSH
 RUN mkdir /var/run/sshd

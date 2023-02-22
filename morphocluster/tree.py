@@ -1520,7 +1520,7 @@ class Tree(object):
             return result
 
         # Otherwise go to parent
-        node = self.connection.execute(nodes.select(nodes.c.node_id == node_id)).first()
+        node = self.connection.execute(nodes.select().where(nodes.c.node_id == node_id)).first()
 
         if node["parent_id"]:
             print("No matching children, trying parent: {}".format(node["parent_id"]))

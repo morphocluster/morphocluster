@@ -2,7 +2,6 @@ import itertools
 import os
 import time
 import zipfile
-from getpass import getpass
 from typing import Dict, List, Optional
 from xmlrpc.client import Boolean
 
@@ -31,7 +30,7 @@ def _add_user(username, password):
     )
 
     with database.engine.connect() as conn:
-        stmt = models.users.insert({"username": username, "pwhash": pwhash})
+        stmt = models.users.insert().values(username=username, pwhash=pwhash)
         conn.execute(stmt)
 
 

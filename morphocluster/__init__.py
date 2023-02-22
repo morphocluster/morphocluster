@@ -109,7 +109,7 @@ def create_app(test_config=None):
     @app.route("/get_obj_image/<objid>")
     def get_obj_image(objid):
         with database.engine.connect() as conn:
-            stmt = models.objects.select(models.objects.c.object_id == objid)
+            stmt = models.objects.select().where(models.objects.c.object_id == objid)
             result = conn.execute(stmt).first()
 
         if result is None:
@@ -133,7 +133,7 @@ def create_app(test_config=None):
     def check_auth(username, password):
         # Retrieve entry from the database
         with database.engine.connect() as conn:
-            stmt = models.users.select(models.users.c.username == username).limit(1)
+            stmt = models.users.select().where(models.users.c.username == username).limit(1)
             user = conn.execute(stmt).first()
 
             if user is None:
