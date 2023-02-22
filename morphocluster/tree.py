@@ -548,26 +548,6 @@ class Tree(object):
 
             return dict(**leaves_result, **deep_result)
 
-    def export_classifications(self, root_id, classification_fn):
-        """
-        Export `object_id`s with cluster labels.
-        """
-
-        with self.connection.begin(), open(classification_fn, "w") as f:
-            writer = csv.writer(f, delimiter=",")
-            starred_nodes = self.get_minlevel_starred(root_id, cache_valid=False)
-
-            bar = ProgressBar(len(starred_nodes), max_width=40)
-
-            for node in starred_nodes:
-                objs = self.get_objects_recursive(node["node_id"])
-
-                for o in objs:
-                    writer.writerow((o["object_id"], node["name"]))
-
-                bar.numerator += 1
-                print(bar, end="\r")
-
     def dump_tree(self, root_id):
         """
         Generate a processing.Tree from the tree below root_id.

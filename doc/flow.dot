@@ -1,0 +1,32 @@
+# ~/.local/bin/dot2tex morphocluster2022/flow.dot -o morphocluster2022/flow.tex
+
+digraph G {
+    rankdir=TB
+    node [shape=box style=rounded];
+    graph [nodesep="0.2" padding="0" margin="0"];
+    newrank=true;
+
+    _source0 -> extract [label="<archive>.zip"];
+    extract -> load_objects -> load_features -> cluster [style=invis];
+    _source1 -> load_objects [label="<archive>.zip"];
+    extract -> cluster [label="<features>.h5"];
+    extract -> load_features [label="<features>.h5"];
+    cluster -> import [label="<tree>.zip"];
+    import -> validate -> grow -> name;
+    grow -> export;
+    export -> cluster [label="<exported tree>.zip" constraint=false];
+
+    _source0 [style=invis];
+    _source1 [style=invis];
+
+    load_objects [label="Load objects: `flask load-objects <archive>.zip`"]
+    load_features [label="Load features: `flask load-features <features>.h5`"]
+
+    cluster [label="Clustering: `morphocluster cluster --min-cluster-size <m> --min-samples <n> <features>.h5 [--tree <exported tree>.zip]`"];
+    import [label="Import: `flask load-project <tree>.zip`"];
+    validate [label="Validation [Validate]"];
+    grow [label="Growing [Grow]"];
+    extract [label="Feature Extraction: `morphocluster features ...`", style=rounded];
+    export [label="Export [Save]"];
+    name [label="Cluster Naming (Expert Mode)",style="rounded,dashed"];
+}

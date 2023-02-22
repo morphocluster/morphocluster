@@ -18,6 +18,7 @@ FROM node:18-alpine as build-frontend
 WORKDIR /frontend
 COPY morphocluster/frontend /frontend
 
+# --openssl-legacy-provider to support some encryption algorithms needed by npm (md4) in OpenSSL 3.0.0
 # See https://github.com/vuejs/vue-cli/issues/6770
 RUN export NODE_OPTIONS=--openssl-legacy-provider && \
     echo Building frontend... && \

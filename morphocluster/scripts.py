@@ -224,3 +224,35 @@ def cluster(
     )
 
     rc.save(result_fn)
+
+@main.group()
+def tree():
+    """Tree-related commands."""
+    pass
+
+@tree.command()
+@click.option(
+    "--features", "features_fns", type=click.Path(exists=True, readable=True), multiple=True
+)
+@click.argument(
+    "tree_fns", type=click.Path(exists=True, readable=True), nargs=-1
+)
+@click.argument("result_fn", type=click.Path(exists=False, writable=True), nargs=1)
+def merge(
+    features_fns,
+    tree_fns,
+    result_fn,
+):
+    """Merge objects from feature files and trees."""
+    rc = Recluster()
+
+    for fn in features_fns:
+        rc.load_features(fn)
+
+    if features_fns:
+        rc.init_tree()
+
+    for tree_fn in tree_fns:
+        rc.load_tree(tree_fn)
+
+    rc.save(result_fn)
