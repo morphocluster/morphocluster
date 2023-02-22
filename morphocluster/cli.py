@@ -256,11 +256,12 @@ def init_app(app):
         if pca is not None:
             print(f"Performing PCA ({pca}d)...")
             start = time.perf_counter()
-            pca = sklearn.decomposition.PCA(pca)
-            vectors = pca.fit_transform(vectors)
+            pca_transformer = sklearn.decomposition.PCA(pca)
+            vectors = pca_transformer.fit_transform(vectors)
             time_fit = time.perf_counter() - start
             print("Dimensionality reduction took {:.0f}s".format(time_fit))
-            print("Explained variance ratio:", pca.explained_variance_ratio_.sum())
+            print("Explained variance ratio:", pca_transformer.explained_variance_ratio_.sum())
+            del pca_transformer
 
         if vectors.shape[1] > 100:
             raise ValueError(
@@ -284,7 +285,7 @@ def init_app(app):
 
             # TODO: Use UPDATE ... RETURNING to get the number of affected rows
 
-            progress = tqdm.tqdm(total=len(object_ids), unit_scale=True)
+            progress = tqdm.tqdm(total=len(object_ids), unit="obj", unit_scale=True)
             obj_iter = iter(zip(object_ids, vectors))  # type: ignore
             while True:
                 chunk = tuple(itertools.islice(obj_iter, 1000))
@@ -531,6 +532,17 @@ def init_app(app):
             processing_tree = tree.dump_tree(root_id)
             df = processing_tree.to_flat(clean_name=clean_name)
             df.to_csv(labels_fn, index=False)
+
+    @app.cli.command()
+    @click.argument("node_id")
+    @click.argument("filename")
+    def export_direct_objects(node_id, filename):
+        with database.engine.connect() as conn, open(filename, "w") as f:
+            tree = Tree(conn)
+
+            f.writelines(
+                "{}\n".format(o["object_id"]) for o in tree.get_objects(node_id)
+            )
 
     @app.cli.command()
     @click.argument("filename")

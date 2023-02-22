@@ -530,7 +530,7 @@ class Tree(object):
         """
         return Tree(self.nodes.copy(), self.objects.copy())
 
-    def to_flat(self, clean_name=True):
+    def to_flat(self, clean_name=True) -> pd.DataFrame:
         """
         Returns a DataFrame with object_id and label.
 
