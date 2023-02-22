@@ -217,7 +217,7 @@ import Vue from "vue";
 const MAX_N_RECOMMENDATIONS = 100000;
 
 export default {
-    name: "bisect",
+    name: "BisectView",
     data() {
         return {
             node_status: "",

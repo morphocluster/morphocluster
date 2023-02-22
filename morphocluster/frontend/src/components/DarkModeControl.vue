@@ -14,7 +14,7 @@
 export default {
     name: "dark-mode-toggle",
     mounted() {
-        this.dark_mode = this.dark_mode;
+        // this.dark_mode = this.dark_mode;
     },
     computed: {
         dark_mode: {

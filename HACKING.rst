@@ -40,3 +40,10 @@ Building the image
 
 Run `./build_docker.sh` to build the docker image.
 Prepend with `MORPHOCLUSTER_CUDA=10.2` for CUDA 10.2 support.
+
+Frontend Development
+--------------------
+
+Install a current Node.js and npm using:
+
+    nvm install --lts --latest-npm

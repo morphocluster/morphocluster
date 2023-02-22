@@ -9,7 +9,7 @@ import axios from "axios";
 import { EventBus } from "@/event-bus.js";
 
 export default {
-    name: "project",
+    name: "ProjectView",
     props: {"project_id": Number},
     components: {},
     data() {

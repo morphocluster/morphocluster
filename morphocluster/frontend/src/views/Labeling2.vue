@@ -26,7 +26,7 @@ import MemberPreview from "@/components/MemberPreview.vue";
 import NodeHeader from "@/components/NodeHeader.vue";
 
 export default {
-  name: "labeling2",
+  name: "Labeling2View",
   props: {
     node_id: Number
   },

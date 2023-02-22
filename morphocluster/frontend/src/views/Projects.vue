@@ -187,7 +187,7 @@ import DarkModeControl from "@/components/DarkModeControl.vue";
 import Humanize from "humanize-plus";
 
 export default {
-    name: "projects",
+    name: "ProjectsView",
     props: {},
     components: { DarkModeControl },
     data() {

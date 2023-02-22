@@ -131,11 +131,10 @@ import * as api from "@/helpers/api.js";
 
 import MemberPreview from "@/components/MemberPreview.vue";
 import MessageLog from "@/components/MessageLog.vue";
-import NodeHeader from "@/components/NodeHeader.vue";
 import DarkModeControl from "../components/DarkModeControl.vue";
 
 export default {
-    name: "approve",
+    name: "ApproveView",
     data() {
         return {
             loading: false,
@@ -165,7 +164,6 @@ export default {
     components: {
         MemberPreview,
         MessageLog,
-        NodeHeader,
         InfiniteLoading,
         DarkModeControl,
     },
