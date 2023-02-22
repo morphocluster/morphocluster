@@ -10,7 +10,7 @@ REDIS_LRU_URL = "redis://redis-lru:6379/0"
 RQ_REDIS_URL = "redis://redis-rq:6379/0"
 
 # Database connection
-SQLALCHEMY_DATABASE_URI = _env.bool("MORPHOCLUSTER_DATABASE_URI", default=
+SQLALCHEMY_DATABASE_URI = _env.str("MORPHOCLUSTER_DATABASE_URI", default=
     "postgresql://morphocluster:morphocluster@postgres/morphocluster"
 )
 SQLALCHEMY_TRACK_MODIFICATIONS = False
