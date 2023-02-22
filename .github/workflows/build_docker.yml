@@ -27,3 +27,4 @@ jobs:
         with:
           push: false
           tags: morphocluster/morphocluster:latest
+          file: docker/morphocluster/Dockerfile
