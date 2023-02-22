@@ -3,15 +3,13 @@ FROM python:3 as build-env
 
 # Configure CUDA environment
 ARG MORPHOCLUSTER_CUDA=no
-# Image metadata
-ARG MORPHOCLUSTER_VERSION=unversioned
 
+# Build environment.yml for main image
 WORKDIR /build-env
 COPY docker/morphocluster/build-env /build-env
 COPY environment*.yml ./
-RUN pip install --no-cache-dir -r requirements.txt
-
-RUN python build.py
+RUN pip install --no-cache-dir -r requirements.txt \
+    && python build.py
 
 # Build the frontend
 FROM node:18-alpine as build-frontend
@@ -30,6 +28,9 @@ RUN export NODE_OPTIONS=--openssl-legacy-provider && \
 FROM mambaorg/micromamba
 WORKDIR /code
 USER root
+
+# Image metadata
+ARG MORPHOCLUSTER_VERSION=unversioned
 
 # Labels
 # see https://github.com/opencontainers/image-spec/blob/main/annotations.md
