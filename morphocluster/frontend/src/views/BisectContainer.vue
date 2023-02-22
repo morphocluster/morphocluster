@@ -21,9 +21,9 @@
         <div class="spinner-container" v-else>
             <spinner></spinner>
         </div>
-        <b-modal ref="doneModal" lazy centered no-fade header-bg-variant="success" title="Bisection done">
+        <b-modal ref="doneModal" lazy centered no-fade header-bg-variant="success" title="Growing done">
             <div class="d-block text-center">
-                Bisection is done for this project.
+                Growing is done for this project.
             </div>
             <footer slot="modal-footer">
                 <b-button variant="primary" :to="{name: 'projects'}">Back to projects</b-button>

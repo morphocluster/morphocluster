@@ -251,6 +251,7 @@ export default {
             })
             .catch((e) => {
                 console.log(e);
+                // TODO: Use axiosErrorHandler
                 this.alerts.unshift({
                     message: e.message,
                     variant: "danger",
