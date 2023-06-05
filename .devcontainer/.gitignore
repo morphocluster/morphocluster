@@ -1,0 +1,3 @@
+# This is only to ignore the legacy cache/ directory.
+# In case it still exists, the cache/ directory can be removed.
+/cache/*
