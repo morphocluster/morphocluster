@@ -17,12 +17,12 @@ sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
 
-from morphocluster._version import get_versions
+from morphocluster import __version__  # noqa
 
 project = "MorphoCluster"
 copyright = "2018-2023, Simon-Martin Schroeder"
 author = "Simon-Martin Schroeder"
-version = get_versions()["version"]
+version = __version__
 
 # -- General configuration ---------------------------------------------------
 
