@@ -92,7 +92,7 @@ The web application runs in a Docker container.
 Flowchart
 ~~~~~~~~~
 
-.. image:: doc/flow.png
+.. image:: docs/flow.png
    :width: 80%
    :align: center
 
