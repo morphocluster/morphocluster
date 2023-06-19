@@ -8,7 +8,7 @@ setup(
     cmdclass=versioneer.get_cmdclass(),
     include_package_data=True,
     install_requires=[
-        "flask>=1.0.2",
+        "flask>=1.0.2,<2",
         "psycopg2-binary",
         "pandas",
         "sqlalchemy>=1.3,<2.0",
@@ -32,6 +32,7 @@ setup(
         "hdbscan",
         "chardet",
         "environs",  # For envvar parsing
+        "markupSafe<=2.0.1",
     ],
     extras_require={
         "tests": ["pytest", "requests", "pytest-cov", "lovely-pytest-docker"],
