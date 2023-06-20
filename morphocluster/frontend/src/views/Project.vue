@@ -9,7 +9,7 @@
             </ul>
             <dark-mode-control />
         </nav>
-        
+
         <table>
             <thead>
                 <tr>
@@ -22,11 +22,11 @@
             </thead>
             <tbody>
                 <tr>
-                    <td> {{ project.name }}</td> <!-- hier muss noch das datum created on hin -->
+                    <td> {{ project.creation_date }}</td> <!-- hier muss noch das datum created on hin -->
                     <td> {{ project.name }}</td>
                     <td> {{ project.node_id }}</td>
                     <td> {{ project.project_id }}</td>
-                    <td> {{ project.name }}</td> <!-- hier muss noch der visible wert hin -->
+                    <td> {{ project.visible }}</td> <!-- hier muss noch der visible wert hin -->
                 </tr>
             </tbody>
         </table> 
@@ -77,8 +77,7 @@ export default {
     overflow: hidden;
 }
 table {
-  width: 100%;
-  border-collapse: collapse;
+    width: 100%;
 }
 
 th, td {

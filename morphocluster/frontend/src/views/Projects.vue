@@ -129,6 +129,12 @@
                             @click.prevent="showSaveModal(data.item)"
                             >Save</b-button
                         >
+                        <b-button
+                            size="sm"
+                            variant="primary"
+                            class="mr-2"
+                            >Recluster</b-button
+                        >
                     </template>
                     <template v-slot:empty>
                         <div class="text-center">No projects available.</div>
@@ -181,10 +187,17 @@
 </template>
 
 <script>
+
+
+
 import * as api from "@/helpers/api.js";
 
 import DarkModeControl from "@/components/DarkModeControl.vue";
 import Humanize from "humanize-plus";
+
+
+
+
 
 export default {
     name: "ProjectsView",
