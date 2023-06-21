@@ -11,23 +11,29 @@
         </nav>
 
         <table>
-            <thead>
-                <tr>
-                    <th> Created on </th>
-                    <th> Name </th>
-                    <th> Node_id </th>
-                    <th> Project_id </th>
-                    <th> Visible </th>
-                </tr>
-            </thead>
+            
             <tbody>
                 <tr>
-                    <td> {{ project.creation_date }}</td> <!-- hier muss noch das datum created on hin -->
-                    <td> {{ project.name }}</td>
-                    <td> {{ project.node_id }}</td>
-                    <td> {{ project.project_id }}</td>
-                    <td> {{ project.visible }}</td> <!-- hier muss noch der visible wert hin -->
+                    <td> Created on </td>
+                    <td> {{ project.creation_date }}</td> 
                 </tr>
+                <tr>
+                    <td> Name </td>
+                    <td> {{ project.name }}</td>
+                </tr>
+                <tr>
+                    <td> Node_id  </td>
+                    <td> {{ project.node_id }}</td>
+                </tr>
+                <tr> 
+                    <td> Project_id </td>
+                    <td> {{ project.project_id }}</td>
+                </tr>
+                <tr>
+                    <td> Visible  </td>
+                    <td> {{ project.visible }}</td> 
+                </tr>    
+                    
             </tbody>
         </table> 
     </div>
@@ -77,6 +83,7 @@ export default {
     overflow: hidden;
 }
 table {
+    
     width: 100%;
 }
 
