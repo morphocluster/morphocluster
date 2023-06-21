@@ -1,5 +1,5 @@
 <template>
-    <div id="Project">
+    <div id="project">
         <nav class="navbar navbar-expand-lg navbar-light bg-dark text-light">
             <router-link class="navbar-brand text-light" to="/"
                 >MorphoCluster</router-link
@@ -10,8 +10,7 @@
             <dark-mode-control />
         </nav>
 
-        <table>
-            
+        <table id="table">
             <tbody>
                 <tr>
                     <td> Created on </td>
@@ -33,7 +32,6 @@
                     <td> Visible  </td>
                     <td> {{ project.visible }}</td> 
                 </tr>    
-                    
             </tbody>
         </table> 
     </div>
@@ -43,7 +41,6 @@
 import axios from "axios";
 import { EventBus } from "@/event-bus.js";
 import DarkModeControl from "@/components/DarkModeControl.vue";
-
 
 export default {
     name: "ProjectView",
@@ -57,7 +54,7 @@ export default {
     methods: {
 
     },
-    mounted() {4
+    mounted() {
         // Load node info
         axios
             .get(`/api/projects/${this.project_id}`)
@@ -75,7 +72,7 @@ export default {
 </script>
 
 <style>
-#Project {
+#project {
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -83,8 +80,7 @@ export default {
     overflow: hidden;
 }
 table {
-    
-    width: 100%;
+    width: 100%
 }
 
 th, td {

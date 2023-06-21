@@ -9,9 +9,6 @@
             </ul>
             <dark-mode-control />
         </nav>
-        <div class="home">
-            <DropZone />
-        </div>
         <div class="scrollable">
             <div class="container">
                 <div class="alerts" v-if="alerts.length">
@@ -180,25 +177,16 @@
                 </form>
             </div>
         </b-modal>
-
     </div>
-    
 </template>
 
 <script>
-
-
-
 import * as api from "@/helpers/api.js";
 
 import DarkModeControl from "@/components/DarkModeControl.vue";
 import Humanize from "humanize-plus";
 
-
-
-
-
-export default {  
+export default {
     name: "ProjectsView",
     props: {},
     components: { DarkModeControl },
@@ -221,12 +209,12 @@ export default {
         };
     },
     methods: {
-        
         showSaveModal(project) {
             console.log("project", project);
             this.save_slug = project.name;
             this.save_project_id = project.project_id;
             this.save_title = `Save ${project.name} (${this.save_project_id})`;
+
             this.$refs.saveModal.show();
         },
         HandleSaveOk(evt) {
@@ -299,5 +287,4 @@ export default {
 .alerts {
     padding-top: 1em;
 }
-
 </style>
