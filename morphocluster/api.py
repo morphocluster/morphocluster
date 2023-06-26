@@ -27,6 +27,7 @@ from flask_restful import reqparse
 from redis.exceptions import RedisError
 from sklearn.manifold import Isomap
 from timer_cm import Timer
+from flask.helpers import send_from_directory
 
 from morphocluster import background, models
 from morphocluster.classifier import Classifier
@@ -211,6 +212,18 @@ def get_subtree(node_id):
 
         return jsonify(result)
 
+# ===============================================================================
+# /files
+# ===============================================================================
+
+@api.route("/files/<path:path>", methods=["GET"])
+def get_file(path):
+    """
+    Send the requested file to the client.
+    """
+
+    # TODO: Send any file
+    send_from_directory(app.config["PROJECT_EXPORT_DIR"], path)
 
 # ===============================================================================
 # /projects
