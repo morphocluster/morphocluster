@@ -1,15 +1,11 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
 // https://github.com/microsoft/vscode-dev-containers/tree/v0.224.2/containers/python-3-miniconda-postgres
 {
-	"name": "MorphoCluster Dev",
 	"dockerComposeFile": [
 		"../docker-compose.default.yml",
 		"docker-compose.extend.yml"
 	],
 	"service": "app",
-	"runServices": [
-		"app"
-	],
 	"workspaceFolder": "/morphocluster",
 	// Set *default* container specific settings.json values on container create.
 	"settings": {

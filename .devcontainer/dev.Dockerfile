@@ -11,7 +11,7 @@ RUN sudo chmod a+rx /usr/local/bin/hadolint
 
 # Install the Conda packages.
 COPY --chown=$MAMBA_USER:$MAMBA_USER conda-lock.yml /tmp/conda-lock.yml
-RUN : \
+RUN --mount=type=cache,target=/opt/conda/pkgs : \
     # Configure Conda to use the conda-forge channel
     && micromamba config append channels conda-forge \
     # Install and clean up

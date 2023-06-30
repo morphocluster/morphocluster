@@ -1,4 +1,4 @@
-name: morphocluster
+name: base
 channels:
   - pytorch
   - conda-forge

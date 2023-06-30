@@ -1,15 +1,16 @@
 version: '3'
 services:
   morphocluster:
-    build:
-      context: .
-      dockerfile: docker/morphocluster/Dockerfile
+    # TODO: Provide docker-compose.prod.yml
+    # build:
+    #   context: .
+    #   dockerfile: docker/morphocluster/Dockerfile
     # image: morphocluster/morphocluster:0.2.1
-    ports:
-      # Expose port 8000 (web service)
-      - "8000:8000"
-      ## TODO: Expose port 22 for external SSH access:
-      #- "8022:22"
+    # ports:
+    #   # Expose port 8000 (web service)
+    #   - "8000:8000"
+    #   ## TODO: Expose port 22 for external SSH access:
+    #   #- "8022:22"
     depends_on:
       - postgres
       - redis-lru
@@ -61,14 +62,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  # We use a named volume so that the data is not lost if the image is rebuilt
+  # We use named volumes so that the data is not lost if the image is rebuilt
   postgres-data:
-
   morphocluster-data:
-    # Example: Store application data in a host directory
-    driver: local
-    driver_opts:
-      o: bind
-      type: none
-      # TODO: Change to the actual directory
-      device: ./data

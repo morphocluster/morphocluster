@@ -4,20 +4,29 @@
 		"TZ": "Europe/Berlin",
 		"LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}",
 		"CONTAINER_WORKSPACE_FOLDER": "${containerWorkspaceFolder}",
+		"FLASK_APP": "morphocluster",
+		# /data is mounted to .devcontainer/data in docker-compose.extend.yml
+		"DATASET_PATH": "/data",
 	},
-	"runArgs": [
-		"--hostname", "devcontainer",
-		// // Warning: loading .env into the environment will undermine the ability
-		// // to use .env to dynamically adjust the unspecified values.
-		// "--env-file", ".env"
+	// "runArgs": [
+	// 	"--hostname", "devcontainer",
+	// 	// // Warning: loading .env into the environment will undermine the ability
+	// 	// // to use .env to dynamically adjust the unspecified values.
+	// 	// "--env-file", ".env"
+	// ],
+	// "build": {
+	// 	"dockerfile": "dev.Dockerfile",
+	// 	"context": "../",
+	// 	"args": {
+	// 		"CONTAINER_WORKSPACE_FOLDER": "${containerWorkspaceFolder}",
+	// 	}
+	// },
+	"dockerComposeFile": [
+		"../docker-compose.default.yml",
+		"docker-compose.extend.yml"
 	],
-	"build": {
-		"dockerfile": "dev.Dockerfile",
-		"context": "../",
-		"args": {
-			"CONTAINER_WORKSPACE_FOLDER": "${containerWorkspaceFolder}",
-		}
-	},
+	"service": "morphocluster",
+	"workspaceFolder": "/workspace/morphocluster",
 	"overrideCommand": false,  // allow the entrypoint to run
 	// "onCreateCommand": ["/usr/local/bin/_configure_docker_group.sh"],
 	// "postCreateCommand": ["/usr/local/bin/_postCreateCommand.sh"],
@@ -32,14 +41,15 @@
 		"ms-python.isort",
 		"ms-toolsai.jupyter",
 		"ms-azuretools.vscode-docker",
-		"ms-vsliveshare.vsliveshare",
+		// "ms-vsliveshare.vsliveshare",
 		"donjayamanne.githistory",
 		"eamodio.gitlens",
-		"mutantdino.resourcemonitor",
-		"github.copilot",
+		// "mutantdino.resourcemonitor",
+		// "github.copilot",
 		"davidanson.vscode-markdownlint",
 		"exiasr.hadolint",
-		"jnoortheen.xonsh",
+		// "jnoortheen.xonsh",
+		"Vue.vscode-typescript-vue-plugin",
 	],
 	"remoteUser": "mambauser",
 	"settings": {
