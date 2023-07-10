@@ -6,6 +6,8 @@ services:
       dockerfile: .devcontainer/dev.Dockerfile
     # env_file:
     #   - .devcontainer/.env
+    environment:
+      - FLASK_ENV=development
 
     volumes:
       - .:/workspace/morphocluster

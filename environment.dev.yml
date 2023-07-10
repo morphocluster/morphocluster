@@ -13,3 +13,10 @@ dependencies:
   - ipykernel  # Jupyter notebooks in VS Code
   - flake8
   - pytest
+  - pytest-cov
+  - requests
+  - make # For docs
+  - pip
+  - pip:
+    - lovely-pytest-docker
+    - -e docs/requirements.txt

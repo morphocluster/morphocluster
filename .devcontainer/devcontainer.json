@@ -5,7 +5,7 @@
 		"LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}",
 		"CONTAINER_WORKSPACE_FOLDER": "${containerWorkspaceFolder}",
 		"FLASK_APP": "morphocluster",
-		# /data is mounted to .devcontainer/data in docker-compose.extend.yml
+		// /data is mounted to .devcontainer/data in docker-compose.extend.yml
 		"DATASET_PATH": "/data",
 	},
 	// "runArgs": [
@@ -29,7 +29,7 @@
 	"workspaceFolder": "/workspace/morphocluster",
 	"overrideCommand": false,  // allow the entrypoint to run
 	// "onCreateCommand": ["/usr/local/bin/_configure_docker_group.sh"],
-	// "postCreateCommand": ["/usr/local/bin/_postCreateCommand.sh"],
+	"postCreateCommand": ["/workspace/morphocluster/.devcontainer/post-create.sh"],
 	"mounts": [
 		"source=pre-commit-cache-${localEnv:USER},target=/home/mambauser/.cache/pre-commit,type=volume",
 		"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind,consistency=cached",
@@ -87,12 +87,6 @@
 
 		// Ruler for "black"-formatted line widths
 		"editor.rulers": [88],
-
-		// Disable barely usable scrollbar
-		"workbench.editor.wrapTabs": true,
-
-		// Turn on autosave
-	    "files.autoSave": "afterDelay",
 
 		// Show whitespace as tiny grey dots
 		"editor.renderWhitespace": "boundary",

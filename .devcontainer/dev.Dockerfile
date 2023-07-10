@@ -24,10 +24,8 @@ RUN --mount=type=cache,target=/opt/conda/pkgs : \
 # <https://github.com/mamba-org/micromamba-docker#running-commands-in-dockerfile-within-the-conda-environment>
 ARG MAMBA_DOCKERFILE_ACTIVATE=1
 
-# Install Poetry and Hatch in isolated environments with pipx.
+# Install conda-lock in an isolated environment with pipx.
 RUN : \
-  && pipx install poetry \
-  && pipx install hatch \
   && pipx install conda-lock \
 ;
 
@@ -36,23 +34,23 @@ ARG CONTAINER_WORKSPACE_FOLDER=/workspaces/default-workspace-folder
 RUN mkdir -p "${CONTAINER_WORKSPACE_FOLDER}"
 WORKDIR "${CONTAINER_WORKSPACE_FOLDER}"
 
-# Copy only the files necessary to install the project.
-# (Remember that we will bind-mount the full project folder after build time.)
-COPY --chown=$MAMBA_USER:$MAMBA_USER pyproject.toml ./
-# Set the version number to zero to avoid cache busting dependency installation
-# when the version number changes.
-RUN : \
-    && mkdir --parents "./morphocluster/" \
-    && echo '__version__ = "0.0.0"' > "./morphocluster/__init__.py" \
-    ;
+# # Copy only the files necessary to install the project.
+# # (Remember that we will bind-mount the full project folder after build time.)
+# COPY --chown=$MAMBA_USER:$MAMBA_USER pyproject.toml ./
+# # Set the version number to zero to avoid cache busting dependency installation
+# # when the version number changes.
+# RUN : \
+#     && mkdir --parents "./morphocluster/" \
+#     && echo '__version__ = "0.0.0"' > "./morphocluster/__init__.py" \
+#     ;
 
-# Install the package for the first time to add project-level dependencies
-RUN pip install --no-cache-dir --editable .
+# # Install the package for the first time to add project-level dependencies
+# RUN pip install --no-cache-dir --editable .
 
-# Copy the real __init__.py
-COPY --chown=$MAMBA_USER:$MAMBA_USER \
-    "./morphocluster/__init__.py" \
-    "./morphocluster/"
+# # Copy the real __init__.py
+# COPY --chown=$MAMBA_USER:$MAMBA_USER \
+#     "./morphocluster/__init__.py" \
+#     "./morphocluster/"
 
-# Reinstall to fix the version number
-RUN pip install --no-cache-dir --editable .
+# # Reinstall to fix the version number
+# RUN pip install --no-cache-dir --editable .

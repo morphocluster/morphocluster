@@ -1,6 +1,5 @@
 sphinx
 sphinx_rtd_theme
 sphinx-autodoc-typehints
-Jinja2
-# Flask is required to successfully import the morphocluster package
-flask
+Jinja2<3.1
+flask<2
