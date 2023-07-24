@@ -18,16 +18,18 @@ SQLALCHEMY_DATABASE_URI = _env.str("MORPHOCLUSTER_DATABASE_URI", default=
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 SQLALCHEMY_DATABASE_OPTIONS = {"connect_args": {"options": "-c statement_timeout=240s"}}
 
-
 # Save the results of accept_recommended_objects
 # to enable the calculation of scores like average precision
 SAVE_RECOMMENDATION_STATS = False
 
-# Dataset directory
-DATASET_PATH = _env.str("DATASET_PATH", default="/data")
+# General directory for data
+DATA_DIR = _env.str("DATA_DIR", default="/data")
 
-# Project export directory
-PROJECT_EXPORT_DIR = _env.str("PROJECT_EXPORT_DIR", default=posixpath.join(DATASET_PATH, "export"))
+# Location for imported and exported files
+FILES_DIR = _env.str("FILES_DIR", default=posixpath.join(DATA_DIR, "files"))
+
+# Location where images are served from
+IMAGES_DIR = _env.str("IMAGES_DIR", default=posixpath.join(DATA_DIR, "images"))
 
 # ORDER BY clause for node_get_next_unfilled
 NODE_GET_NEXT_UNFILLED_ORDER_BY = "largest"

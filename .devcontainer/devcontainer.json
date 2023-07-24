@@ -4,9 +4,7 @@
 		"TZ": "Europe/Berlin",
 		"LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}",
 		"CONTAINER_WORKSPACE_FOLDER": "${containerWorkspaceFolder}",
-		"FLASK_APP": "morphocluster",
-		// /data is mounted to .devcontainer/data in docker-compose.extend.yml
-		"DATASET_PATH": "/data",
+		"FLASK_APP": "morphocluster"
 	},
 	// "runArgs": [
 	// 	"--hostname", "devcontainer",

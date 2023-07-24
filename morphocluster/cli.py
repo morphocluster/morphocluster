@@ -93,7 +93,7 @@ def init_app(app):
             database.metadata.create_all(txn, tables=affected_tables)
 
     def _load_new_objects(
-        index: pd.DataFrame, batch_size: int, conn, zf: zipfile.ZipFile, dst_root: str
+        index: pd.DataFrame, batch_size: int, conn, zf: zipfile.ZipFile, images_dir: str
     ):
         if not index.size:
             return
@@ -116,13 +116,13 @@ def init_app(app):
             )
 
             for row in chunk:
-                zf.extract(row["path"], dst_root)
+                zf.extract(row["path"], images_dir)
 
             progress.update(chunk_len)
         progress.close()
 
     def _update_existing_objects(
-        index: pd.DataFrame, batch_size: int, conn, zf: zipfile.ZipFile, dst_root: str
+        index: pd.DataFrame, batch_size: int, conn, zf: zipfile.ZipFile, images_dir: str
     ):
         if not index.size:
             return
@@ -155,7 +155,7 @@ def init_app(app):
             )
 
             for row in chunk:
-                zf.extract(row["path"], dst_root)
+                zf.extract(row["path"], images_dir)
 
                 if row["path"] != row["path_old"]:
                     try:
@@ -176,9 +176,9 @@ def init_app(app):
 
         batch_size = 1000
 
-        dst_root = app.config["DATASET_PATH"]
+        images_dir = app.config["IMAGES_DIR"]
 
-        print(f"Loading {archive_fn} into {dst_root}...")
+        print(f"Loading {archive_fn} into {images_dir}...")
         with database.engine.begin() as conn, zipfile.ZipFile(archive_fn) as zf:
             with zf.open("index.csv") as f:
                 index: pd.DataFrame = pd.read_csv(f, usecols=["object_id", "path"])  # type: ignore
@@ -202,10 +202,10 @@ def init_app(app):
             print(f"{len(existing):,d} objects already present in the database.")
 
             if add:
-                _load_new_objects(index_new, batch_size, conn, zf, dst_root)
+                _load_new_objects(index_new, batch_size, conn, zf, images_dir)
 
             if update:
-                _update_existing_objects(index_update, batch_size, conn, zf, dst_root)
+                _update_existing_objects(index_update, batch_size, conn, zf, images_dir)
 
             print("Done.")
 
