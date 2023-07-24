@@ -94,14 +94,14 @@ export default {
             console.log("Saving", this.save_project_id, "...");
             this.save_saving = true;
             api.saveProject(this.save_project_id).then((result) => {
-                console.log("Project saved: " + result["tree_fn"]);
+                console.log("Project saved: " + result["url"]);
                 this.save_saving = false;
                 this.$nextTick(() => {
                     // Wrapped in $nextTick to ensure DOM is rendered before closing
                     this.$refs.saveModal.hide();
                 });
                 this.$nextTick(()=> {
-                    this.$router.push(result["tree_fn"]);
+                    window.open(result["url"]+"?download=1");
                 })
             });
         },

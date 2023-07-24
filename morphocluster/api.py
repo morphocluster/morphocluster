@@ -221,9 +221,11 @@ def get_file(path):
     """
     Send the requested file to the client.
     """
+    parser = reqparse.RequestParser()
+    parser.add_argument("download", type=strtobool, default=0, location="args")
+    arguments = parser.parse_args(strict=False)
 
-    # TODO: Send any file
-    send_from_directory(app.config["PROJECT_EXPORT_DIR"], path)
+    send_from_directory(app.config["FILES_DIR"], path, as_attachment = arguments["download"] )
 
 # ===============================================================================
 # /projects
@@ -285,7 +287,7 @@ def get_unfilled_nodes(project_id):
 @api.route("/projects/<int:project_id>/save", methods=["POST"])
 def save_project(project_id):
     """
-    Save the project at PROJECT_EXPORT_DIR.
+    Save the project at FILES_DIR.
     """
     with database.engine.connect() as conn:
         tree = Tree(conn)
@@ -295,7 +297,7 @@ def save_project(project_id):
         root_id = tree.get_root_id(project_id)
 
         tree_fn = os.path.join(
-            api.config["PROJECT_EXPORT_DIR"],  # type: ignore
+            api.config["FILES_DIR"],  # type: ignore
             "{:%Y-%m-%d-%H-%M-%S}--{}--{}.zip".format(
                 datetime.now(), project["project_id"], project["name"]
             ),
@@ -303,8 +305,9 @@ def save_project(project_id):
 
         tree.export_tree(root_id, tree_fn)
 
-        return jsonify({"tree_fn": tree_fn})
+        tree_url = url_for(".get_file", path=os.path.relpath(tree_fn, api.config["FILES_DIR"]))
 
+        return jsonify({"url": tree_url})
 
 # ===============================================================================
 # /nodes
@@ -932,7 +935,7 @@ def accept_recommended_objects(node_id):
                     data = pd.DataFrame({"object_id": object_ids, "rejected": rejected})
 
                 data_fn = os.path.join(
-                    app.config["PROJECT_EXPORT_DIR"],
+                    app.config["FILES_DIR"],
                     "{:%Y-%m-%d-%H-%M-%S}--accept-reject--{}.csv".format(
                         datetime.now(), node_id
                     ),

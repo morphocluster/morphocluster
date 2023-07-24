@@ -29,7 +29,7 @@ def export_project(project_id):
         tree = db_tree.dump_tree(root_id)
 
     tree_fn = os.path.join(
-        config["PROJECT_EXPORT_DIR"],
+        config["FILES_DIR"],
         "{:%Y-%m-%d-%H-%M-%S}--{}--{}.zip".format(
             dt.datetime.now(), project["project_id"], project["name"]
         ),

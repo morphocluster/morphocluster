@@ -54,7 +54,7 @@ def create_app(test_config=None):
     if test_config is not None:
         app.config.update(test_config)
 
-    os.makedirs(app.config["PROJECT_EXPORT_DIR"], exist_ok=True)
+    os.makedirs(app.config["FILES_DIR"], exist_ok=True)
 
     # Fix url_for if behind reverse proxy
     from morphocluster.reverse_proxied import ReverseProxied
