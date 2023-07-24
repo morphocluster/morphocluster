@@ -1,3 +1,5 @@
+import posixpath
+
 from environs import Env
 
 _env = Env()
@@ -16,14 +18,16 @@ SQLALCHEMY_DATABASE_URI = _env.str("MORPHOCLUSTER_DATABASE_URI", default=
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 SQLALCHEMY_DATABASE_OPTIONS = {"connect_args": {"options": "-c statement_timeout=240s"}}
 
-# Project export directory
-PROJECT_EXPORT_DIR = "/data/export"
 
 # Save the results of accept_recommended_objects
 # to enable the calculation of scores like average precision
 SAVE_RECOMMENDATION_STATS = False
 
+# Dataset directory
 DATASET_PATH = _env.str("DATASET_PATH", default="/data")
+
+# Project export directory
+PROJECT_EXPORT_DIR = _env.str("PROJECT_EXPORT_DIR", default=posixpath.join(DATASET_PATH, "export"))
 
 # ORDER BY clause for node_get_next_unfilled
 NODE_GET_NEXT_UNFILLED_ORDER_BY = "largest"

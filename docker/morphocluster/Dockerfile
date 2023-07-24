@@ -31,8 +31,8 @@ USER root
 
 # TODO: Drop SSH
 # supervisor is required to run multiple processes in parallel
-RUN apt-get update --fix-missing && \
-    apt-get install -y supervisor netcat rsync && \
+RUN apt-get update --fix-missing --no-install-recommends && \
+    apt-get install --no-install-recommends -y supervisor netcat rsync && \
     apt-get -qq --no-install-recommends install openssh-server && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
