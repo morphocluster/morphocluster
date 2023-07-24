@@ -51,6 +51,53 @@ It is recommended to include the following in your `.bashrc`:
    COMPOSE_DOCKER_CLI_BUILD=1
    BUILDKIT_PROGRESS=plain
 
+Running the services
+''''''''''''''''''''
+
+Both the backend (Flask) and frontend (Vue) frameworks support hot reloading.
+This means that after saving the code from the editor, the services reload automatically
+and changes should be visible instantaneously.
+To enable this behavior, open two terminals, one for the backend, one for the frontend.
+
+Backend:
+
+..  code-block:: sh
+   cd morphocluster/frontend
+   flask run
+
+   # The output looks similar to this:
+
+      * Serving Flask app "morphocluster" (lazy loading)
+      * Environment: development
+      * Debug mode: on
+      * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
+      * Restarting with stat
+      * Debugger is active!
+      * Debugger PIN: XXX-XXX-XXX
+
+
+Frontend:
+
+..  code-block:: sh
+   cd morphocluster/frontend
+   npm run serve
+
+   # The frontend is built in-place.
+   # After a while, the output looks similar to this:
+
+      DONE  Compiled successfully in 5040ms
+
+      App running at:
+      - Local:   http://localhost:8080/frontend/ 
+      - Network: http://172.25.0.2:8080/frontend/
+
+      Note that the development build is not optimized.
+      To create a production build, run npm run build.
+
+
+Then, open the address of the frontend in your browser.
+
+
 
 Updating dependencies
 ~~~~~~~~~~~~~~~~~~~~~
