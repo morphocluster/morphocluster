@@ -225,7 +225,7 @@ def get_file(path):
     parser.add_argument("download", type=strtobool, default=0, location="args")
     arguments = parser.parse_args(strict=False)
 
-    send_from_directory(app.config["FILES_DIR"], path, as_attachment = arguments["download"] )
+    return send_from_directory(app.config["FILES_DIR"], path, as_attachment = arguments["download"] )
 
 # ===============================================================================
 # /projects
