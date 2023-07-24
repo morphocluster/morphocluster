@@ -16,7 +16,7 @@ version: 1
 metadata:
   content_hash:
     osx-64: d7485141555c4f444c75b7a0e892c6056b956ca1656ba4633d8cb26b09cdadbf
-    linux-64: d1b72a6c846d6049b2876f5c2db9a9f1ee86ebc7f981d1a17b1b58b4a460d58b
+    linux-64: 19032c6d6805c57a654c800bbce148a3c5237b8962a8757b0b4a84c7e2d8ad09
     win-64: 598e3def3401de8401bf802d23b52b54100769fe2a98c6541f00eb949a926320
   channels:
   - url: pytorch
@@ -476,6 +476,18 @@ package:
     sha256: 787eb542f055a2b3de553614b25f09eefb0a0931b0c87dbcce6efdfd92f04f18
   category: main
   optional: false
+- name: libuv
+  version: 1.44.2
+  manager: conda
+  platform: linux-64
+  dependencies:
+    libgcc-ng: '>=12'
+  url: https://conda.anaconda.org/conda-forge/linux-64/libuv-1.44.2-h166bdaf_0.tar.bz2
+  hash:
+    md5: e5cb4fe581a18ca2185a016eb848fc00
+    sha256: dc14922a6d5cf7fde55c0aa8f6661d6871c6a2e94369e7455a8a5927c3065080
+  category: dev
+  optional: true
 - name: libwebp-base
   version: 1.3.1
   manager: conda
@@ -1154,6 +1166,25 @@ package:
     sha256: 2f88965949ba7b4b21e7e5facd62285f7c6efdb17359d1b365c3bb4ecc968d29
   category: main
   optional: false
+- name: nodejs
+  version: 18.16.1
+  manager: conda
+  platform: linux-64
+  dependencies:
+    __glibc: '>=2.17,<3.0.a0'
+    icu: '>=72.1,<73.0a0'
+    libgcc-ng: '>=12'
+    libstdcxx-ng: '>=12'
+    libuv: '>=1.44.2,<1.45.0a0'
+    libzlib: '>=1.2.13,<1.3.0a0'
+    openssl: '>=3.1.1,<4.0a0'
+    zlib: ''
+  url: https://conda.anaconda.org/conda-forge/linux-64/nodejs-18.16.1-hf52ce11_0.conda
+  hash:
+    md5: 23ed78db48ed08c94e5449f6661d65e6
+    sha256: f4a2ed7b871309e41ee0d472c3dc1126d88599b6be58bd22503b964e483fffa1
+  category: dev
+  optional: true
 - name: openh264
   version: 2.1.1
   manager: conda
