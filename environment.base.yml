@@ -14,8 +14,8 @@ dependencies:
   - pip
   - hdbscan
   - Pillow
-  - pytorch
-  - torchvision
+  # - pytorch
+  # - torchvision
   - hiredis
   - joblib==1.1.0 # See https://github.com/scikit-learn-contrib/hdbscan/issues/562
 

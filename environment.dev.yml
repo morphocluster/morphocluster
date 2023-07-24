@@ -19,4 +19,9 @@ dependencies:
   - pip
   - pip:
     - lovely-pytest-docker
-    - -e docs/requirements.txt
+    # - -r docs/requirements.txt
+    - sphinx
+    - sphinx_rtd_theme
+    - sphinx-autodoc-typehints
+    - Jinja2<3.1
+    - flask<2
