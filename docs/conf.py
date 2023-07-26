@@ -77,10 +77,8 @@ html_theme = "sphinx_rtd_theme"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-# rst_prolog = """
-# .. |stream| raw:: html
-
-#    <span class="label">Stream</span>
-# """
+rst_prolog = """
+.. default-role:: code
+"""
 
 # html_css_files = ["custom.css"]

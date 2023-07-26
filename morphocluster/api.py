@@ -228,11 +228,29 @@ def get_file(path):
     return send_from_directory(app.config["FILES_DIR"], path, as_attachment = arguments["download"] )
 
 # ===============================================================================
+# /files
+# ===============================================================================
+
+
+@api.route("/files/<path:path>", methods=["GET"])
+def get_file(path):
+    """
+    Send the requested file to the client.
+    """
+    parser = reqparse.RequestParser()
+    parser.add_argument("download", type=strtobool, default=0, location="args")
+    arguments = parser.parse_args(strict=False)
+
+    return send_from_directory(
+        app.config["FILES_DIR"], path, as_attachment=arguments["download"]
+    )
+
+
+# ===============================================================================
 # /projects
 # ===============================================================================
 @api.route("/projects", methods=["GET"])
 def get_projects():
-
     parser = reqparse.RequestParser()
     parser.add_argument("include_progress", type=strtobool, default=0, location="args")
     arguments = parser.parse_args(strict=False)
@@ -252,7 +270,6 @@ def get_projects():
 
 @api.route("/projects/<int:project_id>", methods=["GET"])
 def get_project(project_id):
-
     parser = reqparse.RequestParser()
     parser.add_argument("include_progress", type=strtobool, default=0, location="args")
     arguments = parser.parse_args(strict=False)
@@ -305,7 +322,9 @@ def save_project(project_id):
 
         tree.export_tree(root_id, tree_fn)
 
-        tree_url = url_for(".get_file", path=os.path.relpath(tree_fn, api.config["FILES_DIR"]))
+        tree_url = url_for(
+            ".get_file", path=os.path.relpath(tree_fn, api.config["FILES_DIR"])
+        )
 
         return jsonify({"url": tree_url})
 
@@ -908,7 +927,6 @@ def accept_recommended_objects(node_id):
     print(parameters)
 
     with Timer("accept_recommended_objects") as t:
-
         with t.child("assemble set of rejected objects"):
             rejected_object_ids = set(
                 m[1:] for m in parameters["rejected_members"] if m.startswith("o")

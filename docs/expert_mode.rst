@@ -61,4 +61,18 @@ Ctrl-click on matching object images and click "Add selected".
 Click "Reload" to regenerate recommended members.
 To select a whole range of objects (starting from the first object in the list), click on the arrow icon in the header of the last matching object.
 
+
+Building a hierarchy of clusters
+--------------------------------
 Member recommendation can be used of efficiently build a cluster hierarchy based on cluster similarity.
+
+- Open a tree in the tree pane.
+- Create an umbrella term for one or multiple clusters (see above).
+- Enter the new umbrella node and click "Recommend members".
+  Similar clusters will be displayed on the right.
+  Select matching clusters and click "add selected".
+  (After adding clusters, you can click "Reload" to get more recommendations based on the updated cluster members.)
+- Go back to the root node in the tree pane and proceed with a different set of clusters.
+
+You can apply this process top-down (start with very coarse concepts and subdivide them later) or bottom-up (start with very specific names and subsume them under coarser names).
+(Or a mix of both.)

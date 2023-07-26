@@ -3,6 +3,7 @@ Create the MorphoCluster app.
 """
 
 import os
+from typing import Mapping, Optional
 
 from flask import Flask, has_request_context, request
 import logging
@@ -32,7 +33,7 @@ formatter = RequestFormatter(
 default_handler.setFormatter(formatter)
 
 
-def create_app(test_config=None):
+def create_app(test_config: Optional[Mapping]=None):
     """Create and configure an instance of the Flask application."""
 
     # Enable fault handler for meaningful stack traces when a worker is killed
@@ -44,6 +45,10 @@ def create_app(test_config=None):
 
     app = Flask(__name__, instance_relative_config=True)
 
+    # Set environment variables
+    if test_config is not None:
+        os.environ.update(test_config)
+
     # Load config
     app.config.from_object("morphocluster.config_default")
 
@@ -51,9 +56,12 @@ def create_app(test_config=None):
     if settings_file:
         app.config.from_pyfile(os.path.join(app.root_path, settings_file))  # type: ignore
 
+<<<<<<< HEAD
     if test_config is not None:
         app.config.update(test_config)
 
+=======
+>>>>>>> main
     os.makedirs(app.config["FILES_DIR"], exist_ok=True)
 
     # Fix url_for if behind reverse proxy
@@ -116,7 +124,7 @@ def create_app(test_config=None):
             return "Unknown object", 404
 
         response = send_from_directory(
-            app.config["DATASET_PATH"], result["path"], conditional=True
+            app.config["IMAGES_DIR"], result["path"], conditional=True
         )
 
         response.headers["Cache-Control"] += ", immutable"

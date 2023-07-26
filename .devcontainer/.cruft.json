@@ -1,0 +1,14 @@
+{
+  "template": "https://github.com/maresb/cookiecutter-micromamba-devcontainer",
+  "commit": "4d69482b0ba1c11084ca4bd11cbcb969b1465dc4",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "package_name": "morphocluster",
+      "timezone": "Europe/Berlin",
+      "packages_dir": ".",
+      "_template": "https://github.com/maresb/cookiecutter-micromamba-devcontainer"
+    }
+  },
+  "directory": null
+}
