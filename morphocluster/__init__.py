@@ -56,12 +56,6 @@ def create_app(test_config: Optional[Mapping]=None):
     if settings_file:
         app.config.from_pyfile(os.path.join(app.root_path, settings_file))  # type: ignore
 
-<<<<<<< HEAD
-    if test_config is not None:
-        app.config.update(test_config)
-
-=======
->>>>>>> main
     os.makedirs(app.config["FILES_DIR"], exist_ok=True)
 
     # Fix url_for if behind reverse proxy
