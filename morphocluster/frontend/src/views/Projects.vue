@@ -9,6 +9,17 @@
         </nav>
         <div class="scrollable">
             <div class="container">
+                <div class="alerts" v-if="alerts.length">
+                    <b-alert
+                        :key="a"
+                        v-for="a of alerts"
+                        dismissible
+                        show
+                        :variant="a.variant"
+                    >
+                        {{ a.message }}
+                    </b-alert>
+                </div>
                 <b-table id="projects_table" striped sort-by="name" :items="projects" :fields="fields" showEmpty>
                     <template slot="table-colgroup">
                         <col class="col-wide" />

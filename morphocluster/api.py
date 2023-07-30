@@ -212,20 +212,6 @@ def get_subtree(node_id):
 
         return jsonify(result)
 
-# ===============================================================================
-# /files
-# ===============================================================================
-
-@api.route("/files/<path:path>", methods=["GET"])
-def get_file(path):
-    """
-    Send the requested file to the client.
-    """
-    parser = reqparse.RequestParser()
-    parser.add_argument("download", type=strtobool, default=0, location="args")
-    arguments = parser.parse_args(strict=False)
-
-    return send_from_directory(app.config["FILES_DIR"], path, as_attachment = arguments["download"] )
 
 # ===============================================================================
 # /files
