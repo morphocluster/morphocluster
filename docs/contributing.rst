@@ -24,15 +24,15 @@ GitHub Pull Requests are the preferred method for collaborating
 on code in this project.
 To contribute, please follow these steps:
 
-1. Fork the `repository`_ on GitHub.
-2. Run the tests and ensure that they all pass on your system.
-3. Write tests that clearly demonstrate the bug or feature you're addressing.
-   Make sure these tests fail initially (a practice known as *test-driven development*).
-4. Implement your changes.
-5. Run the entire test suite again to verify that all tests pass,
-   including the ones you just added.
-6. Write `meaningful commit messages <https://chris.beams.io/posts/git-commit/>`_ to document your changes.
-7. Submit a GitHub Pull Request to the main repository's ``main`` branch. Your contribution will be reviewed promptly.
+1. Fork the `repository`_ on GitHub and clone your fork locally.
+2. Create a new branch for the fix or feature that you're about to implement:
+   `git checkout -b fix-xy`
+   (`fix-xy` is a placeholder. Chose a speaking name.)
+3. Implement your changes.
+4. Write `meaningful commit messages <https://chris.beams.io/posts/git-commit/>`_ to document your changes.
+5. Push your local changes to your fork on GitHub: `git push -u origin fix-xy`
+6. Submit a GitHub Pull Request to the main repository's ``main`` branch.
+   Your contribution will be reviewed promptly.
 
 .. _repository: https://github.com/morphocut/morphocut
 
