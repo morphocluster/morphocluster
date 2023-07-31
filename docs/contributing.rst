@@ -32,13 +32,11 @@ To contribute, please follow these steps:
 
    (Insert the URL of your fork.)
 
-2. Configure the the "upstream" remote to get the latest changes from the central repository:
+2. Configure the the "upstream" remote to be able to get the latest changes from the central repository:
 
    ..  code-block:: sh
 
       git remote add upstream https://github.com/morphocluster/morphocluster.git
-      git checkout main
-      git branch -u upstream main
 
    (This only needs to be done once for each local clone.)
 
@@ -46,8 +44,16 @@ To contribute, please follow these steps:
 
    ..  code-block:: sh
 
+      # Switch to "main" branch
       git checkout main
-      git pull
+
+      # Pull the latest changes from the central repository
+      git pull upstream main
+
+      # Push the latest changes to your fork (optional)
+      git push
+
+      # Create and checkout a new branch named "fix-xy"
       git checkout -b fix-xy
 
    (`fix-xy` is a placeholder. Chose a speaking name.)
@@ -65,6 +71,15 @@ To contribute, please follow these steps:
 6. Submit a GitHub Pull Request. Your contribution will be reviewed promptly.
 
 .. _repository: https://github.com/morphocut/morphocut
+
+7. It might happen that new changes appear on the upstream main branch.
+   These need to be merged into your feature branch:
+
+   ..  code-block:: sh
+
+      # Pull the latest changes from the central repository
+      git pull upstream main
+   
 
 
 VS Code Dev Container
