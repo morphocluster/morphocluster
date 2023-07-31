@@ -24,17 +24,48 @@ GitHub Pull Requests are the preferred method for collaborating
 on code in this project.
 To contribute, please follow these steps:
 
-1. Fork the `repository`_ on GitHub and clone your fork locally.
+1. Fork the MorphoCluster `repository`_ on GitHub and clone your fork locally:
+
+   ..  code-block:: sh
+
+      git clone ...
+
+   (Insert the URL of your fork.)
+
+2. Configure the the "upstream" remote to get the latest changes from the central repository:
+
+   ..  code-block:: sh
+
+      git remote add upstream https://github.com/morphocluster/morphocluster.git
+      git checkout main
+      git branch -u upstream main
+
+   (This only needs to be done once for each local clone.)
+
 2. Create a new branch for the fix or feature that you're about to implement:
-   `git checkout -b fix-xy`
+
+   ..  code-block:: sh
+
+      git checkout main
+      git pull
+      git checkout -b fix-xy
+
    (`fix-xy` is a placeholder. Chose a speaking name.)
+
 3. Implement your changes.
+
 4. Write `meaningful commit messages <https://chris.beams.io/posts/git-commit/>`_ to document your changes.
-5. Push your local changes to your fork on GitHub: `git push -u origin fix-xy`
-6. Submit a GitHub Pull Request to the main repository's ``main`` branch.
-   Your contribution will be reviewed promptly.
+
+5. Push your local changes to your fork on GitHub:
+
+   ..  code-block:: sh
+      
+      git push -u origin fix-xy
+
+6. Submit a GitHub Pull Request. Your contribution will be reviewed promptly.
 
 .. _repository: https://github.com/morphocut/morphocut
+
 
 VS Code Dev Container
 ~~~~~~~~~~~~~~~~~~~~~
@@ -107,6 +138,7 @@ Updating dependencies
 Dependencies are declared in `environment.base.yaml` (general) and `environment.dev.yaml` (development only).
 Run `gen_conda-lock.sh` to regenerate the lock file, then rebuild the devcontainer.
 
+
 Code Style
 ~~~~~~~~~~
 
@@ -122,8 +154,6 @@ please adhere to the following guidelines:
 .. _PEP 8: https://www.python.org/dev/peps/pep-0008/
 .. _PEP 257: https://www.python.org/dev/peps/pep-0257/
 
-The repository includes a ``.vscode/settings.json.default`` file that contains sensible default settings.
-If you're developing in VS Code, you can use it as a starting point.
 
 Documentation Contributions
 ---------------------------
