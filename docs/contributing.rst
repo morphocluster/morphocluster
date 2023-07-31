@@ -24,7 +24,7 @@ GitHub Pull Requests are the preferred method for collaborating
 on code in this project.
 To contribute, please follow these steps:
 
-1. Fork the MorphoCluster `repository`_ on GitHub and clone your fork locally:
+#. Fork the MorphoCluster `repository`_ on GitHub and clone your fork locally:
 
    ..  code-block:: sh
 
@@ -32,7 +32,7 @@ To contribute, please follow these steps:
 
    (Insert the URL of your fork.)
 
-2. Configure the the "upstream" remote to be able to get the latest changes from the central repository:
+#. Configure the the "upstream" remote to be able to get the latest changes from the central repository:
 
    ..  code-block:: sh
 
@@ -40,7 +40,7 @@ To contribute, please follow these steps:
 
    (This only needs to be done once for each local clone.)
 
-2. Create a new branch for the fix or feature that you're about to implement:
+#. Create a new branch for the fix or feature that you're about to implement:
 
    ..  code-block:: sh
 
@@ -58,27 +58,27 @@ To contribute, please follow these steps:
 
    (`fix-xy` is a placeholder. Chose a speaking name.)
 
-3. Implement your changes.
+#. Implement your changes.
 
-4. Write `meaningful commit messages <https://chris.beams.io/posts/git-commit/>`_ to document your changes.
+#. Write `meaningful commit messages <https://chris.beams.io/posts/git-commit/>`_ to document your changes.
 
-5. Push your local changes to your fork on GitHub:
+#. Push your local changes to your fork on GitHub:
 
    ..  code-block:: sh
       
       git push -u origin fix-xy
 
-6. Submit a GitHub Pull Request. Your contribution will be reviewed promptly.
+#. Submit a GitHub Pull Request. Your contribution will be reviewed promptly.
 
-.. _repository: https://github.com/morphocut/morphocut
-
-7. It might happen that new changes appear on the upstream main branch.
+#. It might happen that new changes appear on the upstream main branch.
    These need to be merged into your feature branch:
 
    ..  code-block:: sh
 
       # Pull the latest changes from the central repository
       git pull upstream main
+
+.. _repository: https://github.com/morphocut/morphocut
    
 
 
