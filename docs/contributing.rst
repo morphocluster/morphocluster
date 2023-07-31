@@ -62,6 +62,7 @@ To enable this behavior, open two terminals, one for the backend, one for the fr
 Backend:
 
 ..  code-block:: sh
+
    cd morphocluster/frontend
    flask run
 
@@ -79,6 +80,7 @@ Backend:
 Frontend:
 
 ..  code-block:: sh
+   
    cd morphocluster/frontend
    npm run serve
 
