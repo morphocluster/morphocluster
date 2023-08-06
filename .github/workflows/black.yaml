@@ -20,12 +20,12 @@ jobs:
       - name: Setup Python env
         uses: actions/setup-python@v3
 
-      - name: Install black and reorder-python-imports
-        run: pip install black reorder-python-imports
+      - name: Install black
+        run: pip install black
 
-      - name: Black and Sort changed files
+      - name: Black changed files
         run: |
-          black --check reorder-python-imports ${{ steps.changed-files.outputs.all_changed_files }}
+          black --check ${{ steps.changed-files.outputs.all_changed_files }}
 
       - name: Run black on full codebase
         uses: psf/black@stable
