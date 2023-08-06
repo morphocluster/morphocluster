@@ -1,0 +1,31 @@
+name: Black (python)
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v35
+        with:
+          files: **/*.py
+
+      - name: Setup Python env
+        uses: actions/setup-python@v3
+
+      - name: Install black and reorder-python-imports
+        run: pip install black reorder-python-imports
+
+      - name: Black and Sort changed files
+        run: |
+          black --check reorder-python-imports ${{ steps.changed-files.outputs.all_changed_files }}
+
+      - name: Run black on full codebase
+        uses: psf/black@stable
