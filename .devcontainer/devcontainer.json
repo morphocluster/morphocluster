@@ -47,7 +47,8 @@
 		"davidanson.vscode-markdownlint",
 		"exiasr.hadolint",
 		// "jnoortheen.xonsh",
-		"Vue.vscode-typescript-vue-plugin",
+		"Vue.volar",
+		"Vue.vscode-typescript-vue-plugin"
 	],
 	"remoteUser": "mambauser",
 	"settings": {
