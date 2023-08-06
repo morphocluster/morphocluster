@@ -31,6 +31,11 @@ var router = new Router({
       component: () => import(/* webpackChunkName: "projects" */ './views/Projects.vue'),
     },
     {
+      name: 'files',
+      path: '/f',
+      component: () => import(/* webpackChunkName: "projects" */ './views/Files.vue'),
+    },
+    {
       name: 'approve',
       path: '/p/:project_id/approve/:node_id?',
       component: () => import(/* webpackChunkName: "approve" */ './views/Approve.vue'),

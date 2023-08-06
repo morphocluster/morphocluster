@@ -1,12 +1,15 @@
 <template>
     <div id="projects">
         <nav class="navbar navbar-expand-lg navbar-light bg-dark text-light">
-            <router-link class="navbar-brand text-light" to="/"
-                >MorphoCluster</router-link
-            >
-            <ul class="navbar-nav mr-auto">
-                <li class="nav-item active text-light">Projects</li>
+            <ul class="navbar-nav mr-5">
+                <li class="nav-item active text-light">MorphoCluster</li>
             </ul>
+            <router-link class="navbar-brand text-light mr-5" to="/"
+                >Projects</router-link
+            >
+            <router-link class="navbar-brand text-light mr-auto mr-5" :to="{name: 'files'}"
+                >Files</router-link
+            >
             <dark-mode-control />
         </nav>
         <div class="scrollable">
