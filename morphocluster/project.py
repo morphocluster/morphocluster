@@ -109,7 +109,7 @@ def _slice_center(length, n_items):
 
 class Project:
     """
-    Abstract a project in the database.
+    Interact with projects.
     """
 
     @staticmethod
@@ -205,36 +205,31 @@ class Project:
         return dict(dataset)
 
 
+    @contextlib.contextmanager
     def lock(self):
-        return _ProjectLocker(self)
-
-
-class _ProjectLocker:
-    def __init__(self, project):
-        self.project = project
-
-    def __enter__(self) -> "_LockedProject":
-        self.project._connection.execute(
-            select([func.pg_advisory_xact_lock(self.project.project_id)])
+        # Acquire exclusive transaction level advisory lock
+        self._connection.execute(
+            select([func.pg_advisory_xact_lock(self.project_id)])
         )
-        return _LockedProject(self.project)
 
-    def __exit__(self, *_):
+        yield _LockedProject(self)
+
+        # The lock is cleared automatically when the transaction ends
         pass
 
 
 class _LockedProject:
-    def __init__(self, project):
+    # A locked project provides all the functionality that requires locking
+
+    def __init__(self, project: Project):
         self.project = project
 
     def __getattr__(self, name):
         return getattr(self.project, name)
 
     def import_tree(self, tree):
-        """Fill the project with the supplied tree.
-
-        Returns:
-            A Project instance
+        """
+        Fill the project with the supplied tree.
         """
 
         print("Loading {}...".format(tree))
