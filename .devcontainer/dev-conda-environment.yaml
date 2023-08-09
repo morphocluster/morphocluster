@@ -1,0 +1,31 @@
+name: base
+category: dev
+channels:
+- conda-forge
+dependencies:
+- git  # Also installed from Ubuntu, but this is newer.
+- xonsh
+- pre-commit
+- black
+- isort
+- flake8
+- pytest
+- dasel
+- mamba
+- pipx
+- condax
+- ipykernel  # Jupyter notebooks in VS Code
+- nbformat  # Additional utilities for Jupyter notebooks (e.g. Plotly support)
+- line_profiler
+- cookiecutter
+- cruft
+- flake8-use-fstring
+- flake8-blind-except
+- flake8-builtins
+- flake8-use-pathlib
+- flake8-noqa
+
+# # In case you want to install packages from PyPI which aren't on Conda-Forge,
+# # uncomment this block and add them as follows:
+# - pip:
+#   - flake8-noqa  # Example

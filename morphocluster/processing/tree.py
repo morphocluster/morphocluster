@@ -7,6 +7,7 @@ import json
 import os
 import sys
 from io import StringIO
+from typing import Dict
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import fire
@@ -157,7 +158,11 @@ class Tree(object):
 
         objects = pd.concat([objects, root_objects], ignore_index=True)
 
-        return Tree(nodes, objects)
+        meta = {}
+        meta["base"] = "from_HDBSCAN"
+        meta["base_fn"] = path
+
+        return Tree(nodes, objects, meta=meta)
 
     @staticmethod
     def from_labels(labels, object_ids) -> "Tree":
@@ -166,6 +171,9 @@ class Tree(object):
 
         labels may contain -1. Then an object is assigned to root.
         """
+
+        if meta is None:
+            meta = {}
 
         labels = pd.Series(labels)
         object_ids = pd.Series(object_ids)
@@ -184,7 +192,7 @@ class Tree(object):
             raise ValueError("No non-empty labels were supplied.")
 
         # Add root node
-        nodes.append({"node_id": root_id})
+        nodes.append({"node_id": root_id, "parent_id": None})
         nodes = pd.DataFrame(nodes)
 
         # Compose objects
@@ -192,7 +200,9 @@ class Tree(object):
         # Mount unlabeled objects (-1) to root
         objects.loc[objects["node_id"] == -1, "node_id"] = root_id
 
-        return Tree(nodes, objects)
+        meta["base"] = "from_labels"
+
+        return Tree(nodes, objects, meta=meta)
 
     @staticmethod
     def from_cluster_labels(cluster_labels_fn, object_ids_fn=None) -> "Tree":
@@ -230,7 +240,9 @@ class Tree(object):
 
             objects = pd.concat([objects, root_objects], ignore_index=True)
 
-        return Tree(nodes, objects)
+        meta = {}
+        meta["base"] = "from_cluster_labels"
+        meta["base_fn"] = cluster_labels_fn
 
     def __init__(self, nodes=None, objects=None, rejected_objects=None, meta=None):
         if nodes is not None:
@@ -512,7 +524,7 @@ class Tree(object):
         """
         return Tree(self.nodes.copy(), self.objects.copy())
 
-    def to_flat(self, clean_name=True):
+    def to_flat(self, clean_name=True) -> pd.DataFrame:
         """
         Returns a DataFrame with object_id and label.
 
@@ -587,6 +599,10 @@ class Tree(object):
 
         result_mask = ~objects["label"].isna()
         return objects.loc[result_mask, ["object_id", "label"]].reset_index(drop=True)
+
+    def offset_node_ids(self, offset):
+        self.nodes["node_id"] += offset
+        self.nodes.loc[pd.notna(self.nodes["parent_id"]), "parent_id"] += offset
 
 
 if __name__ == "__main__":

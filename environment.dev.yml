@@ -1,0 +1,28 @@
+name: base
+category: dev
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - git  # Also installed from Ubuntu, but this is newer.
+  - pre-commit
+  - black
+  - isort
+  - pipx
+  - mamba
+  - ipykernel  # Jupyter notebooks in VS Code
+  - flake8
+  - pytest
+  - pytest-cov
+  - requests
+  - nodejs # To build the frontend
+  - make # For docs
+  - pip
+  - pip:
+    - lovely-pytest-docker
+    # - -r docs/requirements.txt
+    - sphinx
+    - sphinx_rtd_theme
+    - sphinx-autodoc-typehints
+    - Jinja2<3.1
+    - flask<2

@@ -1,5 +1,6 @@
 import json
 import os
+import traceback
 import uuid
 import warnings
 import zlib
@@ -21,6 +22,7 @@ from flask_restful import reqparse
 from redis.exceptions import RedisError
 from sklearn.manifold.isomap import Isomap
 from timer_cm import Timer
+from flask.helpers import send_from_directory
 
 from morphocluster import background, models
 from morphocluster.classifier import Classifier
@@ -31,6 +33,45 @@ from morphocluster.project import Project
 from morphocluster.schemas import JobSchema, LogSchema
 
 api = Blueprint("api", __name__)
+
+from werkzeug.exceptions import HTTPException
+
+
+def _complex2repr(o):
+    if isinstance(o, (int, str, float)):
+        return o
+
+    if isinstance(o, (list, tuple)):
+        return [_complex2repr(v) for v in o]
+
+    return repr(o)
+
+
+@api.errorhandler(HTTPException)
+def handle_exception(e):
+    """Return JSON instead of HTML for HTTP errors."""
+
+    data = {
+        "code": e.code,
+        "name": e.name,
+        "description": e.description,
+    }
+
+    # flask_restful.abort populates the data attribute
+    data.update(getattr(e, "data", {}))
+
+    # Store traceback
+    data["traceback"] = traceback.format_exc()
+
+    # Convert all complex values to their representation
+    data = {k: _complex2repr(v) for k, v in data.items()}
+
+    # start with the correct headers and status code from the error
+    response = e.get_response()
+    # replace the body with JSON
+    response.data = json.dumps(data)
+    response.content_type = "application/json"
+    return response
 
 
 def batch(iterable, n=1):
@@ -72,7 +113,7 @@ def jsonify(*args, **kwargs):
 def log(action, node_id=None, reverse_action=None, data=None):
     connection = database.get_connection()
     auth = request.authorization
-    username = auth.username if auth is not None else None
+    username = auth.username if auth is not None else None  # type: ignore
 
     stmt = models.log.insert(
         {
@@ -89,7 +130,7 @@ def log(action, node_id=None, reverse_action=None, data=None):
 
 @api.record
 def record(state):
-    api.config = state.app.config
+    api.config = state.app.config  # type: ignore
 
 
 @api.after_request
@@ -210,11 +251,29 @@ def dataset_get_projects(dataset_id):
 
 
 # ===============================================================================
+# /files
+# ===============================================================================
+
+
+@api.route("/files/<path:path>", methods=["GET"])
+def get_file(path):
+    """
+    Send the requested file to the client.
+    """
+    parser = reqparse.RequestParser()
+    parser.add_argument("download", type=strtobool, default=0, location="args")
+    arguments = parser.parse_args(strict=False)
+
+    return send_from_directory(
+        app.config["FILES_DIR"], path, as_attachment=arguments["download"]
+    )
+
+
+# ===============================================================================
 # /projects
 # ===============================================================================
 @api.route("/projects/<int:project_id>", methods=["GET"])
 def get_project(project_id):
-
     parser = reqparse.RequestParser()
     parser.add_argument("include_progress", type=strtobool, default=0)
     parser.add_argument("include_dataset", type=strtobool, default=0)
@@ -234,7 +293,7 @@ def get_project(project_id):
 @api.route("/projects/<int:project_id>/save", methods=["POST"])
 def save_project(project_id):
     """
-    Save the project at PROJECT_EXPORT_DIR.
+    Save the project at FILES_DIR.
     """
 
     with Project(project_id).lock() as project:
@@ -394,6 +453,7 @@ def _load_or_calc(func, func_kwargs, request_id, page, page_size=100, compress=T
 
     # If a request_id is given, load the result from the cache
     if request_id is not None:
+        cache_key = "{}:{}".format(func.__name__, request_id)
         try:
             cache_key = "{}:{}".format(func.__name__, request_id)
             print("Loading cache key {}...".format(cache_key))
@@ -677,14 +737,14 @@ def get_node_members(project_id, node_id):
     """
 
     parser = reqparse.RequestParser()
-    parser.add_argument("nodes", type=strtobool, default=0)
-    parser.add_argument("objects", type=strtobool, default=0)
-    parser.add_argument("arrange_by", default="")
-    parser.add_argument("page", type=int, default=0)
-    parser.add_argument("request_id", default=None)
-    parser.add_argument("starred_first", type=strtobool, default=1)
-    parser.add_argument("descending", type=strtobool, default=0)
-    arguments = parser.parse_args(strict=True)
+    parser.add_argument("nodes", type=strtobool, default=0, location="args")
+    parser.add_argument("objects", type=strtobool, default=0, location="args")
+    parser.add_argument("arrange_by", default="", location="args")
+    parser.add_argument("page", type=int, default=0, location="args")
+    parser.add_argument("request_id", default=None, location="args")
+    parser.add_argument("starred_first", type=strtobool, default=1, location="args")
+    parser.add_argument("descending", type=strtobool, default=0, location="args")
+    arguments = parser.parse_args(strict=False)
 
     print(arguments)
 
@@ -707,8 +767,8 @@ def get_node_stats(project_id, node_id):
     """
 
     parser = reqparse.RequestParser()
-    parser.add_argument("log", default=None)
-    arguments = parser.parse_args(strict=True)
+    parser.add_argument("log", default=None, location="args")
+    arguments = parser.parse_args(strict=False)
 
     with Project(project_id).lock() as project:
         progress = project.calculate_progress(node_id)
@@ -845,7 +905,6 @@ def accept_recommended_objects(project_id, node_id):
     print(parameters)
 
     with Timer("accept_recommended_objects") as t:
-
         with t.child("assemble set of rejected objects"):
             rejected_object_ids = set(
                 m[1:] for m in parameters["rejected_members"] if m.startswith("o")
@@ -948,10 +1007,10 @@ def node_get_recommended_children(project_id, node_id):
         request_id (str, optional): Identification string for the current request collection.
     """
     parser = reqparse.RequestParser()
-    parser.add_argument("page", type=int, default=0)
-    parser.add_argument("max_n", type=int, default=100)
-    parser.add_argument("request_id", default=None)
-    arguments = parser.parse_args(strict=True)
+    parser.add_argument("page", type=int, default=0, location="args")
+    parser.add_argument("max_n", type=int, default=100, location="args")
+    parser.add_argument("request_id", default=None, location="args")
+    arguments = parser.parse_args(strict=False)
 
     # Limit max_n
     arguments.max_n = max(arguments.max_n, 1000)
@@ -988,10 +1047,10 @@ def node_get_recommended_objects(project_id, node_id):
         max_n (int): Maximum number of recommended objects.
     """
     parser = reqparse.RequestParser()
-    parser.add_argument("page", type=int, default=0)
-    parser.add_argument("max_n", type=int, default=100)
-    parser.add_argument("request_id", default=None)
-    arguments = parser.parse_args(strict=True)
+    parser.add_argument("page", type=int, default=0, location="args")
+    parser.add_argument("max_n", type=int, default=100, location="args")
+    parser.add_argument("request_id", default=None, location="args")
+    arguments = parser.parse_args(strict=False)
 
     # Limit max_n
     arguments.max_n = max(arguments.max_n, 1000)
@@ -1007,8 +1066,8 @@ def node_get_recommended_objects(project_id, node_id):
 @api.route("/projects/<int:project_id>/next_unapproved", methods=["GET"])
 def node_get_next_unapproved(project_id, node_id=None):
     parser = reqparse.RequestParser()
-    parser.add_argument("leaf", type=strtobool, default=False)
-    arguments = parser.parse_args(strict=True)
+    parser.add_argument("leaf", type=strtobool, default=False, location="args")
+    arguments = parser.parse_args(strict=False)
 
     with Project(project_id).lock() as project:
 
@@ -1034,9 +1093,12 @@ def node_get_next_unapproved(project_id, node_id=None):
 @api.route("/projects/<int:project_id>/next_unfilled", methods=["GET"])
 def node_get_next_unfilled(project_id, node_id=None):
     parser = reqparse.RequestParser()
-    parser.add_argument("leaf", type=strtobool, default=False)
-    parser.add_argument("preferred_first", type=strtobool, default=False)
-    arguments = parser.parse_args(strict=True)
+    parser.add_argument("leaf", type=strtobool, default=False, location="args")
+    parser.add_argument(
+        "preferred_first", type=strtobool, default=False, location="args"
+    )
+    parser.add_argument("order_by", type=str, default=None, location="args")
+    arguments = parser.parse_args(strict=False)
 
     print(arguments)
 

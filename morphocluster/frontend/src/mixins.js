@@ -3,6 +3,11 @@ import globalState from "@/globalState.js";
 export default {
     data() {
         return {
+            // TODO: Upgrade to structured format:
+            //     {
+            //         message: e.message,
+            //         variant: "danger",
+            //     }
             messages: []
         };
     },

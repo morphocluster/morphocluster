@@ -1,6 +1,8 @@
 from setuptools import setup
 import versioneer
 
+import versioneer
+
 setup(
     name="morphocluster",
     packages=["morphocluster"],

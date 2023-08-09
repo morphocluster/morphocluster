@@ -167,6 +167,81 @@ def init_app(app):
             )
         )
 
+    def _load_new_objects(
+        index: pd.DataFrame, batch_size: int, conn, zf: zipfile.ZipFile, images_dir: str
+    ):
+        if not index.size:
+            return
+
+        print(f"Loading {len(index):,d} new objects...")
+        index_iter = index.itertuples()
+        progress = tqdm.tqdm(total=len(index), unit_scale=True)
+        while True:
+            chunk = tuple(
+                row._asdict() for row in itertools.islice(index_iter, batch_size)
+            )
+            if not chunk:
+                break
+
+            chunk_len = len(chunk)
+
+            conn.execute(
+                models.objects.insert(),  # pylint: disable=no-value-for-parameter
+                [dict(row) for row in chunk],
+            )
+
+            for row in chunk:
+                zf.extract(row["path"], images_dir)
+
+            progress.update(chunk_len)
+        progress.close()
+
+    def _update_existing_objects(
+        index: pd.DataFrame, batch_size: int, conn, zf: zipfile.ZipFile, images_dir: str
+    ):
+        if not index.size:
+            return
+
+        stmt = (
+            models.objects.update()
+            .where(models.objects.c.object_id == bindparam("_object_id"))
+            .values({"path": bindparam("path")})
+        )
+
+        print(f"Updating {len(index):,d} existing objects...")
+        index_iter = index.itertuples()
+        progress = tqdm.tqdm(total=len(index), unit_scale=True)
+        while True:
+            chunk = tuple(
+                row._asdict() for row in itertools.islice(index_iter, batch_size)
+            )
+            if not chunk:
+                break
+
+            chunk_len = len(chunk)
+
+            # Update path
+            conn.execute(
+                stmt,
+                [
+                    {"_object_id": str(row["object_id"]), "path": row["path"]}
+                    for row in chunk
+                ],
+            )
+
+            for row in chunk:
+                zf.extract(row["path"], images_dir)
+
+                if row["path"] != row["path_old"]:
+                    try:
+                        os.remove(row["path_old"])
+                    except FileNotFoundError:
+                        print("Missing previous image:", row["path_old"])
+                        pass
+
+            progress.update(chunk_len)
+        progress.close()
+
     @app.cli.command()
     @click.argument("root_id", type=int)
     @click.argument("tree_fn")
@@ -263,16 +338,16 @@ def init_app(app):
             _add_user(username, password)
         except IntegrityError as e:
             print(e)
+        else:
+            print(f"User {username} added.")
 
     @app.cli.command()
     @click.argument("username")
     def change_user(username):
         print("Changing user {}:".format(username))
-        password = getpass("Password: ")
-        password_repeat = getpass("Retype Password: ")
 
-        if password != password_repeat:
-            print("Passwords do not match!")
+        if not password:
+            print("Password must not be empty!")
             return
 
         pwhash = generate_password_hash(
@@ -285,6 +360,8 @@ def init_app(app):
                 conn.execute(stmt)
         except IntegrityError as e:
             print(e)
+        else:
+            print(f"User {username} changed.")
 
     @app.cli.command()
     @click.argument("root_id")
@@ -292,7 +369,10 @@ def init_app(app):
     def export_classifications(root_id, classification_fn):
         with database.engine.connect() as conn:
             tree = Tree(conn)
-            tree.export_classifications(root_id, classification_fn)
+            root_id = tree.get_root_id(project_id)
+            processing_tree = tree.dump_tree(root_id)
+            df = processing_tree.to_flat(clean_name=clean_name)
+            df.to_csv(labels_fn, index=False)
 
     @app.cli.command()
     @click.argument("node_id")

@@ -3,6 +3,34 @@ Create the MorphoCluster app.
 """
 
 import os
+from typing import Mapping, Optional
+
+from flask import Flask, has_request_context, request
+import logging
+
+from ._version import get_versions
+
+__version__ = get_versions()["version"]
+del get_versions
+
+from flask.logging import default_handler
+
+class RequestFormatter(logging.Formatter):
+    def format(self, record):
+        if has_request_context():
+            record.url = request.url
+            record.remote_addr = request.remote_addr
+        else:
+            record.url = None
+            record.remote_addr = None
+
+        return super().format(record)
+
+formatter = RequestFormatter(
+    '[%(asctime)s] %(remote_addr)s requested %(url)s\n'
+    '%(levelname)s in %(module)s: %(message)s'
+)
+default_handler.setFormatter(formatter)
 
 from flask import Flask
 
@@ -12,7 +40,7 @@ __version__ = get_versions()["version"]
 del get_versions
 
 
-def create_app(test_config=None):
+def create_app(test_config: Optional[Mapping]=None):
     """Create and configure an instance of the Flask application."""
 
     from flask import Response, abort, redirect, render_template, request, url_for
@@ -24,15 +52,23 @@ def create_app(test_config=None):
 
     app = Flask(__name__, instance_relative_config=True)
 
+    # Set environment variables
+    if test_config is not None:
+        os.environ.update(test_config)
+
     # Load config
     app.config.from_object("morphocluster.config_default")
 
     settings_file = os.environ.get("MORPHOCLUSTER_SETTINGS")
     if settings_file:
-        app.config.from_pyfile(os.path.join(app.root_path, settings_file))
+        app.config.from_pyfile(os.path.join(app.root_path, settings_file))  # type: ignore
 
-    if test_config is not None:
-        app.config.update(test_config)
+    os.makedirs(app.config["FILES_DIR"], exist_ok=True)
+
+    # Fix url_for if behind reverse proxy
+    from morphocluster.reverse_proxied import ReverseProxied
+
+    app.wsgi_app = ReverseProxied(app.wsgi_app, app.config)
 
     if not os.path.isabs(app.config["DATA_DIR"]):
         app.config["DATA_DIR"] = os.path.join(app.root_path, app.config["DATA_DIR"])
@@ -85,11 +121,11 @@ def create_app(test_config=None):
     @app.route("/get_obj_image/<objid>")
     def get_obj_image(objid):
         with database.engine.connect() as conn:
-            stmt = models.objects.select(models.objects.c.object_id == objid)
+            stmt = models.objects.select().where(models.objects.c.object_id == objid)
             result = conn.execute(stmt).first()
 
         if result is None:
-            abort(404)
+            return "Unknown object", 404
 
         response = send_from_directory(
             app.config["DATA_DIR"], result["image_fn"], conditional=True
@@ -109,8 +145,9 @@ def create_app(test_config=None):
     # ===============================================================================
     # Authentication
     # ===============================================================================
-    from morphocluster import models
     from werkzeug.security import check_password_hash
+
+    from morphocluster import models
 
     def check_auth(username, password):
         # Retrieve entry from the database
@@ -134,7 +171,7 @@ def create_app(test_config=None):
 
         auth = request.authorization
 
-        success = check_auth(auth.username, auth.password) if auth else None
+        success = check_auth(auth.username, auth.password) if auth else None  # type: ignore
 
         if not auth or not success:
             if success is False:

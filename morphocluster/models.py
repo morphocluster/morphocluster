@@ -25,6 +25,7 @@ from sqlalchemy.types import (
 
 from morphocluster.cube import Cube
 from morphocluster.extensions import database as db
+from morphocluster.sql.types import Point
 
 metadata = db.metadata
 

@@ -1,0 +1,67 @@
+version: '3'
+services:
+  morphocluster:
+    # TODO: Provide docker-compose.prod.yml
+    # build:
+    #   context: .
+    #   dockerfile: docker/morphocluster/Dockerfile
+    # image: morphocluster/morphocluster:0.2.1
+    # ports:
+    #   # Expose port 8000 (web service)
+    #   - "8000:8000"
+    #   ## TODO: Expose port 22 for external SSH access:
+    #   #- "8022:22"
+    depends_on:
+      - postgres
+      - redis-lru
+    restart: unless-stopped
+    volumes:
+      - morphocluster-data:/data
+      - ${PWD}/docker/morphocluster/authorized_keys:/authorized_keys:ro
+    environment:
+      # Store command history in the data volume
+      - HISTSIZE=-1
+      - HISTFILESIZE=-1
+      - HISTFILE=/data/.bash_history
+      - FLASK_APP=morphocluster
+    # # TODO: Uncomment this block to use the host's GPU inside the container
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities:
+    #           - gpu
+  postgres:
+    image: postgres:12-alpine
+    environment:
+      POSTGRES_USER: morphocluster
+      POSTGRES_PASSWORD: morphocluster
+      POSTGRES_DB: morphocluster
+    ports:
+      - "5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgresql/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+    # Increase shared memory to allow for big queries
+    shm_size: '2gb'
+    restart: unless-stopped
+
+  redis-rq:
+    image: "redis:5-alpine"
+    ports:
+      - "6379"
+    restart: unless-stopped
+
+  redis-lru:
+    image: "redis:5-alpine"
+    ports:
+      - "6379"
+    volumes:
+      - ./docker/redis-lru/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    restart: unless-stopped
+
+volumes:
+  # We use named volumes so that the data is not lost if the image is rebuilt
+  postgres-data:
+  morphocluster-data:

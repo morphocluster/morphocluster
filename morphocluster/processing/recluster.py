@@ -15,11 +15,11 @@ from morphocluster.processing import Tree
 def _subsample_dataset(sample_size, dataset):
     """
     dataset["features"] is a numpy.ndarray
-    dataset["objids"] is a pandas.Series
+    dataset["object_id"] is a pandas.Series
     """
 
     features = dataset["features"]
-    objids = dataset["objids"]
+    object_id = dataset["object_id"]
 
     if features.shape[0] <= sample_size:
         return dataset
@@ -27,7 +27,7 @@ def _subsample_dataset(sample_size, dataset):
     idx = np.random.permutation(features.shape[0])[:sample_size]
 
     features = features[idx]
-    objids = objids.iloc[idx].reset_index(drop=True)
+    object_id = object_id.iloc[idx].reset_index(drop=True)
 
     return {"features": features, "objids": objids}
 
@@ -105,8 +105,7 @@ class Recluster:
         for i, tree in enumerate(self.trees):
             print("Tree #{}:".format(i))
 
-            approved_nodes_selector = tree.nodes["approved"] == True
-            approved_node_ids = tree.nodes.loc[approved_nodes_selector, "node_id"]
+            approved_node_ids: pd.Series = tree.nodes.loc[tree.nodes["approved"], "node_id"]  # type: ignore
 
             approved_objects_selector = tree.objects["node_id"].isin(approved_node_ids)
 
@@ -117,7 +116,7 @@ class Recluster:
                 tree.objects.loc[approved_objects_selector, "object_id"]
             )
 
-            tree_objids.append(tree.objects["object_id"])
+            tree_object_id.append(tree.objects["object_id"])
 
             print(
                 " Approved objects: {:,d} / {:,d} ({:.2%})".format(
@@ -139,8 +138,8 @@ class Recluster:
         tree_objids = pd.concat(tree_objids).drop_duplicates().reset_index(drop=True)
 
         # This is faster than np.isin
-        dataset_objids = pd.Series(self.dataset["objids"])
-        dataset_available_selector = dataset_objids.isin(tree_objids)
+        dataset_object_id = pd.Series(self.dataset["object_id"])
+        dataset_available_selector = dataset_object_id.isin(tree_object_id)
         n_dataset_available = dataset_available_selector.sum()
 
         print(
@@ -151,10 +150,10 @@ class Recluster:
             )
         )
 
-        dataset_selector = ~dataset_objids.isin(approved_objids)
+        dataset_selector = ~dataset_object_id.isin(approved_object_id)
 
         n_selected = dataset_selector.sum()
-        n_total = len(dataset_objids)
+        n_total = len(dataset_object_id)
 
         print(
             "Unapproved objects present in dataset: {:,d} / {:,d} ({:.2%})".format(
@@ -167,7 +166,53 @@ class Recluster:
             "objids": dataset_objids[dataset_selector].reset_index(drop=True),
         }
 
-    def cluster(self, ignore_approved=True, sample_size=None, **kwargs):
+    def _subsample_unexplored(self, keep_frac: float, dataset):
+        if not self.trees:
+            return dataset
+
+        tree = self.merge_trees()
+
+        # Assemble training set from the features and node_ids of approved objects
+        objects = (
+            pd.DataFrame({"object_id": self.dataset["object_id"]})
+            .merge(tree.objects, how="left", on="object_id")
+            .merge(tree.nodes[["node_id", "approved"]], how="left", on="node_id")
+        )
+        mask = objects["approved"] & ~pd.isna(objects["node_id"])
+        X_train = self.dataset["features"][mask]
+        y_train = objects.loc[mask, "node_id"]
+
+        # Train NearestCentroidClassifier
+        clf = sklearn.neighbors.NearestCentroid()
+        clf.fit(X_train, y_train)
+        del X_train
+        del y_train
+
+        # Assemble eval set from dataset
+        X_eval = dataset["features"]
+
+        # Calculate the distance of every object in dataset to the existing cluster centroids
+        _, distances = sklearn.metrics.pairwise_distances_argmin_min(
+            X_eval, clf.centroids_
+        )
+
+        # Retain only the fraction with the largest distances
+        thr = np.quantile(distances, 1 - keep_frac)
+        mask = distances >= thr
+
+        return {
+            "features": dataset["features"][mask],
+            "object_id": dataset["object_id"][mask].reset_index(drop=True),
+        }
+
+    def cluster(
+        self,
+        ignore_approved=True,
+        sample_size=None,
+        pca: Optional[int] = None,
+        keep_unexplored: Optional[float] = None,
+        **kwargs,
+    ):
         """
         Cluster the data.
         """
@@ -176,6 +221,14 @@ class Recluster:
             dataset = self._get_unapproved_dataset()
         else:
             dataset = self.dataset
+
+        if keep_unexplored is not None:
+            assert (
+                0 <= keep_unexplored <= 1
+            ), f"keep_unexplored needs to be in range (0,1), got {keep_unexplored}"
+
+            print(f"Subsampling unexplored data ({keep_unexplored:.3f})...")
+            dataset = self._subsample_unexplored(keep_unexplored, dataset)
 
         if sample_size is not None:
             print("Subsampling dataset ({:,d})...".format(sample_size))
@@ -189,7 +242,7 @@ class Recluster:
 
         print(f"Clustering {n_objects:,d} objects...")
         start = time.perf_counter()
-        labels = clusterer.fit_predict(dataset["features"])
+        labels = clusterer.fit_predict(features)
         time_fit = time.perf_counter() - start
 
         print("Clustering took {:.0f}s".format(time_fit))
@@ -210,7 +263,20 @@ class Recluster:
         )
 
         # Turn cluster_labels to a tree
-        self.trees.append(Tree.from_labels(labels, dataset["objids"]))
+        self.trees.append(
+            Tree.from_labels(
+                labels,
+                dataset["object_id"],
+                meta={
+                    "cluster": {
+                        "ignore_approved": ignore_approved,
+                        "sample_size": sample_size,
+                        "pca": pca,
+                        **kwargs,
+                    }
+                },
+            )
+        )
 
         return self
 

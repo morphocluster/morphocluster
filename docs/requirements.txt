@@ -1,0 +1,8 @@
+sphinx
+sphinx_rtd_theme
+sphinx-autodoc-typehints
+Jinja2<3.1
+flask<2
+# TODO: Get rid of fixed versions
+itsdangerous==2.0.1
+werkzeug<2.1

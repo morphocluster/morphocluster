@@ -1,0 +1,15 @@
+language: minimal
+
+services:
+    - docker
+    
+before_install:
+    - cp docker-compose.default.yml docker-compose.yml
+    - cp environment.default.yml environment.yml
+
+    - docker-compose --version
+    - docker-compose up --no-start
+    - docker-compose start
+
+after_script:
+    - docker-compose stop

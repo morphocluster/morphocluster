@@ -222,6 +222,7 @@ import EventLog from "@/EventLog.js";
 
 import MemberPreview from "@/components/MemberPreview.vue";
 import MessageLog from "@/components/MessageLog.vue";
+import DarkModeControl from "@/components/DarkModeControl.vue";
 
 const MAX_N_RECOMMENDATIONS = 100000;
 
@@ -256,13 +257,13 @@ export default {
                 {
                     event: "remove",
                     icon: "mdi-close",
-                    title: "Remove this object from the suggestions."
+                    title: "Remove this object from the suggestions.",
                 },
                 {
                     event: "accept",
                     icon: "mdi-check",
-                    title: "Accept this object."
-                }
+                    title: "Accept this object.",
+                },
             ],
 
             /*
@@ -287,7 +288,7 @@ export default {
             doneDialogModel: false,
 
             /* Accepted members */
-            accepted_members: [],
+            accepted_members_page: [],
 
             /* Sorting effort */
             log_data: {
@@ -365,11 +366,11 @@ export default {
             return this.rec_n_pages - this.rec_interval_right;
         },
         not_ok_tooltip() {
-            if (this.turtle_mode) {
+            if (this.accepted_members_page.length) {
                 return "<strong>All</strong> visible recommendations <strong>do not match</strong> without exception. Save all as rejected and proceed. <kbd>J</kbd>";
             }
             return "<strong>Some</strong> visible recommendations do not match. Decrease right limit. <kbd>J</kbd>";
-        }
+        },
     },
     methods: {
         updateView(project_id, node_id) {
@@ -549,7 +550,7 @@ export default {
 
             // Reset data (but keep project)
             Object.assign(this.$data, this.$options.data(), {
-                project: this.project
+                project: this.project,
             });
 
             // Time when the view is visited
@@ -559,7 +560,7 @@ export default {
 
             this.node_status = "loading";
 
-            var projectPromise = new Promise(resolve => {
+            var projectPromise = new Promise((resolve) => {
                 if (this.project && this.project.project_id == project_id) {
                     // Project was already loaded.
                     resolve();
@@ -588,7 +589,7 @@ export default {
                             true
                         )
                         // (This really needs to be nested!)
-                        .then(node_id => {
+                        .then((node_id) => {
                             if (node_id === null) {
                                 // Done
                                 this.$refs.doneModal.show();
@@ -600,8 +601,8 @@ export default {
                                 name: "grow",
                                 params: {
                                     project_id: project_id,
-                                    node_id: node_id
-                                }
+                                    node_id: node_id,
+                                },
                             };
 
                             // Navigate to the new adress. This starts a new processing of the whole chain.
@@ -623,12 +624,12 @@ export default {
                 .then(() => {
                     this.node_status = "loaded";
                 })
-                .catch(e => {
+                .catch((e) => {
                     this.axiosErrorHandler(e);
                 });
 
             nodeIdPromise
-                .then(node_id => {
+                .then((node_id) => {
                     console.log("getNodeRecommendedObjects...");
                     this.rec_status = "loading";
 
@@ -638,7 +639,7 @@ export default {
                         MAX_N_RECOMMENDATIONS
                     );
                 })
-                .then(data => {
+                .then((data) => {
                     // TODO: Do something when there are no recommendations!
                     this.rec_members = shuffle(data.data);
                     this.rec_base_url = data.links.self;
@@ -652,7 +653,7 @@ export default {
                     // Time when the view is fully initialized
                     this.log_data.time_initialized = Date.now();
                 })
-                .catch(e => {
+                .catch((e) => {
                     this.axiosErrorHandler(e);
                 });
         },
@@ -681,7 +682,7 @@ export default {
 
             axios
                 .get(`${this.node_members_url}&page=${this.node_members_page}`)
-                .then(response => {
+                .then((response) => {
                     this.node_members = this.node_members.concat(
                         response.data.data
                     );
@@ -698,27 +699,25 @@ export default {
                         $state.complete();
                     }
                 })
-                .catch(e => {
+                .catch((e) => {
                     this.axiosErrorHandler(e);
                 });
         },
-        membersOk: function() {
-            // Increase umber of decisions
+        membersOk: function () {
+            // Increase number of decisions
             this.log_data.n_accept_page++;
 
             this.rec_interval_left = this.rec_current_page + 1;
-
-            this.accepted_members = [];
 
             this.updateCurrentPage();
 
             this.showNext();
         },
-        membersNotOk: function() {
+        membersNotOk: function () {
             // Increase umber of decisions
             this.log_data.n_reject_page++;
 
-            if (this.accepted_members.length) {
+            if (this.accepted_members_page.length) {
                 // If there are accepted members, reject all remaining and proceed like in membersOk
                 var remaining_members = this.rec_members.map(this.getUniqueId);
 
@@ -726,7 +725,6 @@ export default {
                 this.rejected_members.push(...remaining_members);
 
                 this.rec_interval_left = this.rec_current_page + 1;
-                this.accepted_members = [];
             } else {
                 this.rec_interval_right = this.rec_current_page;
                 this.found_right = true;
@@ -760,7 +758,7 @@ export default {
                 );
             }
         },
-        showNext: function() {
+        showNext: function () {
             console.log(
                 this.rec_current_page,
                 this.rec_interval_left,
@@ -774,16 +772,18 @@ export default {
                 return;
             }
 
+            this.accepted_members_page = [];
+
             axios
                 .get(`${this.rec_base_url}&page=${this.rec_current_page}`)
-                .then(response => {
+                .then((response) => {
                     console.log(
                         response.data.data,
                         shuffle(response.data.data)
                     );
                     this.rec_members = shuffle(response.data.data);
                 })
-                .catch(e => {
+                .catch((e) => {
                     this.axiosErrorHandler(e);
                 });
         },
@@ -823,6 +823,12 @@ export default {
                     });
                 })
                 .then(() => {
+                    // Update progress
+                    api.getNodeProgress(node.node_id, {
+                        log: "grow",
+                    });
+                })
+                .then(() => {
                     console.log("Saved.");
                     this.saving = false;
                     this.saved = true;
@@ -840,7 +846,7 @@ export default {
                         this.log_data
                     );
                 })
-                .catch(e => {
+                .catch((e) => {
                     this.messages.unshift(`Error saving ${node.node_id}.`);
                     console.log(e);
                 });
@@ -885,9 +891,9 @@ export default {
             // Enable turtle mode
             this.autoEnableTurtleMode();
 
-            this.accepted_members.push(this.getUniqueId(member));
+            this.accepted_members_page.push(this.getUniqueId(member));
             this.messages.unshift(
-                `Accepted ${this.accepted_members.length} objects.`
+                `Accepted ${this.accepted_members_page.length} objects.`
             );
         },
         next() {
@@ -917,8 +923,8 @@ export default {
                 console.log("next");
                 this.next();
             }
-        }
-    }
+        },
+    },
 };
 </script>
 

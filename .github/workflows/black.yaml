@@ -1,0 +1,29 @@
+name: Black (python)
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v37
+        with:
+          files: "**/*.py"
+
+      - name: Setup Python env
+        uses: actions/setup-python@v3
+
+      - name: Install black
+        run: pip install black
+
+      - name: Black changed files
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          black --check ${{ steps.changed-files.outputs.all_changed_files }}

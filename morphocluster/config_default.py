@@ -1,5 +1,12 @@
+import posixpath
+
+from environs import Env
+
+_env = Env()
+_env.read_env()
+
 # Redis (LRU for caching)
-REDIS_LRU_URL = "redis://:@localhost:6380/0"
+REDIS_LRU_URL = "redis://redis-lru:6379/0"
 
 # Redis for rq
 RQ_REDIS_URL = "redis://localhost:6379/0"
