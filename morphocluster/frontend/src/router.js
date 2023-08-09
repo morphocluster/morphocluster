@@ -32,7 +32,7 @@ var router = new Router({
     },
     {
       name: 'files',
-      path: '/f',
+      path: '/files',
       component: () => import(/* webpackChunkName: "projects" */ './views/Files.vue'),
     },
     {

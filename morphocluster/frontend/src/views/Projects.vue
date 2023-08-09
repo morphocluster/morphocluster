@@ -2,12 +2,12 @@
     <div id="projects">
         <nav class="navbar navbar-expand-lg navbar-light bg-dark text-light">
             <ul class="navbar-nav mr-5">
-                <li class="nav-item active text-light">MorphoCluster</li>
+                <li class="nav-item active text-light">Projects</li>
             </ul>
             <router-link class="navbar-brand text-light mr-5" to="/"
-                >Projects</router-link
+                >MorphoCluster</router-link
             >
-            <router-link class="navbar-brand text-light mr-auto mr-5" :to="{name: 'files'}"
+            <router-link class="navbar-brand text-light mr-auto" :to="{name: 'files'}"
                 >Files</router-link
             >
             <dark-mode-control />
