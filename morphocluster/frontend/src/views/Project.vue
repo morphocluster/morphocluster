@@ -1,37 +1,22 @@
 <template>
     <div id="project">
         <nav class="navbar navbar-expand-lg navbar-light bg-dark text-light">
-            <router-link class="navbar-brand text-light" to="/">MorphoCluster</router-link>
-            <ul class="navbar-nav mr-auto">
-                <li class="nav-item active text-light">Projects</li>
+            <ul class="navbar-nav mr-5">
+                <li class="nav-item active text-light">Project</li>
             </ul>
+            <router-link class="navbar-brand text-light mr-5" to="/"
+                >MorphoCluster</router-link
+            >
+            <router-link class="navbar-brand text-light mr-5" to="/"
+                >Projects</router-link
+            >
+            <router-link class="navbar-brand text-light mr-auto" :to="{name: 'files'}"
+                >Files</router-link
+            >
             <dark-mode-control />
         </nav>
         <div class="container">
-            <table id="table" style="width=100%">
-                <tbody>
-                    <tr>
-                        <td>Created on</td>
-                        <td>{{ project.creation_date }}</td>
-                    </tr>
-                    <tr>
-                        <td>Name</td>
-                        <td>{{ project.name }}</td>
-                    </tr>
-                    <tr>
-                        <td>Node_id</td>
-                        <td>{{ project.node_id }}</td>
-                    </tr>
-                    <tr>
-                        <td>Project_id</td>
-                        <td>{{ project.project_id }}</td>
-                    </tr>
-                    <tr>
-                        <td>Visible</td>
-                        <td>{{ project.visible }}</td>
-                    </tr>
-                </tbody>
-            </table>
+            <b-table striped hover :items="items" :fields="fields"></b-table>
             <div style="margin: auto ; width: 0; padding-top: 7px ">
                 <b-button size="sm" variant="primary" href="" @click.prevent="showSaveModal(project)">
                     Save Project
@@ -78,6 +63,8 @@ export default {
             save_title: "",
             save_project_id: null,
             save_saving: false,
+            fields: ['Category','Info'],
+            items: []
         };
     },
     methods: {
@@ -112,6 +99,10 @@ export default {
             .get(`/api/projects/${this.project_id}`)
             .then(response => {
                 this.project = response.data;
+                for(var prop in this.project){
+                    this.items.push({'Category':prop,'Info':this.project[prop]})
+                }
+                
                 console.log(response.data);
 
                 EventBus.$emit("set-title", this.project.name);
@@ -119,7 +110,7 @@ export default {
             .catch(e => {
                 console.log(e);
             });
-    }
+    },
 };
 </script>
 
