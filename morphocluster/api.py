@@ -231,6 +231,12 @@ def get_file(path):
         app.config["FILES_DIR"], path, as_attachment=arguments["download"]
     )
 
+@api.route("/files", methods=["GET"])
+def get_files():
+    
+    return {"reuturn":os.listdir(app.config["FILES_DIR"])}
+
+
 
 # ===============================================================================
 # /projects

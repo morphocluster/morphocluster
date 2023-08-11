@@ -1,12 +1,21 @@
 <template>
     <div id="files">
-        <nav class="navbar navbar-expand-lg navbar-light bg-dark text-light">
-            <ul class="navbar-nav mr-5">
-                <li class="nav-item active text-light">Files</li>
-            </ul>
-            <router-link class="navbar-brand text-light mr-5" to="/">MorphoCluster</router-link>
-            <router-link class="navbar-brand text-light mr-auto" to="/">Projects</router-link>
-            <dark-mode-control />
+        <nav class="navbar navbar-expand-lg navbar navbar-dark bg-dark">
+            <a class="navbar-brand" href="/p">MorphoCluster</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" >
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/p">Projects</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" >Files<span class="sr-only">(current)</span></a>
+                    </li>
+                </ul> 
+            </div>
         </nav>
         <div class="scrollable">
             <div class="container">
@@ -15,8 +24,7 @@
                         {{ a.message }}
                     </b-alert>
                 </div>
-                <b-table id="files_table" striped sort-by="name" :items="projects" :fields="fields" showEmpty>
-
+                <b-table id="files_table" striped sort-by="name" :items="projects" :fields="fields" showEmpty>                
                 </b-table>
             </div>
         </div>
@@ -27,14 +35,15 @@
 
 import * as api from "@/helpers/api.js";
 import Humanize from "humanize-plus";
-import DarkModeControl from "@/components/DarkModeControl.vue";
 
+import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap";
 
 
 export default {
     name: "FilesView",
     props: {},
-    components: { DarkModeControl },
+    components: { },
     data() {
         return {
             fields: [

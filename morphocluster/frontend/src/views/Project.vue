@@ -1,19 +1,21 @@
 <template>
     <div id="project">
-        <nav class="navbar navbar-expand-lg navbar-light bg-dark text-light">
-            <ul class="navbar-nav mr-5">
-                <li class="nav-item active text-light">Project</li>
-            </ul>
-            <router-link class="navbar-brand text-light mr-5" to="/"
-                >MorphoCluster</router-link
-            >
-            <router-link class="navbar-brand text-light mr-5" to="/"
-                >Projects</router-link
-            >
-            <router-link class="navbar-brand text-light mr-auto" :to="{name: 'files'}"
-                >Files</router-link
-            >
-            <dark-mode-control />
+        <nav class="navbar navbar-expand-lg navbar navbar-dark bg-dark">
+            <a class="navbar-brand" href="/p">MorphoCluster</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/p" >Projects</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/files">Files</a>
+                    </li>
+                </ul>
+            </div>
         </nav>
         <div class="container">
             <table id="table" style="width=100%">
@@ -73,12 +75,13 @@
 import * as api from "@/helpers/api.js";
 import axios from "axios";
 import { EventBus } from "@/event-bus.js";
-import DarkModeControl from "@/components/DarkModeControl.vue";
+import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap";
 
 export default {
     name: "ProjectView",
     props: { "project_id": Number },
-    components: { DarkModeControl },
+    components: { },
     data() {
         return {
             project: null,

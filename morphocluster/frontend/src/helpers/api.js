@@ -68,6 +68,14 @@ export function mergeNodeInto(node_id, dest_node_id) {
     return axios.post(`/api/nodes/${node_id}/merge_into`, data);
 }
 
+// Files
+export function getFiles(include_progress = false){
+    return axios.get(`/api/files`,{ params: { include_progress } } )
+        .then(response => {
+            return response.data;
+        });
+}
+
 // Project
 
 export function getProjects(include_progress = false) {
