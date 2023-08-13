@@ -24,7 +24,17 @@
                         {{ a.message }}
                     </b-alert>
                 </div>
-                <b-table id="files_table" striped sort-by="name" :items="projects" :fields="fields" showEmpty>                
+                <b-table id="files_table" striped sort-by="name" :items="files" :fields="fields" showEmpty>                
+                    <template v-slot:cell(name)="data">
+                        <router-link v-if="data.item.Type === 'directory' " :to="{
+                            name: 'file',
+                            params: { file_path: data.item.path },
+                        }">{{ data.item.Name }}</router-link>
+                        <div v-if="data.item.Type === 'file'">
+                            {{data.item.Name}}
+                        </div>
+                    </template>
+                    
                 </b-table>
             </div>
         </div>
@@ -42,12 +52,16 @@ import "bootstrap";
 
 export default {
     name: "FilesView",
-    props: {},
+    props: { "file_path": String },
     components: { },
+    directory: "directory",
     data() {
         return {
             fields: [
-                { key: "name", sortable: true }
+                { key: "Name", sortable: true },
+                "Path",
+                "Type",
+                "Last_modified",
             ],
             files: [],
             alerts: [],

@@ -234,8 +234,22 @@ def get_file(path):
 @api.route("/files", methods=["GET"])
 def get_files():
     
-    return {"reuturn":os.listdir(app.config["FILES_DIR"])}
+    directory_path = app.config["FILES_DIR"]
+    file_list = []
+    
+    for entry in os.scandir(directory_path):
+        entry_info = {
+            "Name": entry.name,
+            "Path": os.path.relpath(entry.path,api.config["FILES_DIR"]),
+            "Type": "directory" if entry.is_dir() else "file",
+            "Last_modified": datetime.fromtimestamp(entry.stat().st_mtime).isoformat(),
+            "Type_flag": 1 if entry.is_dir() else 0, 
+        }
+        file_list.append(entry_info)
+    
+    return jsonify(file_list)
 
+# path=os.path.relpath(tree_fn, api.config["FILES_DIR"])
 
 
 # ===============================================================================
