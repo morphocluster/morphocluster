@@ -234,7 +234,7 @@ def get_file(path):
 @api.route("/files", methods=["GET"])
 def get_files():
     
-    directory_path = app.config["FILES_DIR"]
+    directory_path = app.config["FILES_DIR"] 
     file_list = []
     
     for entry in os.scandir(directory_path):

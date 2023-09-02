@@ -12,7 +12,7 @@
                         <a class="nav-link" href="/p">Projects</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" >Files<span class="sr-only">(current)</span></a>
+                        <router-link class="nav-link" :to="{name:'files', params: {file_path: 'files'},}">Files</router-link>
                     </li>
                 </ul> 
             </div>
@@ -27,8 +27,8 @@
                 <b-table id="files_table" striped sort-by="name" :items="files" :fields="fields" showEmpty>                
                     <template v-slot:cell(name)="data">
                         <router-link v-if="data.item.Type === 'directory' " :to="{
-                            name: 'file',
-                            params: { file_path: data.item.path },
+                            name: 'files',
+                            params: { file_path:  data.item.Path },
                         }">{{ data.item.Name }}</router-link>
                         <div v-if="data.item.Type === 'file'">
                             {{data.item.Name}}

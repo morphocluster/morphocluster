@@ -13,7 +13,7 @@
                         <a class="nav-link active" >Projects <span class="sr-only">(current)</span></a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/files">Files</a>
+                        <router-link class="nav-link" :to="{name:'files', params: {file_path: ''},}">Files</router-link>
                     </li>
                 </ul>
             </div>
