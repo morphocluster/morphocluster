@@ -43,8 +43,9 @@
 
 <script>
 
-import * as api from "@/helpers/api.js";
+
 import Humanize from "humanize-plus";
+import axios from "axios";
 
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap";
@@ -72,17 +73,19 @@ export default {
 
     },
     mounted() {
-        api.getFiles()
+        
+        axios
+            .get(`/api/files/${this.file_path}`)
             .then((files) => {
-                this.files = files
-            }).catch((e) => {
-                console.log(e);
-                // TODO: Use axiosErrorHandler
-                this.alerts.unshift({
-                    message: e.message,
-                    variant: "danger",
+                    this.files = files
+                }).catch((e) => {
+                    console.log(e);
+                    // TODO: Use axiosErrorHandler
+                    this.alerts.unshift({
+                        message: e.message,
+                        variant: "danger",
+                    });
                 });
-            });
     }
 }
 

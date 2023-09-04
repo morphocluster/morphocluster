@@ -69,8 +69,8 @@ export function mergeNodeInto(node_id, dest_node_id) {
 }
 
 // Files
-export function getFiles(include_progress = false){
-    return axios.get(`/api/files`,{ params: { include_progress } } )
+export function getFiles(path=""){
+    return axios.get(`/api/files/${path}`)
         .then(response => {
             return response.data;
         });

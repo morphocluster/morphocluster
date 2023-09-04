@@ -218,7 +218,7 @@ def get_subtree(node_id):
 # ===============================================================================
 
 
-@api.route("/files/<path:path>", methods=["GET"])
+@api.route("/files/<path:path>/view", methods=["GET"])
 def get_file(path):
     """
     Send the requested file to the client.
@@ -231,8 +231,9 @@ def get_file(path):
         app.config["FILES_DIR"], path, as_attachment=arguments["download"]
     )
 
-@api.route("/files", methods=["GET"])
-def get_files():
+
+@api.route("/files/<string:path>", methods=["GET"])
+def get_files(path):
     
     directory_path = app.config["FILES_DIR"] 
     file_list = []
