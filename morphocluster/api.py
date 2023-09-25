@@ -35,6 +35,8 @@ from morphocluster.extensions import database, redis_lru, rq
 from morphocluster.helpers import keydefaultdict, seq2array
 from morphocluster.schemas import JobSchema, LogSchema
 from morphocluster.tree import Tree
+from werkzeug.utils import secure_filename
+
 
 api = Blueprint("api", __name__)
 
@@ -236,22 +238,41 @@ def view_file(path):
 @api.route("/files/", methods=["GET"])
 def get_direntry(path=""):
     if path != "":
-        directory_path = app.config["FILES_DIR"]+"/"+path
+        directory_path = app.config["FILES_DIR"] + "/" + path
     else:
         directory_path = app.config["FILES_DIR"]
     file_list = []
-    
+
     for entry in os.scandir(directory_path):
         entry_info = {
             "Name": entry.name,
-            "Path": os.path.relpath(entry.path,api.config["FILES_DIR"]),
+            "Path": os.path.relpath(entry.path, api.config["FILES_DIR"]),
             "Type": "directory" if entry.is_dir() else "file",
             "Last_modified": datetime.fromtimestamp(entry.stat().st_mtime).isoformat(),
-            "Type_flag": 1 if entry.is_dir() else 0, 
+            "Type_flag": 1 if entry.is_dir() else 0,
         }
         file_list.append(entry_info)
-    
+
     return jsonify(file_list)
+
+@api.route("/files/", methods=["POST"])
+@api.route("/files/<path:path>", methods=["POST"])
+def upload_file(path=""):
+    try:
+        upload_file = request.files["file"]
+        if upload_file:
+            # Fügen Sie den `path` zum Dateinamen hinzu, um den Pfad im Dateisystem zu berücksichtigen
+            file_path_on_server = os.path.join(app.config["FILES_DIR"],
+                path, secure_filename(upload_file.filename)
+            )
+            upload_file.save(file_path_on_server)
+            return jsonify({"message": "Datei erfolgreich hochgeladen"}), 200
+        else:
+            return jsonify({"message": "Datei nicht gefunden"}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 
 # path=os.path.relpath(tree_fn, api.config["FILES_DIR"])
 

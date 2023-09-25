@@ -83,6 +83,15 @@ export function getFile(file_path){
     });
 }
 
+export function uploadFile(file,file_path){
+    const formData = new FormData();
+    formData.append("file", file);
+    return axios.post(`/api/files/${file_path}`,formData)
+        .then(response => {return response.data;});
+}
+
+
+
 
 // Project
 

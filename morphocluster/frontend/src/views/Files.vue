@@ -3,7 +3,7 @@
         <nav class="navbar navbar-expand-lg navbar navbar-dark bg-dark">
             <a class="navbar-brand" href="/p">MorphoCluster</a>
             <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
-                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" >
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
@@ -12,9 +12,9 @@
                         <a class="nav-link" href="/p">Projects</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" >Files/{{ this.file_path }}<span class="sr-only">(current)</span></a>
+                        <a class="nav-link active">Files/{{ this.file_path }}<span class="sr-only">(current)</span></a>
                     </li>
-                </ul> 
+                </ul>
             </div>
         </nav>
         <div class="scrollable">
@@ -24,18 +24,25 @@
                         {{ a.message }}
                     </b-alert>
                 </div>
-                <b-table id="files_table" striped sort-by="name" :items="files" :fields="fields" showEmpty>                
+                <b-table id="files_table" striped sort-by="name" :items="files" :fields="fields" showEmpty>
                     <template v-slot:cell(name)="data">
-                        <router-link v-if="data.item.Type === 'directory' " :to="{
+                        <router-link v-if="data.item.Type === 'directory'" :to="{
                             name: 'files',
-                            params: { file_path:  data.item.Path},
+                            params: { file_path: data.item.Path },
                         }">{{ data.item.Name }}</router-link>
-                        <div v-if="data.item.Type === 'file'" class="file-link">
-                            {{data.item.Name}}
+                        <div v-if="data.item.Type === 'file'" >
+                            {{ data.item.Name }}
                         </div>
                     </template>
                 </b-table>
             </div>
+        </div>
+        <div class="container mt-4">
+            <div class="alert alert-info" role="alert">
+                Ziehe Dateien hierhin, um sie hochzuladen
+            </div>
+            <input type="file" id="fileInput" style="display: none" @change="handleFileUpload" multiple />
+            <button class="btn btn-primary" @click="openFileInput">Dateien auswählen</button>
         </div>
     </div>
 </template>
@@ -49,12 +56,15 @@ import axios from "axios";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap";
 
+import { uploadFile } from "../helpers/api.js";
+
 
 export default {
     name: "FilesView",
-    props: { "file_path": String},
-    components: { },
+    props: { "file_path": String },
+    components: {},
     test: "test",
+    response: "",
 
     data() {
         return {
@@ -64,7 +74,7 @@ export default {
             ],
             files: [],
             alerts: [],
-            
+
         };
     },
     created() {
@@ -74,12 +84,33 @@ export default {
         $route: "initialize",
     },
     methods: {
+        openFileInput() {
+            document.getElementById("fileInput").click();
+        },
+        async handleFileUpload(event) {
+            const selectedFiles = event.target.files;
+
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+
+                try {
+                    const response = await uploadFile(file, this.file_path);
+                    console.log("Datei erfolgreich hochgeladen:", response.message);
+                    window.location.reload();
+
+                    
+                } catch (error) {
+                    console.error("Fehler beim Hochladen der Datei:", error.message);
+                    
+                }
+            }
+        },
         async initialize() {
-            try{
+            try {
                 const response = await axios.get(`/api/files/${this.file_path}`);
                 this.files = response.data;
                 this.test = this.files[0]["Name"];
-            }catch(error){
+            } catch (error) {
                 console.error(error);
                 this.alerts.unshift({
                     message: error.message,
@@ -121,7 +152,6 @@ export default {
 .alerts {
     padding-top: 1em;
 }
-.file-link {
-  color: rgb(9, 107, 41); /* Ändere die Farbe nach Bedarf */
-}
+
+
 </style>
