@@ -12,7 +12,7 @@
                         <a class="nav-link" href="/p">Projects</a>
                     </li>
                     <li class="nav-item">
-                        <router-link class="nav-link" :to="{name:'files', params: {file_path: 'main', is_main: true},}">Files</router-link>
+                        <a class="nav-link active" >Files/{{ this.file_path }}<span class="sr-only">(current)</span></a>
                     </li>
                 </ul> 
             </div>
@@ -28,7 +28,7 @@
                     <template v-slot:cell(name)="data">
                         <router-link v-if="data.item.Type === 'directory' " :to="{
                             name: 'files',
-                            params: { file_path:  data.item.Path , is_main: false },
+                            params: { file_path:  data.item.Path},
                         }">{{ data.item.Name }}</router-link>
                         <div v-if="data.item.Type === 'file'" class="file-link">
                             {{data.item.Name}}
@@ -52,7 +52,7 @@ import "bootstrap";
 
 export default {
     name: "FilesView",
-    props: { "file_path": String, "is_main": Boolean},
+    props: { "file_path": String},
     components: { },
     test: "test",
 
@@ -60,8 +60,6 @@ export default {
         return {
             fields: [
                 { key: "Name", sortable: true },
-                "Path",
-                "Type",
                 "Last_modified",
             ],
             files: [],
@@ -78,7 +76,7 @@ export default {
     methods: {
         async initialize() {
             try{
-                const response = await axios.get(`/api/files/${this.file_path}?is_main=${this.is_main}`);
+                const response = await axios.get(`/api/files/${this.file_path}`);
                 this.files = response.data;
                 this.test = this.files[0]["Name"];
             }catch(error){

@@ -219,7 +219,7 @@ def get_subtree(node_id):
 
 
 @api.route("/files/<path:path>/view", methods=["GET"])
-def get_file(path):
+def view_file(path):
     """
     Send the requested file to the client.
     """
@@ -233,16 +233,12 @@ def get_file(path):
 
 
 @api.route("/files/<path:path>", methods=["GET"])
-def get_files(path):
-
-    is_main = request.args.get('is_main', default='false')
-
-    if is_main=="true":
-        path = ""
+@api.route("/files/", methods=["GET"])
+def get_direntry(path=""):
+    if path != "":
+        directory_path = app.config["FILES_DIR"]+"/"+path
     else:
-        path = "/"+path
-    
-    directory_path = app.config["FILES_DIR"]+path
+        directory_path = app.config["FILES_DIR"]
     file_list = []
     
     for entry in os.scandir(directory_path):
@@ -337,7 +333,7 @@ def save_project(project_id):
         tree.export_tree(root_id, tree_fn)
 
         tree_url = url_for(
-            ".get_file", path=os.path.relpath(tree_fn, api.config["FILES_DIR"])
+            ".view_file", path=os.path.relpath(tree_fn, api.config["FILES_DIR"])
         )
 
         return jsonify({"url": tree_url})

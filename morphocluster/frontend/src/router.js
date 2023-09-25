@@ -34,7 +34,7 @@ var router = new Router({
       name: 'files',
       path: '/files/:file_path',
       component: () => import(/* webpackChunkName: "projects" */ './views/Files.vue'),
-      props: (route) => ({file_path: route.params.file_path, is_main: route.params.is_main}),
+      props: (route) => ({file_path: route.params.file_path}),
     },
     {
       name: 'approve',
