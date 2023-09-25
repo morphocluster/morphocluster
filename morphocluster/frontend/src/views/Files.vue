@@ -30,7 +30,7 @@
                             name: 'files',
                             params: { file_path: data.item.Path },
                         }">{{ data.item.Name }}</router-link>
-                        <div v-if="data.item.Type === 'file'" >
+                        <div v-if="data.item.Type === 'file'">
                             {{ data.item.Name }}
                         </div>
                     </template>
@@ -38,8 +38,8 @@
             </div>
         </div>
         <div class="container mt-4">
-            <div class="alert alert-info" role="alert">
-                Ziehe Dateien hierhin, um sie hochzuladen
+            <div class="dropzone" @dragover.prevent @dragenter.prevent @dragleave.prevent @drop="handleDrop">
+                Ziehe Dateien hierhin oder klicke, um Dateien auszuwählen
             </div>
             <input type="file" id="fileInput" style="display: none" @change="handleFileUpload" multiple />
             <button class="btn btn-primary" @click="openFileInput">Dateien auswählen</button>
@@ -48,24 +48,17 @@
 </template>
 
 <script>
-
-
-
 import axios from "axios";
-
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap";
-
 import { uploadFile } from "../helpers/api.js";
-
 
 export default {
     name: "FilesView",
-    props: { "file_path": String },
+    props: { file_path: String },
     components: {},
     test: "test",
     response: "",
-
     data() {
         return {
             fields: [
@@ -74,7 +67,6 @@ export default {
             ],
             files: [],
             alerts: [],
-
         };
     },
     created() {
@@ -97,11 +89,8 @@ export default {
                     const response = await uploadFile(file, this.file_path);
                     console.log("Datei erfolgreich hochgeladen:", response.message);
                     window.location.reload();
-
-                    
                 } catch (error) {
                     console.error("Fehler beim Hochladen der Datei:", error.message);
-                    
                 }
             }
         },
@@ -117,13 +106,26 @@ export default {
                     variant: "danger",
                 });
             }
-        }
+        },
+        // Funktion zum Verarbeiten des Drag-and-Drop-Ereignisses
+        async handleDrop(event) {
+            event.preventDefault();
+            const selectedFiles = event.dataTransfer.files;
+
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+
+                try {
+                    const response = await uploadFile(file, this.file_path);
+                    console.log("Datei erfolgreich hochgeladen:", response.message);
+                    window.location.reload();
+                } catch (error) {
+                    console.error("Fehler beim Hochladen der Datei:", error.message);
+                }
+            }
+        },
     },
-}
-
-
-
-
+};
 </script>
 
 <style>
@@ -153,5 +155,10 @@ export default {
     padding-top: 1em;
 }
 
-
+.dropzone {
+    border: 2px dashed #ccc;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+}
 </style>
