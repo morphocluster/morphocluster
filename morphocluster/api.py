@@ -232,10 +232,17 @@ def get_file(path):
     )
 
 
-@api.route("/files/<string:path>", methods=["GET"])
+@api.route("/files/<path:path>", methods=["GET"])
 def get_files(path):
+
+    is_main = request.args.get('is_main', default='false')
+
+    if is_main=="true":
+        path = ""
+    else:
+        path = "/"+path
     
-    directory_path = app.config["FILES_DIR"] 
+    directory_path = app.config["FILES_DIR"]+path
     file_list = []
     
     for entry in os.scandir(directory_path):

@@ -12,7 +12,7 @@
                         <a class="nav-link" href="/p">Projects</a>
                     </li>
                     <li class="nav-item">
-                        <router-link class="nav-link" :to="{name:'files', params: {file_path: 'files'},}">Files</router-link>
+                        <router-link class="nav-link" :to="{name:'files', params: {file_path: 'main', is_main: true},}">Files</router-link>
                     </li>
                 </ul> 
             </div>
@@ -28,13 +28,12 @@
                     <template v-slot:cell(name)="data">
                         <router-link v-if="data.item.Type === 'directory' " :to="{
                             name: 'files',
-                            params: { file_path:  data.item.Path },
+                            params: { file_path:  data.item.Path , is_main: false },
                         }">{{ data.item.Name }}</router-link>
-                        <div v-if="data.item.Type === 'file'">
+                        <div v-if="data.item.Type === 'file'" class="file-link">
                             {{data.item.Name}}
                         </div>
                     </template>
-                    
                 </b-table>
             </div>
         </div>
@@ -44,7 +43,7 @@
 <script>
 
 
-import Humanize from "humanize-plus";
+
 import axios from "axios";
 
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -53,9 +52,10 @@ import "bootstrap";
 
 export default {
     name: "FilesView",
-    props: { "file_path": String },
+    props: { "file_path": String, "is_main": Boolean},
     components: { },
-    directory: "directory",
+    test: "test",
+
     data() {
         return {
             fields: [
@@ -66,27 +66,30 @@ export default {
             ],
             files: [],
             alerts: [],
-            Humanize,
+            
         };
     },
-    methods: {
-
+    created() {
+        this.initialize();
     },
-    mounted() {
-        
-        axios
-            .get(`/api/files/${this.file_path}`)
-            .then((files) => {
-                    this.files = files
-                }).catch((e) => {
-                    console.log(e);
-                    // TODO: Use axiosErrorHandler
-                    this.alerts.unshift({
-                        message: e.message,
-                        variant: "danger",
-                    });
+    watch: {
+        $route: "initialize",
+    },
+    methods: {
+        async initialize() {
+            try{
+                const response = await axios.get(`/api/files/${this.file_path}?is_main=${this.is_main}`);
+                this.files = response.data;
+                this.test = this.files[0]["Name"];
+            }catch(error){
+                console.error(error);
+                this.alerts.unshift({
+                    message: error.message,
+                    variant: "danger",
                 });
-    }
+            }
+        }
+    },
 }
 
 
@@ -119,5 +122,8 @@ export default {
 
 .alerts {
     padding-top: 1em;
+}
+.file-link {
+  color: rgb(9, 107, 41); /* Ändere die Farbe nach Bedarf */
 }
 </style>

@@ -12,7 +12,7 @@
                         <a class="nav-link" href="/p" >Projects</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/files">Files</a>
+                        <router-link class="nav-link" :to="{name:'files', params: {file_path: 'main', is_main: true},}">Files</router-link>
                     </li>
                 </ul>
             </div>

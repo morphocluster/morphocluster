@@ -69,12 +69,20 @@ export function mergeNodeInto(node_id, dest_node_id) {
 }
 
 // Files
-export function getFiles(path=""){
-    return axios.get(`/api/files/${path}`)
+export function getFiles(file_path,is_main){
+    return axios.get(`/api/files/${file_path}?is_main=${is_main}`)
         .then(response => {
             return response.data;
         });
 }
+
+export function getFile(file_path){
+    return axios.get(`/api/file/${file_path}/view`)
+    .then(response => {
+        return response.data;
+    });
+}
+
 
 // Project
 
