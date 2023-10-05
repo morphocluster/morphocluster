@@ -57,7 +57,6 @@ export default {
     name: "FilesView",
     props: { file_path: String },
     components: {},
-    test: "test",
     response: "",
     data() {
         return {
@@ -87,10 +86,10 @@ export default {
 
                 try {
                     const response = await uploadFile(file, this.file_path);
-                    console.log("Datei erfolgreich hochgeladen:", response.message);
+                    console.log("Data upload successfull", response.message);
                     window.location.reload();
                 } catch (error) {
-                    console.error("Fehler beim Hochladen der Datei:", error.message);
+                    console.error("Data upload failed", error.message);
                 }
             }
         },
@@ -98,7 +97,6 @@ export default {
             try {
                 const response = await axios.get(`/api/files/${this.file_path}`);
                 this.files = response.data;
-                this.test = this.files[0]["name"];
             } catch (error) {
                 console.error(error);
                 this.alerts.unshift({
@@ -114,13 +112,12 @@ export default {
 
             for (let i = 0; i < selectedFiles.length; i++) {
                 const file = selectedFiles[i];
-
                 try {
                     const response = await uploadFile(file, this.file_path);
-                    console.log("Datei erfolgreich hochgeladen:", response.message);
+                    console.log("Data upload successfull", response.message);
                     window.location.reload();
                 } catch (error) {
-                    console.error("Fehler beim Hochladen der Datei:", error.message);
+                    console.error("Data upload failed", error.message);
                 }
             }
         },

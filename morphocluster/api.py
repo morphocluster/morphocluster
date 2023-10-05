@@ -260,13 +260,13 @@ def upload_file(path=""):
     try:
         upload_file = request.files["file"]
         if upload_file:
-            file_path_on_server = os.path.join(app.config["FILES_DIR"],
-                path, secure_filename(upload_file.filename)
+            file_path_on_server = secure_filename(os.path.join(app.config["FILES_DIR"],
+                path, secure_filename(upload_file.filename))
             )
             upload_file.save(file_path_on_server)
-            return jsonify({"message": "Datei erfolgreich hochgeladen"}), 200
+            return jsonify({"message": "Data upload succesfull"}), 200
         else:
-            return jsonify({"message": "Datei nicht gefunden"}), 400
+            return jsonify({"message": "Data upload Failed"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
