@@ -26,12 +26,12 @@
                 </div>
                 <b-table id="files_table" striped sort-by="name" :items="files" :fields="fields" showEmpty>
                     <template v-slot:cell(name)="data">
-                        <router-link v-if="data.item.Type === 'directory'" :to="{
+                        <router-link v-if="data.item.type === 'directory'" :to="{
                             name: 'files',
-                            params: { file_path: data.item.Path },
-                        }">{{ data.item.Name }}</router-link>
-                        <div v-if="data.item.Type === 'file'">
-                            {{ data.item.Name }}
+                            params: { file_path: data.item.path },
+                        }">{{ data.item.name }}</router-link>
+                        <div v-if="data.item.type === 'file'">
+                            {{ data.item.name }}
                         </div>
                     </template>
                 </b-table>
@@ -62,8 +62,8 @@ export default {
     data() {
         return {
             fields: [
-                { key: "Name", sortable: true },
-                "Last_modified",
+                { key: "name", sortable: true },
+                "last_modified",
             ],
             files: [],
             alerts: [],
@@ -98,7 +98,7 @@ export default {
             try {
                 const response = await axios.get(`/api/files/${this.file_path}`);
                 this.files = response.data;
-                this.test = this.files[0]["Name"];
+                this.test = this.files[0]["name"];
             } catch (error) {
                 console.error(error);
                 this.alerts.unshift({

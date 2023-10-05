@@ -237,19 +237,18 @@ def view_file(path):
 @api.route("/files/<path:path>", methods=["GET"])
 @api.route("/files/", methods=["GET"])
 def get_direntry(path=""):
-    if path != "":
-        directory_path = app.config["FILES_DIR"] + "/" + path
-    else:
-        directory_path = app.config["FILES_DIR"]
+
+    directory_path = os.path.join(app.config["FILES_DIR"],path)
+
     file_list = []
 
     for entry in os.scandir(directory_path):
         entry_info = {
-            "Name": entry.name,
-            "Path": os.path.relpath(entry.path, api.config["FILES_DIR"]),
-            "Type": "directory" if entry.is_dir() else "file",
-            "Last_modified": datetime.fromtimestamp(entry.stat().st_mtime).isoformat(),
-            "Type_flag": 1 if entry.is_dir() else 0,
+            "name": entry.name,
+            "path": os.path.relpath(entry.path, api.config["FILES_DIR"]),
+            "type": "directory" if entry.is_dir() else "file",
+            "last_modified": datetime.fromtimestamp(entry.stat().st_mtime).isoformat(),
+            "type_flag": 1 if entry.is_dir() else 0,
         }
         file_list.append(entry_info)
 
@@ -261,7 +260,6 @@ def upload_file(path=""):
     try:
         upload_file = request.files["file"]
         if upload_file:
-            # Fügen Sie den `path` zum Dateinamen hinzu, um den Pfad im Dateisystem zu berücksichtigen
             file_path_on_server = os.path.join(app.config["FILES_DIR"],
                 path, secure_filename(upload_file.filename)
             )
@@ -271,11 +269,7 @@ def upload_file(path=""):
             return jsonify({"message": "Datei nicht gefunden"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-
-
-# path=os.path.relpath(tree_fn, api.config["FILES_DIR"])
-
+    
 
 # ===============================================================================
 # /projects
