@@ -56,14 +56,15 @@ def ecotaxa_fix_types(dataframe):
 )
 @click.option("--encoding")
 @click.option("--delimiter")
-def fix_ecotaxa(archive_fn, encoding, delimiter: Optional[str]):
+@click.option("--force", is_flag=True)
+def fix_ecotaxa(archive_fn, encoding, delimiter: Optional[str], force: bool):
     """Fix EcoTaxa-style archives to be processable by MorphoCluster."""
 
     if delimiter is not None:
         delimiter = delimiter.replace("\\t", "\t")
 
     with zipfile.ZipFile(archive_fn, "a") as zf:
-        if "index.csv" in zf.namelist():
+        if "index.csv" in zf.namelist() and not force:
             print("Archive already contains index.csv")
             return
 
