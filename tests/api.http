@@ -1,0 +1,22 @@
+GET http://127.0.0.1:5000/api/datasets/1
+
+###
+
+GET http://127.0.0.1:5000/api/datasets/1/projects
+
+###
+
+GET http://127.0.0.1:5000/api/datasets/undefined/projects
+#?include_progress=false
+
+###
+
+GET http://127.0.0.1:5000/api/datasets/1/projects/1
+
+###
+
+GET http://127.0.0.1:5000/api/datasets/1/projects/1/tree
+
+###
+
+GET http://127.0.0.1:5000/api/datasets/1/projects/1/tree/1
