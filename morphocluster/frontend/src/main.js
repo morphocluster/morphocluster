@@ -17,4 +17,9 @@ new Vue({
   router,
   vuetify,
   render: h => h(App),
+  data() {
+    return {
+      config: window.config,
+    };
+  },
 }).$mount('#app')
