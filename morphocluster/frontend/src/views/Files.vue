@@ -29,10 +29,11 @@
                         <router-link v-if="data.item.type === 'directory'" :to="{
                             name: 'files',
                             params: { file_path: data.item.path },
-                        }">{{ data.item.name }}</router-link>
-                        <div v-if="data.item.type === 'file'">
-                            {{ data.item.name }}
-                        </div>
+                        }"><i class="mdi mdi-folder" />  {{ data.item.name }}</router-link>
+                        <router-link v-if="data.item.type === 'file'" :to="{
+                            name: 'file',
+                            params: { file_name: data.item.name, file_path: data.item.path },
+                        }"><i class="mdi mdi-file" />  {{ data.item.name}} </router-link>
                     </template>
                 </b-table>
             </div>
@@ -45,9 +46,11 @@
             <button class="btn btn-primary" @click="openFileInput">Dateien auswählen</button>
         </div>
     </div>
+
 </template>
 
 <script>
+import "@mdi/font/css/materialdesignicons.css";
 import axios from "axios";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap";
