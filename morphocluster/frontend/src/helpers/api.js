@@ -76,7 +76,7 @@ export function getDirEntry(file_path){
         });
 }
 
-export function getFile(file_path){
+export function getFile_info(file_path){
     return axios.get(`/api/file/${file_path}/view`)
     .then(response => {
         return response.data;
