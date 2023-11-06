@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 import werkzeug.exceptions
 from flask import Response
+from flask import send_file
 from flask import current_app as app
 from flask import jsonify as flask_jsonify
 from flask import request
@@ -254,7 +255,7 @@ def get_direntry(path=""):
 
     return jsonify(file_list)
 
-@api.route("/file/<path:file_path>", methods=["GET"])
+@api.route("/file/info/<path:file_path>", methods=["GET"])
 def get_file_info(file_path):
     file_list = []
     try:
@@ -275,6 +276,20 @@ def get_file_info(file_path):
             return jsonify({"error": "File not found."}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@api.route("/file/<path:file_path>", methods=["GET"])
+def get_file(file_path):
+    try:
+        file_path_on_server = os.path.join(app.config["FILES_DIR"], file_path)
+        if os.path.exists(file_path_on_server) and os.path.isfile(file_path_on_server):
+            return send_file(file_path_on_server, as_attachment=True)
+        else:
+            return jsonify({"error": "File not found."}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
 
 
 @api.route("/files/", methods=["POST"])

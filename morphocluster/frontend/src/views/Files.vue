@@ -43,7 +43,10 @@
                 Ziehe Dateien hierhin oder klicke, um Dateien auszuwählen
             </div>
             <input type="file" id="fileInput" style="display: none" @change="handleFileUpload" multiple />
-            <button class="btn btn-primary" @click="openFileInput">Dateien auswählen</button>
+            <div class="container mt-4 text-center">
+                <button class="btn btn-primary" @click="openFileInput">Dateien auswählen</button>
+            </div>
+
         </div>
     </div>
 

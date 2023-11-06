@@ -77,7 +77,14 @@ export function getDirEntry(file_path){
 }
 
 export function getFile_info(file_path){
-    return axios.get(`/api/file/${file_path}/view`)
+    return axios.get(`/api/file/info/${file_path}`)
+    .then(response => {
+        return response.data;
+    });
+}
+
+export function getFile(file_path){
+    return axios.get(`/api/file/${file_path}`)
     .then(response => {
         return response.data;
     });

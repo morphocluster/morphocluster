@@ -19,11 +19,11 @@
       </div>
     </nav>
     <div class="container">
-      <b-table id="files_table" striped sort-by="name" :items="file" :fields="fields" showEmpty>
+      <b-table id="files_table" striped sort-by="name" :items="file_info" :fields="fields" showEmpty>
       </b-table>
     </div>
     <div class="d-flex justify-content-center">
-      <b-button size="sm" variant="primary" class="mx-2">
+      <b-button size="sm" variant="primary" class="mx-2" @click.prevent="downloadFile">
         Download
       </b-button>
       <b-button size="sm" variant="primary" class="mx-2">
@@ -37,9 +37,11 @@
 
 <script>
 
+// import * as api from "@/helpers/api.js";
 import axios from "axios";
-import "bootstrap";
+// import { EventBus } from "@/event-bus.js";
 import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap";
 
 export default {
   name: "FileView",
@@ -53,7 +55,8 @@ export default {
         "path",
         "type",
       ],
-      file: [],
+      file_info: [],
+      file: null,
       alerts: [],
     };
   },
@@ -69,8 +72,10 @@ export default {
   methods: {
     async initialize() {
       try {
-        const response = await axios.get(`/api/file/${this.file_path}`);
-        this.file = response.data;
+        const response = await axios.get(`/api/file/info/${this.file_path}`);
+        this.file_info = response.data;
+        const response2 = await axios.get(`/api/file/${this.file_path}`)
+        this.file = response2.data;
       } catch (error) {
         console.error(error);
         this.alerts.unshift({
@@ -79,8 +84,17 @@ export default {
         });
       }
     },
+    downloadFile() {
+  if (this.file_info.length > 0) {
+    window.open(`/api/file/${this.file_info[0].path}`);
+  } else {
+    this.alerts.unshift({
+      message: "No file available for download.",
+      variant: "danger",
+    });
+  }
   },
-
+},
 };
 </script>
 
