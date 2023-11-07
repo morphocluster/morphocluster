@@ -257,56 +257,41 @@ def get_direntry(path=""):
 
 @api.route("/file/info/<path:file_path>", methods=["GET"])
 def get_file_info(file_path):
-    file_list = []
-    try:
+    file_path_on_server = os.path.join(app.config["FILES_DIR"], file_path)
 
-        file_path_on_server = os.path.join(app.config["FILES_DIR"], file_path)
+    if os.path.isfile(file_path_on_server):
 
-        if os.path.exists(file_path_on_server) and os.path.isfile(file_path_on_server):
+        file_info = {
+            "name": os.path.basename(file_path),
+            "path": file_path,
+            "type": "file",
+            "last_modified": datetime.fromtimestamp(os.path.getmtime(file_path_on_server)).isoformat(),
+        }
+        return jsonify(file_info)
+    else:
+        raise werkzeug.exceptions.NotFound()
 
-            file_info = {
-                "name": os.path.basename(file_path),
-                "path": file_path,
-                "type": "file",
-                "last_modified": datetime.fromtimestamp(os.path.getmtime(file_path_on_server)).isoformat(),
-            }
-            file_list.append(file_info)
-            return jsonify(file_list)
-        else:
-            return jsonify({"error": "File not found."}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
     
 @api.route("/file/<path:file_path>", methods=["GET"])
 def get_file(file_path):
-    try:
-        file_path_on_server = os.path.join(app.config["FILES_DIR"], file_path)
-        if os.path.exists(file_path_on_server) and os.path.isfile(file_path_on_server):
-            return send_file(file_path_on_server, as_attachment=True)
-        else:
-            return jsonify({"error": "File not found."}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-
+    file_path_on_server = os.path.join(app.config["FILES_DIR"], file_path)
+    if os.path.exists(file_path_on_server) and os.path.isfile(file_path_on_server):
+        return send_file(file_path_on_server, as_attachment=True)
+    else:
+        raise werkzeug.exceptions.NotFound()
 
 
 @api.route("/files/", methods=["POST"])
 @api.route("/files/<path:path>", methods=["POST"])
-def upload_file(path=""):
-    try:
-        upload_file = request.files["file"]
-        if upload_file:
-            file_path_on_server = os.path.join(app.config["FILES_DIR"],
-                path, secure_filename(upload_file.filename))
-            
+def upload_files(path=""):
+    uploaded_files = request.files.getlist('file')
+    if uploaded_files:
+        for upload_file in uploaded_files:
+            file_path_on_server = os.path.join(app.config['FILES_DIR'], path, secure_filename(upload_file.filename))
             upload_file.save(file_path_on_server)
-            return jsonify({"message": "Data upload succesfull"}), 200
-        else:
-            return jsonify({"message": "Data upload Failed"}), 400
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"message": "Data upload successful"}), 200
+    else:
+        raise werkzeug.exceptions.BadRequest()
 
 
 

@@ -55,7 +55,7 @@ export default {
         "path",
         "type",
       ],
-      file_info: [],
+      file_info: null,
       file: null,
       alerts: [],
     };
@@ -74,7 +74,7 @@ export default {
       try {
         const response = await axios.get(`/api/file/info/${this.file_path}`);
         this.file_info = response.data;
-        const response2 = await axios.get(`/api/file/${this.file_path}`)
+        const response2 = await axios.get(`/api/files/${this.file_path}`)
         this.file = response2.data;
       } catch (error) {
         console.error(error);

@@ -40,11 +40,11 @@
         </div>
         <div class="container mt-4">
             <div class="dropzone" @dragover.prevent @dragenter.prevent @dragleave.prevent @drop="handleDrop">
-                Ziehe Dateien hierhin oder klicke, um Dateien auszuwählen
+                Upload Files
             </div>
-            <input type="file" id="fileInput" style="display: none" @change="handleFileUpload" multiple />
+            <input type="file" id="fileInput" style="display: none" @change="handleFileSelect" multiple />
             <div class="container mt-4 text-center">
-                <button class="btn btn-primary" @click="openFileInput">Dateien auswählen</button>
+                <button class="btn btn-primary" @click="openFileInput">Select File</button>
             </div>
 
         </div>
@@ -57,7 +57,7 @@ import "@mdi/font/css/materialdesignicons.css";
 import axios from "axios";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap";
-import { uploadFile } from "../helpers/api.js";
+import { uploadFiles } from "../helpers/api.js";
 
 export default {
     name: "FilesView",
@@ -84,21 +84,6 @@ export default {
         openFileInput() {
             document.getElementById("fileInput").click();
         },
-        async handleFileUpload(event) {
-            const selectedFiles = event.target.files;
-
-            for (let i = 0; i < selectedFiles.length; i++) {
-                const file = selectedFiles[i];
-
-                try {
-                    const response = await uploadFile(file, this.file_path);
-                    console.log("Data upload successfull", response.message);
-                    window.location.reload();
-                } catch (error) {
-                    console.error("Data upload failed", error.message);
-                }
-            }
-        },
         async initialize() {
             try {
                 const response = await axios.get(`/api/files/${this.file_path}`);
@@ -111,21 +96,23 @@ export default {
                 });
             }
         },
-        // Funktion zum Verarbeiten des Drag-and-Drop-Ereignisses
         async handleDrop(event) {
+            this.uploadFiles(event, true);
+        },
+        async handleFileSelect(event) {
+            this.uploadFiles(event, false);
+        },
+        async uploadFiles(event,is_drop) {
             event.preventDefault();
-            const selectedFiles = event.dataTransfer.files;
-
-            for (let i = 0; i < selectedFiles.length; i++) {
+            const selectedFiles = is_drop ? event.dataTransfer.files : event.target.files;
+            const formData = new FormData();
+            for(let i = 0; i < selectedFiles.length; i++){
                 const file = selectedFiles[i];
-                try {
-                    const response = await uploadFile(file, this.file_path);
-                    console.log("Data upload successfull", response.message);
-                    window.location.reload();
-                } catch (error) {
-                    console.error("Data upload failed", error.message);
-                }
+                formData.append('file',file);
             }
+            const response = await uploadFiles(formData, this.file_path);
+            console.log("Data upload successful", response.message);
+            this.initialize();
         },
     },
 };
