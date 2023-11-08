@@ -220,69 +220,49 @@ def get_subtree(node_id):
 # /files
 # ===============================================================================
 
+@api.route("/files/",methods=["GET"])
+@api.route("/files/<path:path>",methods=["GET"])
+def get_entry(path=""):
+    """
+    info = true:    sends info about the file
+    info = false:   sends the file
+    """
+    server_path = os.path.join(app.config["FILES_DIR"], path)
 
-@api.route("/files/<path:path>/view", methods=["GET"])
-def view_file(path):
-    """
-    Send the requested file to the client.
-    """
     parser = reqparse.RequestParser()
     parser.add_argument("download", type=strtobool, default=0, location="args")
+    parser.add_argument("info", type=strtobool, default=0, location="args")
     arguments = parser.parse_args(strict=False)
 
-    return send_from_directory(
-        app.config["FILES_DIR"], path, as_attachment=arguments["download"]
-    )
-
-
-@api.route("/files/<path:path>", methods=["GET"])
-@api.route("/files/", methods=["GET"])
-def get_direntry(path=""):
-
-    directory_path = os.path.join(app.config["FILES_DIR"],path)
-
-    file_list = []
-
-    for entry in os.scandir(directory_path):
-        entry_info = {
-            "name": entry.name,
-            "path": os.path.relpath(entry.path, api.config["FILES_DIR"]),
-            "type": "directory" if entry.is_dir() else "file",
-            "last_modified": datetime.fromtimestamp(entry.stat().st_mtime).isoformat(),
-            "type_flag": 1 if entry.is_dir() else 0,
-        }
-        file_list.append(entry_info)
-
-    return jsonify(file_list)
-
-@api.route("/file/info/<path:file_path>", methods=["GET"])
-def get_file_info(file_path):
-    file_path_on_server = os.path.join(app.config["FILES_DIR"], file_path)
-
-    if os.path.isfile(file_path_on_server):
-
-        file_info = {
-            "name": os.path.basename(file_path),
-            "path": file_path,
+    if arguments["info"]:
+        info = {
+            "name": os.path.basename(path),
+            "path": path,
             "type": "file",
-            "last_modified": datetime.fromtimestamp(os.path.getmtime(file_path_on_server)).isoformat(),
+            "last_modified": datetime.fromtimestamp(os.path.getmtime(server_path)).isoformat(),
         }
-        return jsonify(file_info)
-    else:
-        raise werkzeug.exceptions.NotFound()
+        if os.path.isdir(server_path):
+            file_list = []
 
+            for entry in os.scandir(server_path):
+                entry_info = {
+                    "name": entry.name,
+                    "path": os.path.relpath(entry.path, app.config["FILES_DIR"]),
+                    "type": "directory" if entry.is_dir() else "file",
+                    "last_modified": datetime.fromtimestamp(entry.stat().st_mtime).isoformat(),
+                }
+                file_list.append(entry_info)
+            info["children"] = file_list
+
+        return jsonify(info)
     
-@api.route("/file/<path:file_path>", methods=["GET"])
-def get_file(file_path):
-    file_path_on_server = os.path.join(app.config["FILES_DIR"], file_path)
-    if os.path.exists(file_path_on_server) and os.path.isfile(file_path_on_server):
-        return send_file(file_path_on_server, as_attachment=True)
-    else:
-        raise werkzeug.exceptions.NotFound()
+    return send_from_directory(
+         app.config["FILES_DIR"], path, as_attachment=arguments["download"]
+     )
 
 
-@api.route("/files/", methods=["POST"])
-@api.route("/files/<path:path>", methods=["POST"])
+@api.route("/files/to/", methods=["PUT"])
+@api.route("/files/to/<path:path>", methods=["PUT"])
 def upload_files(path=""):
     uploaded_files = request.files.getlist('file')
     if uploaded_files:

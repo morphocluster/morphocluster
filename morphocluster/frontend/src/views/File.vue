@@ -19,8 +19,7 @@
       </div>
     </nav>
     <div class="container">
-      <b-table id="files_table" striped sort-by="name" :items="file_info" :fields="fields" showEmpty>
-      </b-table>
+      <b-table stacked :items="file_info"></b-table>
     </div>
     <div class="d-flex justify-content-center">
       <b-button size="sm" variant="primary" class="mx-2" @click.prevent="downloadFile">
@@ -49,13 +48,7 @@ export default {
   components: {},
   data() {
     return {
-      fields: [
-        { key: "name", sortable: true },
-        "last_modified",
-        "path",
-        "type",
-      ],
-      file_info: null,
+      file_info: [],
       file: null,
       alerts: [],
     };
@@ -72,10 +65,8 @@ export default {
   methods: {
     async initialize() {
       try {
-        const response = await axios.get(`/api/file/info/${this.file_path}`);
-        this.file_info = response.data;
-        const response2 = await axios.get(`/api/files/${this.file_path}`)
-        this.file = response2.data;
+        const response = await axios.get(`/api/files/${this.file_path}?download=false&info=true`);
+        this.file_info = [response.data];
       } catch (error) {
         console.error(error);
         this.alerts.unshift({
@@ -85,16 +76,16 @@ export default {
       }
     },
     downloadFile() {
-  if (this.file_info.length > 0) {
-    window.open(`/api/file/${this.file_info[0].path}`);
-  } else {
-    this.alerts.unshift({
-      message: "No file available for download.",
-      variant: "danger",
-    });
-  }
+      if (this.file_info.length > 0) {
+        window.open(`/api/files/${this.file_path}` + "?download=1");
+      } else {
+        this.alerts.unshift({
+          message: "No file available for download.",
+          variant: "danger",
+        });
+      }
+    },
   },
-},
 };
 </script>
 

@@ -86,8 +86,8 @@ export default {
         },
         async initialize() {
             try {
-                const response = await axios.get(`/api/files/${this.file_path}`);
-                this.files = response.data;
+                const response1 = await axios.get(`/api/files/${this.file_path}?download=false&info=true`);
+                this.files = response1.data["children"];
             } catch (error) {
                 console.error(error);
                 this.alerts.unshift({

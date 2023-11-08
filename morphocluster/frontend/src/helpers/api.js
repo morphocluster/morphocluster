@@ -70,28 +70,28 @@ export function mergeNodeInto(node_id, dest_node_id) {
 
 // Files
 export function getDirEntry(file_path){
-    return axios.get(`/api/files/${file_path}`)
+    return axios.get(`/api/files/${file_path}?download=false&info=true`)
         .then(response => {
             return response.data;
         });
 }
 
 export function getFile_info(file_path){
-    return axios.get(`/api/file/info/${file_path}`)
+    return axios.get(`/api/files/${file_path}?download=false&info=true`)
     .then(response => {
         return response.data;
     });
 }
 
 export function getFile(file_path){
-    return axios.get(`/api/file/${file_path}`)
+    return axios.get(`/api/files/${file_path}?download=true&info=false`)
     .then(response => {
         return response.data;
     });
 }
 
 export function uploadFiles(files, file_path){
-    return axios.post(`/api/files/${file_path}`,files)
+    return axios.put(`/api/files/to/${file_path}`,files)
         .then(response => {return response.data;});
 }
 
