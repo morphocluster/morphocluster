@@ -32,15 +32,15 @@ var router = new Router({
     },
     {
       name: 'files',
-      path: '/files/:file_path',
-      component: () => import(/* webpackChunkName: "projects" */ './views/Files.vue'),
-      props: (route) => ({file_path: route.params.file_path}),
+      path: '/files/:file_path?',
+      component: () => import(/* webpackChunkName: "files" */ './views/Files.vue'),
+      props: (route) => ({ file_path: route.params.file_path }),
     },
     {
       name: 'file',
       path: '/file/:file_name',
       component: () => import('./views/File.vue'),
-      props: (route) => ({file_name: route.params.file_name, file_path: route.params.file_path})
+      props: (route) => ({ file_name: route.params.file_name, file_path: route.params.file_path })
     },
     {
       name: 'approve',
