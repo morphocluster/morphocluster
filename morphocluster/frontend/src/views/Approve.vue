@@ -133,8 +133,6 @@ import MemberPreview from "@/components/MemberPreview.vue";
 import MessageLog from "@/components/MessageLog.vue";
 import DarkModeControl from "../components/DarkModeControl.vue";
 
-
-
 export default {
     name: "ApproveView",
     data() {
