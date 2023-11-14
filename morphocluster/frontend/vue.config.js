@@ -7,6 +7,11 @@ module.exports = {
                 ws: true,
                 changeOrigin: true
             },
+            '/config.js': {
+                target: 'http://localhost:5000',
+                ws: true,
+                changeOrigin: true
+            },
             '/static': {
                 target: 'http://localhost:5000',
                 ws: true,
