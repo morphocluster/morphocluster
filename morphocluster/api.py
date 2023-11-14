@@ -13,22 +13,23 @@ from datetime import datetime
 from distutils.util import strtobool
 from functools import wraps
 from pprint import pprint
+from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
 import werkzeug.exceptions
 from flask import Response
-from flask import send_file
 from flask import current_app as app
 from flask import jsonify as flask_jsonify
-from flask import request
+from flask import request, send_file
 from flask.blueprints import Blueprint
-from flask.helpers import url_for
+from flask.helpers import send_from_directory, url_for
 from flask_restful import reqparse
 from redis.exceptions import RedisError
 from sklearn.manifold import Isomap
 from timer_cm import Timer
-from flask.helpers import send_from_directory
+from werkzeug.exceptions import NotFound
+from werkzeug.utils import secure_filename
 
 from morphocluster import background, models
 from morphocluster.classifier import Classifier
@@ -36,8 +37,6 @@ from morphocluster.extensions import database, redis_lru, rq
 from morphocluster.helpers import keydefaultdict, seq2array
 from morphocluster.schemas import JobSchema, LogSchema
 from morphocluster.tree import Tree
-from werkzeug.utils import secure_filename
-
 
 api = Blueprint("api", __name__)
 
@@ -161,6 +160,17 @@ def _node_icon(node):
     return "mdi mdi-hexagon-multiple"
 
 
+def secure_path(path: str):
+    """Return a secure, ascii-only version of the supplied path."""
+
+    # Make absolute and relative again, to circumvent path traversal exploits (../../foo)
+    path = os.path.relpath(os.path.join("/", path), "/")
+
+    # Convert to secure characters
+    parts = (secure_filename(p) for p in path.split("/"))
+    return os.path.join(*parts)
+
+
 # ===============================================================================
 # /tree
 # ===============================================================================
@@ -220,28 +230,39 @@ def get_subtree(node_id):
 # /files
 # ===============================================================================
 
-@api.route("/files/",methods=["GET"])
-@api.route("/files/<path:path>",methods=["GET"])
-def get_entry(path=""):
+
+@api.route("/files/", methods=["GET"])
+@api.route("/files/<path:path>", methods=["GET"])
+def get_filesystem_entry(path=""):
     """
     info = true:    sends info about the file
     info = false:   sends the file
     """
+
+    path = secure_path(path)
+
     server_path = os.path.join(app.config["FILES_DIR"], path)
+
+    if not os.path.exists(server_path):
+        raise NotFound()
 
     parser = reqparse.RequestParser()
     parser.add_argument("download", type=strtobool, default=0, location="args")
     parser.add_argument("info", type=strtobool, default=0, location="args")
     arguments = parser.parse_args(strict=False)
 
-    if arguments["info"]:
-        info = {
+    is_dir = os.path.isdir(server_path)
+
+    if is_dir or arguments["info"]:
+        info: Dict[str, Any] = {
             "name": os.path.basename(path),
             "path": path,
             "type": "file",
-            "last_modified": datetime.fromtimestamp(os.path.getmtime(server_path)).isoformat(),
+            "last_modified": datetime.fromtimestamp(
+                os.path.getmtime(server_path)
+            ).isoformat(),
         }
-        if os.path.isdir(server_path):
+        if is_dir:
             file_list = []
 
             for entry in os.scandir(server_path):
@@ -249,30 +270,32 @@ def get_entry(path=""):
                     "name": entry.name,
                     "path": os.path.relpath(entry.path, app.config["FILES_DIR"]),
                     "type": "directory" if entry.is_dir() else "file",
-                    "last_modified": datetime.fromtimestamp(entry.stat().st_mtime).isoformat(),
+                    "last_modified": datetime.fromtimestamp(
+                        entry.stat().st_mtime
+                    ).isoformat(),
                 }
                 file_list.append(entry_info)
             info["children"] = file_list
 
         return jsonify(info)
-    
-    return send_from_directory(
-         app.config["FILES_DIR"], path, as_attachment=arguments["download"]
-     )
+
+    return send_file(server_path, as_attachment=arguments["download"])
 
 
-@api.route("/files/to/", methods=["PUT"])
-@api.route("/files/to/<path:path>", methods=["PUT"])
+@api.route("/files/", methods=["POST"])
+@api.route("/files/<path:path>", methods=["POST"])
 def upload_files(path=""):
-    uploaded_files = request.files.getlist('file')
+    path = secure_path(path)
+
+    uploaded_files = request.files.getlist("file")
     if uploaded_files:
         for upload_file in uploaded_files:
-            file_path_on_server = os.path.join(app.config['FILES_DIR'], path, secure_filename(upload_file.filename))
-            upload_file.save(file_path_on_server)
+            filename = secure_filename(upload_file.filename)
+            server_path = os.path.join(app.config["FILES_DIR"], path, filename)
+            upload_file.save(server_path)
         return jsonify({"message": "Data upload successful"}), 200
     else:
         raise werkzeug.exceptions.BadRequest()
-
 
 
 # ===============================================================================

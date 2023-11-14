@@ -9,7 +9,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link" href="/p">Projects</a>
+                        <router-link class="nav-link" :to="{ name: 'projects' }">Projects</router-link>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link active">Files/{{ this.file_path }}<span class="sr-only">(current)</span></a>
@@ -29,11 +29,11 @@
                         <router-link v-if="data.item.type === 'directory'" :to="{
                             name: 'files',
                             params: { file_path: data.item.path },
-                        }"><i class="mdi mdi-folder" />  {{ data.item.name }}</router-link>
+                        }"><i class="mdi mdi-folder" /> {{ data.item.name }}</router-link>
                         <router-link v-if="data.item.type === 'file'" :to="{
                             name: 'file',
                             params: { file_name: data.item.name, file_path: data.item.path },
-                        }"><i class="mdi mdi-file" />  {{ data.item.name}} </router-link>
+                        }"><i class="mdi mdi-file" /> {{ data.item.name }} </router-link>
                     </template>
                 </b-table>
             </div>
@@ -49,7 +49,6 @@
 
         </div>
     </div>
-
 </template>
 
 <script>
@@ -86,6 +85,7 @@ export default {
         },
         async initialize() {
             try {
+                // TODO: Use functions from api.js
                 const response1 = await axios.get(`/api/files/${this.file_path}?download=false&info=true`);
                 this.files = response1.data["children"];
             } catch (error) {
@@ -102,13 +102,13 @@ export default {
         async handleFileSelect(event) {
             this.uploadFiles(event, false);
         },
-        async uploadFiles(event,is_drop) {
+        async uploadFiles(event, is_drop) {
             event.preventDefault();
             const selectedFiles = is_drop ? event.dataTransfer.files : event.target.files;
             const formData = new FormData();
-            for(let i = 0; i < selectedFiles.length; i++){
+            for (let i = 0; i < selectedFiles.length; i++) {
                 const file = selectedFiles[i];
-                formData.append('file',file);
+                formData.append('file', file);
             }
             const response = await uploadFiles(formData, this.file_path);
             console.log("Data upload successful", response.message);

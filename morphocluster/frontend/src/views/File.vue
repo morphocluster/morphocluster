@@ -10,10 +10,10 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav">
           <li class="nav-item">
-            <a class="nav-link" href="/p">Projects</a>
+            <router-link class="nav-link" :to="{ name: 'projects' }">Projects</router-link>
           </li>
           <li class="nav-item">
-            <router-link class="nav-link" :to="{ name: 'files', params: { file_path: '' }, }">Files</router-link>
+            <router-link class="nav-link" :to="{ name: 'files', params: { file_path: '' } }">Files</router-link>
           </li>
         </ul>
       </div>
@@ -26,7 +26,7 @@
         Download
       </b-button>
       <b-button size="sm" variant="primary" class="mx-2">
-        Save as project
+        Import as project
       </b-button>
     </div>
   </div>
@@ -65,6 +65,7 @@ export default {
   methods: {
     async initialize() {
       try {
+        // TODO: Use functions from api.js
         const response = await axios.get(`/api/files/${this.file_path}?download=false&info=true`);
         this.file_info = [response.data];
       } catch (error) {
