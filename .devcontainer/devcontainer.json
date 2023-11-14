@@ -25,36 +25,34 @@
 	],
 	"service": "morphocluster",
 	"workspaceFolder": "/workspace/morphocluster",
-	"overrideCommand": false,  // allow the entrypoint to run
+	"overrideCommand": false, // allow the entrypoint to run
 	// "onCreateCommand": ["/usr/local/bin/_configure_docker_group.sh"],
-	"postCreateCommand": ["/workspace/morphocluster/.devcontainer/post-create.sh"],
+	"postCreateCommand": [
+		"/workspace/morphocluster/.devcontainer/post-create.sh"
+	],
 	"mounts": [
 		"source=pre-commit-cache-${localEnv:USER},target=/home/mambauser/.cache/pre-commit,type=volume",
 		"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind,consistency=cached",
 	],
 	"extensions": [
-		"ms-python.python",
 		"ms-python.vscode-pylance",
+		"ms-python.python",
 		"ms-python.flake8",
 		"ms-python.isort",
 		"ms-toolsai.jupyter",
 		"ms-azuretools.vscode-docker",
-		// "ms-vsliveshare.vsliveshare",
 		"donjayamanne.githistory",
 		"eamodio.gitlens",
-		// "mutantdino.resourcemonitor",
-		// "github.copilot",
 		"davidanson.vscode-markdownlint",
 		"exiasr.hadolint",
-		// "jnoortheen.xonsh",
 		"Vue.volar",
-		"Vue.vscode-typescript-vue-plugin"
+		"Vue.vscode-typescript-vue-plugin",
+		"ms-python.black-formatter"
 	],
 	"remoteUser": "mambauser",
 	"settings": {
 		// Disable telemetry
 		"telemetry.enableTelemetry": false,
-
 		// Files to completely exclude from view
 		// (see also search.exclude and files.watcherExclude)
 		"files.exclude": {
@@ -67,56 +65,46 @@
 			// Ignore cache directory, except for files which start with . (e.g. .gitignore)
 			".devcontainer/cache/*/[!\\.]*": true,
 		},
-
-		// For linting (code format checking), disable pylint and enable
-		// pydocstyle for docstrings and flake8 for code.
-		"python.linting.pylintEnabled": false,
-		"python.linting.pydocstyleEnabled": false,
-		"python.linting.flake8Enabled": true,
-		"python.linting.flake8Args": [
+		"flake8.args": [
 			"--max-line-length=88",
 			// Let black handle formatting: <https://stackoverflow.com/q/59241007>
 			// Also exclude isort stuff: <https://stackoverflow.com/a/69396215>
 			// But don't exclude E5 for line length
 			"--extend-ignore=E101,E111,E114,E115,E116,E117,E12,E13,E2,E3,E401,E70,W1,W2,W3,W5,E4,W4",
 		],
-
 		// Turn on "black" for automatic code formatting
 		"python.formatting.provider": "black",
-
+		"black-formatter.args": [
+			"--line-length=88"
+		]
+		// Format on save
+		"editor.formatOnSave": true,
 		// Ruler for "black"-formatted line widths
-		"editor.rulers": [88],
-
+		"editor.rulers": [
+			88
+		],
 		// Show whitespace as tiny grey dots
 		"editor.renderWhitespace": "boundary",
-
 		// Use Pylance
 		"python.languageServer": "Pylance",
 		"python.analysis.typeCheckingMode": "basic",
-
 		// Use isort for imports
 		"python.sortImports.path": "/opt/conda/bin/isort",
 		"python.sortImports.args": [
 			"--settings-path=${workspaceFolder}/pyproject.toml"
 		], // <https://github.com/microsoft/vscode-isort/issues/53#issuecomment-1310754796>
-
 		// Interpret lines beginning with "# !%" as ipython magic commands
 		"jupyter.magicCommandsAsComments": true,
-
 		// Path of the default Python environment
 		"python.pythonPath": "/opt/conda/bin/python",
 		"python.defaultInterpreterPath": "/opt/conda/bin/python",
-
 		// Disable the "conda activate base" command when opening a new terminal
 		"python.terminal.activateEnvironment": false,
-
 		// Automatically keep Git up-to-date with remotes
 		"git.autofetch": "all",
-
 		// Make sure that key combos like Ctrl+K are not intercepted by VS Code
 		// when using the terminal
 		"terminal.integrated.allowChords": false,
-
 		"terminal.integrated.inheritEnv": false
 	}
 }
