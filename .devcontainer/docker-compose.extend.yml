@@ -4,6 +4,8 @@ services:
     build:
       context: . # Relative to project root
       dockerfile: .devcontainer/dev.Dockerfile
+      args:
+        DOCKER_BUILDKIT: 1
     environment:
       - FLASK_ENV=development
 
