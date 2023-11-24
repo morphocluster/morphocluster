@@ -161,6 +161,19 @@ def _node_icon(node):
 
 
 def secure_path(path: str):
+    """Return a secure, version of the supplied path. To get get Filesystem-entry, incorrect but secure file_names are be allowed"""
+
+    # Make absolute and relative again, to circumvent path traversal exploits (../../foo)
+    path = os.path.relpath(os.path.join("/", path), "/")
+
+    # Convert to secure characters
+    # parts = (secure_filename(p) for p in path.split("/"))
+    # return os.path.join(*parts)
+
+    return path
+
+
+def secure_path_and_name(path: str):
     """Return a secure, ascii-only version of the supplied path."""
 
     # Make absolute and relative again, to circumvent path traversal exploits (../../foo)
@@ -238,6 +251,10 @@ def get_filesystem_entry(path=""):
     info = true:    sends info about the file
     info = false:   sends the file
     """
+    parser = reqparse.RequestParser()
+    parser.add_argument("download", type=strtobool, default=0, location="args")
+    parser.add_argument("info", type=strtobool, default=0, location="args")
+    arguments = parser.parse_args(strict=False)
 
     path = secure_path(path)
 
@@ -246,10 +263,13 @@ def get_filesystem_entry(path=""):
     if not os.path.exists(server_path):
         raise NotFound()
 
-    parser = reqparse.RequestParser()
-    parser.add_argument("download", type=strtobool, default=0, location="args")
-    parser.add_argument("info", type=strtobool, default=0, location="args")
-    arguments = parser.parse_args(strict=False)
+    path_parts = path.split("/")
+
+    breadcrumb_paths = []
+    for i in range(1, len(path_parts) + 1):
+        breadcrumb_path = "/".join(path_parts[:i])
+        if breadcrumb_path != ".":
+            breadcrumb_paths.append(breadcrumb_path)
 
     is_dir = os.path.isdir(server_path)
 
@@ -257,13 +277,14 @@ def get_filesystem_entry(path=""):
         info: Dict[str, Any] = {
             "name": os.path.basename(path),
             "path": path,
-            "type": "file",
+            "type": "directory" if is_dir else "file",
             "last_modified": datetime.fromtimestamp(
                 os.path.getmtime(server_path)
             ).isoformat(),
+            "breadcrumb_paths": breadcrumb_paths,
         }
         if is_dir:
-            file_list = []
+            entries = {"file": [], "directory": []}
 
             for entry in os.scandir(server_path):
                 entry_info = {
@@ -274,8 +295,12 @@ def get_filesystem_entry(path=""):
                         entry.stat().st_mtime
                     ).isoformat(),
                 }
-                file_list.append(entry_info)
-            info["children"] = file_list
+
+                entries[entry_info["type"]].append(entry_info)
+
+            info["children"] = sorted(
+                entries["directory"], key=lambda entry: entry["name"]
+            ) + sorted(entries["file"], key=lambda entry: entry["name"])
 
         return jsonify(info)
 
@@ -290,7 +315,7 @@ def upload_files(path=""):
     uploaded_files = request.files.getlist("file")
     if uploaded_files:
         for upload_file in uploaded_files:
-            filename = secure_filename(upload_file.filename)
+            filename = secure_path_and_name(upload_file.filename)
             server_path = os.path.join(app.config["FILES_DIR"], path, filename)
             upload_file.save(server_path)
         return jsonify({"message": "Data upload successful"}), 200
