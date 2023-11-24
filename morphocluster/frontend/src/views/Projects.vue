@@ -17,6 +17,7 @@
                     </li>
                 </ul>
             </div>
+            <dark-mode-control />
         </nav>
         <div class="scrollable">
             <div class="container">
@@ -100,13 +101,15 @@
 import * as api from "@/helpers/api.js";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap";
+import DarkModeControl from "@/components/DarkModeControl.vue";
+
 
 import Humanize from "humanize-plus";
 
 export default {
     name: "ProjectsView",
     props: {},
-    components: {},
+    components: { DarkModeControl },
     data() {
         return {
             fields: [
