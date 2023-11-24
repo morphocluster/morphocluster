@@ -23,7 +23,7 @@ from flask import current_app as app
 from flask import jsonify as flask_jsonify
 from flask import request, send_file
 from flask.blueprints import Blueprint
-from flask.helpers import send_from_directory, url_for
+from flask.helpers import url_for
 from flask_restful import reqparse
 from redis.exceptions import RedisError
 from sklearn.manifold import Isomap
@@ -400,7 +400,8 @@ def save_project(project_id):
         tree.export_tree(root_id, tree_fn)
 
         tree_url = url_for(
-            ".view_file", path=os.path.relpath(tree_fn, api.config["FILES_DIR"])
+            ".get_filesystem_entry",
+            path=os.path.relpath(tree_fn, api.config["FILES_DIR"]),
         )
 
         return jsonify({"url": tree_url})
