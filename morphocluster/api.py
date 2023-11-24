@@ -5,6 +5,7 @@ Created on 19.03.2018
 """
 import json
 import os
+import pathlib
 import traceback
 import uuid
 import warnings
@@ -244,6 +245,37 @@ def get_subtree(node_id):
 # ===============================================================================
 
 
+def _format_fs_entry(
+    server_path: pathlib.Path, include_children=False, include_parents=False
+):
+    """Format a path on the server for sending to the client."""
+
+    fs_entry: Dict[str, Any] = {
+        "name": server_path.name,
+        "path": server_path.relative_to(app.config["FILES_DIR"]),
+        "type": "directory" if server_path.is_dir() else "file",
+        "last_modified": datetime.fromtimestamp(
+            server_path.stat().st_mtime,
+        ).isoformat(),
+    }
+
+    if include_parents:
+        # Format parents
+        fs_entry["parents"] = [_format_fs_entry(p) for p in server_path.parents]
+
+    if include_children:
+        # Format children
+        directories = [_format_fs_entry(p) for p in server_path.iterdir() if p.is_dir()]
+        files = [_format_fs_entry(p) for p in server_path.iterdir() if p.is_file()]
+
+        # Sort directories first, then files
+        fs_entry["children"] = sorted(
+            directories, key=lambda entry: entry["name"]
+        ) + sorted(files, key=lambda entry: entry["name"])
+
+    return fs_entry
+
+
 @api.route("/files/", methods=["GET"])
 @api.route("/files/<path:path>", methods=["GET"])
 def get_filesystem_entry(path=""):
@@ -256,52 +288,17 @@ def get_filesystem_entry(path=""):
     parser.add_argument("info", type=strtobool, default=0, location="args")
     arguments = parser.parse_args(strict=False)
 
-    path = secure_path(path)
+    path = pathlib.PurePath(secure_path(path))
 
-    server_path = os.path.join(app.config["FILES_DIR"], path)
+    server_path: pathlib.Path = app.config["FILES_DIR"] / path
 
-    if not os.path.exists(server_path):
+    if not server_path.exists():
         raise NotFound()
 
-    path_parts = path.split("/")
-
-    breadcrumb_paths = []
-    for i in range(1, len(path_parts) + 1):
-        breadcrumb_path = "/".join(path_parts[:i])
-        if breadcrumb_path != ".":
-            breadcrumb_paths.append(breadcrumb_path)
-
-    is_dir = os.path.isdir(server_path)
-
-    if is_dir or arguments["info"]:
-        info: Dict[str, Any] = {
-            "name": os.path.basename(path),
-            "path": path,
-            "type": "directory" if is_dir else "file",
-            "last_modified": datetime.fromtimestamp(
-                os.path.getmtime(server_path)
-            ).isoformat(),
-            "breadcrumb_paths": breadcrumb_paths,
-        }
-        if is_dir:
-            entries = {"file": [], "directory": []}
-
-            for entry in os.scandir(server_path):
-                entry_info = {
-                    "name": entry.name,
-                    "path": os.path.relpath(entry.path, app.config["FILES_DIR"]),
-                    "type": "directory" if entry.is_dir() else "file",
-                    "last_modified": datetime.fromtimestamp(
-                        entry.stat().st_mtime
-                    ).isoformat(),
-                }
-
-                entries[entry_info["type"]].append(entry_info)
-
-            info["children"] = sorted(
-                entries["directory"], key=lambda entry: entry["name"]
-            ) + sorted(entries["file"], key=lambda entry: entry["name"])
-
+    if server_path.is_dir() or arguments["info"]:
+        info = _format_fs_entry(
+            server_path, include_children=server_path.is_dir(), include_parents=True
+        )
         return jsonify(info)
 
     return send_file(server_path, as_attachment=arguments["download"])

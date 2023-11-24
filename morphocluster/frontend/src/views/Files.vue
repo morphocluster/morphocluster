@@ -129,14 +129,14 @@ export default {
             }
         },
         async handleDrop(event) {
-            this.uploadFiles(event, true);
+            event.preventDefault();
+            this.uploadFiles(event.dataTransfer.files);
         },
         async handleFileSelect(event) {
-            this.uploadFiles(event, false);
-        },
-        async uploadFiles(event, is_drop) {
             event.preventDefault();
-            const selectedFiles = is_drop ? event.dataTransfer.files : event.target.files;
+            this.uploadFiles(event.target.files);
+        },
+        async uploadFiles(selectedFiles) {
             const formData = new FormData();
             for (let i = 0; i < selectedFiles.length; i++) {
                 const file = selectedFiles[i];
@@ -148,7 +148,7 @@ export default {
         },
         downloadFile() {
             if (this.fileInfos.length > 0) {
-                window.open(`/api/files/${this.file.path}` + "?download=1");
+                window.open(`/api/files/${this.file.path}?download=1`);
             } else {
                 this.alerts.unshift({
                     message: "No file available for download.",
