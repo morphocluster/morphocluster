@@ -23,30 +23,30 @@
                     <li class="breadcrumb-item">
                         <router-link :to="{ name: 'files' }">Home</router-link>
                     </li>
-                    <li v-for="(path, index) in breadcrumb" :key="index" class="breadcrumb-item">
-                        <router-link :to="{ name: 'files', params: { file_path: path } }">{{ getBasename(path)
+                    <li v-for="(parent, index) in entry.parents" :key="index" class="breadcrumb-item">
+                        <router-link :to="{ name: 'files', params: { file_path: parent.path } }">{{ parent.name
                         }}</router-link>
                     </li>
                 </ol>
             </nav>
         </div>
         <div class="scrollable">
-            <div class="container" v-if="this.file.type === 'directory'">
+            <div class="container" v-if="this.entry.type === 'directory'">
                 <div class="alerts" v-if="alerts.length">
                     <b-alert :key="a" v-for="a of alerts" dismissible show :variant="a.variant">
                         {{ a.message }}
                     </b-alert>
                 </div>
-                <b-table id="files_table" striped :items="files" :fields="fields" showEmpty>
-                    <template v-slot:cell(name)="data">
-                        <router-link v-if="data.item.type === 'directory'" :to="{
+                <b-table id="files_table" striped :items="entry.children" :fields="fields" showEmpty>
+                    <template v-slot:cell(name)="child">
+                        <router-link v-if="child.item.type === 'directory'" :to="{
                             name: 'files',
-                            params: { file_path: data.item.path },
-                        }"><i class="mdi mdi-folder" /> {{ data.item.name }}</router-link>
-                        <router-link v-if="data.item.type === 'file'" :to="{
+                            params: { file_path: child.item.path },
+                        }"><i class="mdi mdi-folder" /> {{ child.item.name }}</router-link>
+                        <router-link v-if="child.item.type === 'file'" :to="{
                             name: 'files',
-                            params: { file_path: data.item.path },
-                        }"><i class="mdi mdi-file" /> {{ data.item.name }} </router-link>
+                            params: { file_path: child.item.path },
+                        }"><i class="mdi mdi-file" /> {{ child.item.name }} </router-link>
                     </template>
                 </b-table>
                 <div class="dropzone" @dragover.prevent @dragenter.prevent @dragleave.prevent @drop="handleDrop">
@@ -57,8 +57,8 @@
                     <button class="btn btn-primary" @click="openFileInput">Select File</button>
                 </div>
             </div>
-            <div class="container" v-if="this.file.type === 'file'">
-                <b-table v-if="this.file.type === 'file'" id="files_table" stacked :items="fileInfos"></b-table>
+            <div class="container" v-if="this.entry.type === 'file'">
+                <b-table v-if="this.entry.type === 'file'" id="files_table" stacked :items="fileInfos"></b-table>
                 <div class="d-flex justify-content-center">
                     <b-button size="sm" variant="primary" class="mx-2" @click.prevent="downloadFile">
                         Download
@@ -91,10 +91,7 @@ export default {
                 { key: "name" },
                 "last_modified",
             ],
-            files: [],
-            file: {},
-            fileInfos: [],
-            breadcrumb: null,
+            entry: null,
             alerts: [],
         };
     },
@@ -114,12 +111,7 @@ export default {
         },
         async initialize() {
             try {
-                const data = await api.getFileInfo(this.file_path);
-                const { children, breadcrumb_paths, ...fileinfo } = data;
-                this.breadcrumb = breadcrumb_paths;
-                this.files = children;
-                this.file = fileinfo;
-                this.fileInfos = [fileinfo];
+                this.entry = await api.getFileInfo(this.file_path);
             } catch (error) {
                 console.error(error);
                 this.alerts.unshift({
@@ -142,19 +134,12 @@ export default {
                 const file = selectedFiles[i];
                 formData.append('file', file);
             }
-            const response = await uploadFiles(formData, this.file_path);
+            const response = await uploadFiles(formData, this.entry.path);
             console.log("Data upload successful", response.message);
             this.initialize();
         },
         downloadFile() {
-            if (this.fileInfos.length > 0) {
-                window.open(`/api/files/${this.file.path}?download=1`);
-            } else {
-                this.alerts.unshift({
-                    message: "No file available for download.",
-                    variant: "danger",
-                });
-            }
+            window.open(`/api/files/${this.entry.path}?download=1`);
         },
     },
 };

@@ -250,9 +250,11 @@ def _format_fs_entry(
 ):
     """Format a path on the server for sending to the client."""
 
+    client_path = server_path.relative_to(app.config["FILES_DIR"])
+
     fs_entry: Dict[str, Any] = {
         "name": server_path.name,
-        "path": server_path.relative_to(app.config["FILES_DIR"]),
+        "path": str(client_path),
         "type": "directory" if server_path.is_dir() else "file",
         "last_modified": datetime.fromtimestamp(
             server_path.stat().st_mtime,
@@ -261,7 +263,10 @@ def _format_fs_entry(
 
     if include_parents:
         # Format parents
-        fs_entry["parents"] = [_format_fs_entry(p) for p in server_path.parents]
+        fs_entry["parents"] = [
+            _format_fs_entry(pathlib.Path(app.config["FILES_DIR"], p))
+            for p in client_path.parents
+        ]
 
     if include_children:
         # Format children
@@ -290,7 +295,7 @@ def get_filesystem_entry(path=""):
 
     path = pathlib.PurePath(secure_path(path))
 
-    server_path: pathlib.Path = app.config["FILES_DIR"] / path
+    server_path = pathlib.Path(app.config["FILES_DIR"], path)
 
     if not server_path.exists():
         raise NotFound()

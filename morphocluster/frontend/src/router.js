@@ -37,12 +37,6 @@ var router = new Router({
       props: (route) => ({ file_path: route.params.file_path || "" }),
     },
     {
-      name: 'file',
-      path: '/file/:file_name',
-      component: () => import('./views/File.vue'),
-      props: (route) => ({ file_name: route.params.file_name }),
-    },
-    {
       name: 'approve',
       path: '/p/:project_id/approve/:node_id?',
       component: () => import(/* webpackChunkName: "approve" */ './views/Approve.vue'),
