@@ -58,7 +58,8 @@
                 </div>
             </div>
             <div class="container" v-if="this.entry.type === 'file'">
-                <b-table v-if="this.entry.type === 'file'" id="files_table" stacked :items="fileInfos"></b-table>
+                <!--TODO: Convert to regular table and select and format properties by hand. -->
+                <b-table v-if="this.entry.type === 'file'" id="files_table" stacked :items="entry"></b-table>
                 <div class="d-flex justify-content-center">
                     <b-button size="sm" variant="primary" class="mx-2" @click.prevent="downloadFile">
                         Download
