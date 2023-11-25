@@ -1,35 +1,18 @@
 <template>
     <div id="files">
         <nav class="navbar navbar-expand-lg navbar navbar-dark bg-dark">
-            <a class="navbar-brand" href="/p">MorphoCluster</a>
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
-                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <router-link class="nav-link" :to="{ name: 'projects' }">Projects</router-link>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active">Files<span class="sr-only">(current)</span></a>
+            <router-link class="navbar-brand" :to="{ name: 'home' }">MorphoCluster</router-link>
+            <div class="navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav nav-item">
+                    <li v-for="(parent, index) in entry.parents.slice().reverse()" :key="index" class="navbar-item">
+                        <router-link class="nav-link" :to="{ name: 'files', params: { file_path: parent.path } }">{{
+                            parent.name
+                        }}</router-link>
                     </li>
                 </ul>
             </div>
+            <dark-mode-control />
         </nav>
-        <div class="container">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item">
-                        <router-link :to="{ name: 'files' }">Home</router-link>
-                    </li>
-                    <li v-for="(parent, index) in entry.parents" :key="index" class="breadcrumb-item">
-                        <router-link :to="{ name: 'files', params: { file_path: parent.path } }">{{ parent.name
-                        }}</router-link>
-                    </li>
-                </ol>
-            </nav>
-        </div>
         <div class="scrollable">
             <div class="container" v-if="this.entry.type === 'directory'">
                 <div class="alerts" v-if="alerts.length">
@@ -59,8 +42,17 @@
             </div>
             <div class="container" v-if="this.entry.type === 'file'">
                 <!--TODO: Convert to regular table and select and format properties by hand. -->
-                <b-table v-if="this.entry.type === 'file'" id="files_table" stacked :items="entry"></b-table>
-                <div class="d-flex justify-content-center">
+                <table id="table" style="width=100%">
+                    <tr>
+                        <td style="padding-right: 20px;">Name:</td>
+                        <td>{{ this.entry.name }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding-right: 20px;">Created On:</td>
+                        <td>{{ this.entry.last_modified }}</td>
+                    </tr>
+                </table>
+                <div class=" d-flex justify-content-center">
                     <b-button size="sm" variant="primary" class="mx-2" @click.prevent="downloadFile">
                         Download
                     </b-button>
@@ -79,13 +71,13 @@ import * as api from "@/helpers/api.js";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap";
 import { uploadFiles } from "../helpers/api.js";
+import DarkModeControl from "@/components/DarkModeControl.vue";
 
 export default {
     name: "FilesView",
     props: { file_path: String },
-    components: {},
     response: "",
-
+    components: { DarkModeControl },
     data() {
         return {
             fields: [

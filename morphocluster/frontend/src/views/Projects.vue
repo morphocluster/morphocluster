@@ -1,23 +1,8 @@
 <template>
     <div id="projects">
         <nav class="navbar navbar-expand-lg navbar navbar-dark bg-dark">
-            <a class="navbar-brand" href="/p">MorphoCluster</a>
-
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
-                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link active">Projects <span class="sr-only">(current)</span></a>
-                    </li>
-                    <li class="nav-item">
-                        <router-link class="nav-link" :to="{ name: 'files' }">Files</router-link>
-                    </li>
-                </ul>
-            </div>
-            <dark-mode-control />
+            <router-link class="navbar-brand" :to="{ name: 'home' }">MorphoCluster</router-link>
+            <dark-mode-control class="ml-auto" />
         </nav>
         <div class="scrollable">
             <div class="container">

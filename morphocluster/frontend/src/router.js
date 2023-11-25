@@ -26,6 +26,11 @@ var router = new Router({
       props: (route) => ({ node_id: parseInt(route.params.node_id) }),
     },
     {
+      name: 'home',
+      path: '/home',
+      component: () => import(/* webpackChunkName: "home" */ './views/Home.vue'),
+    },
+    {
       name: 'projects',
       path: '/p',
       component: () => import(/* webpackChunkName: "projects" */ './views/Projects.vue'),

@@ -1,21 +1,15 @@
 <template>
     <div id="project">
         <nav class="navbar navbar-expand-lg navbar navbar-dark bg-dark">
-            <a class="navbar-brand" href="/p">MorphoCluster</a>
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
-                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
+            <router-link class="navbar-brand" :to="{ name: 'home' }">MorphoCluster</router-link>
+            <div class="navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav nav-item">
                     <li class="nav-item">
-                        <a class="nav-link" href="/p" >Projects</a>
-                    </li>
-                    <li class="nav-item">
-                        <router-link class="nav-link" :to="{name:'files', params: {file_path: ''},}">Files</router-link>
+                        <router-link class="nav-link" :to="{ name: 'projects' }">Projects</router-link>
                     </li>
                 </ul>
             </div>
+            <dark-mode-control />
         </nav>
         <div class="container">
             <table id="table" style="width=100%">
@@ -77,11 +71,12 @@ import axios from "axios";
 import { EventBus } from "@/event-bus.js";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap";
+import DarkModeControl from "@/components/DarkModeControl.vue";
 
 export default {
     name: "ProjectView",
     props: { "project_id": Number },
-    components: { },
+    components: { DarkModeControl },
     data() {
         return {
             project: null,
@@ -111,8 +106,8 @@ export default {
                     // Wrapped in $nextTick to ensure DOM is rendered before closing
                     this.$refs.saveModal.hide();
                 });
-                this.$nextTick(()=> {
-                    window.open(result["url"]+"?download=1");
+                this.$nextTick(() => {
+                    window.open(result["url"] + "?download=1");
                 })
             });
         },
