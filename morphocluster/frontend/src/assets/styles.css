@@ -1,7 +1,7 @@
 html, body {
 	height: 100%;
 	margin: 0;
-	overflow: hidden;
+	overflow: hidden !important;
 }
 
 .tooltip kbd {
@@ -16,26 +16,19 @@ html, body {
 	/*color: gray;*/
 }
 
-/* Dark/Light Mode */
-:root {
-	--background-color: white;
-	--color: #212529;
+.view {
+	padding: 64px 0 0 0;
 }
 
-:root.dark-mode {
-	--background-color: black;
-	--color: #f7f7f9;
+.v-application {
+	height: 100%;
 }
 
-body {
-	color: var(--color);
-	background-color: var(--background-color);
+main {
+	height: calc(100% - 56px - 36px);
 }
 
-table, .table {
-	color: var(--color);
-}
-
-.modal-dialog {
-	color: black;
+.container {
+	height: 100%;
+	overflow: auto;
 }
