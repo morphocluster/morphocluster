@@ -1,14 +1,5 @@
 <template>
-    <div id="projects">
-        <nav class="navbar navbar-expand-lg navbar navbar-dark bg-dark">
-            <router-link class="navbar-brand" :to="{ name: 'home' }">MorphoCluster</router-link>
-            <ul class="navbar-nav nav-item">
-                <li class="nav-item">
-                    <router-link class="nav-link" :to="{ name: 'projects' }">Projects</router-link>
-                </li>
-            </ul>
-            <dark-mode-control class="ml-auto" />
-        </nav>
+    <div id="dataset" class="view">
         <div class="scrollable">
             <div class="container">
                 <div class="alerts" v-if="alerts.length">
@@ -29,19 +20,20 @@
                     </template>
                     <template v-slot:cell(progress)="data">
                         <!-- validated / grown clusters -->
-                        <b-progress v-if="'progress' in data.item" :max="data.item.progress.leaves_n_nodes" class="mb-1">
+                        <b-progress v-if="'progress' in data.item" :max="data.item.progress.leaves_n_nodes"
+                            class="mb-1">
                             <b-progress-bar variant="success" :value="data.item.progress.leaves_n_filled_nodes
-                            " v-b-tooltip.hover
+                                " v-b-tooltip.hover
                                 :title="`${data.item.progress.leaves_n_filled_nodes} / ${data.item.progress.leaves_n_nodes} clusters grown`" />
                             <b-progress-bar variant="warning" :value="data.item.progress.leaves_n_approved_nodes -
                                 data.item.progress.leaves_n_filled_nodes
-                            " v-b-tooltip.hover :title="`${Humanize.compactInteger(
-    data.item.progress.leaves_n_approved_nodes,
-    1
-)} / ${Humanize.compactInteger(
-    data.item.progress.leaves_n_nodes,
-    1
-)} clusters validated`" />
+                                " v-b-tooltip.hover :title="`${Humanize.compactInteger(
+                                data.item.progress.leaves_n_approved_nodes,
+                                1
+                            )} / ${Humanize.compactInteger(
+                                data.item.progress.leaves_n_nodes,
+                                1
+                            )} clusters validated`" />
                         </b-progress>
                         <!-- objects in clusters -->
                         <b-progress v-if="'progress' in data.item" :max="data.item.progress.n_objects_deep" class="mb-1"
@@ -57,7 +49,7 @@
                                 100
                             )}%) objects in validated clusters`">
                             <b-progress-bar variant="success" :value="data.item.progress.leaves_n_approved_objects
-                            " v-b-tooltip.hover />
+                                " v-b-tooltip.hover />
                         </b-progress>
                     </template>
                     <template v-slot:cell(action)="data">
