@@ -7,6 +7,7 @@
                         {{ a.message }}
                     </b-alert>
                 </div>
+                <!-- TODO: Convert all Bootstrap components to Vuetify -->
                 <b-table id="projects_table" striped sort-by="name" :items="projects" :fields="fields" showEmpty>
                     <template slot="table-colgroup">
                         <col class="col-wide" />
@@ -28,12 +29,12 @@
                             <b-progress-bar variant="warning" :value="data.item.progress.leaves_n_approved_nodes -
                                 data.item.progress.leaves_n_filled_nodes
                                 " v-b-tooltip.hover :title="`${Humanize.compactInteger(
-                                data.item.progress.leaves_n_approved_nodes,
-                                1
-                            )} / ${Humanize.compactInteger(
-                                data.item.progress.leaves_n_nodes,
-                                1
-                            )} clusters validated`" />
+                                    data.item.progress.leaves_n_approved_nodes,
+                                    1
+                                )} / ${Humanize.compactInteger(
+                                    data.item.progress.leaves_n_nodes,
+                                    1
+                                )} clusters validated`" />
                         </b-progress>
                         <!-- objects in clusters -->
                         <b-progress v-if="'progress' in data.item" :max="data.item.progress.n_objects_deep" class="mb-1"
@@ -81,17 +82,12 @@
 
 <script>
 import * as api from "@/helpers/api.js";
-import "bootstrap/dist/css/bootstrap.min.css";
-import "bootstrap";
-import DarkModeControl from "@/components/DarkModeControl.vue";
-
 
 import Humanize from "humanize-plus";
 
 export default {
     name: "ProjectsView",
     props: {},
-    components: { DarkModeControl },
     data() {
         return {
             fields: [
