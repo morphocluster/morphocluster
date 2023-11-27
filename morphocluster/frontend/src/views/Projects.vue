@@ -7,6 +7,7 @@
                         {{ a.message }}
                     </b-alert>
                 </div>
+                <!-- TODO: Convert all Bootstrap components to Vuetify -->
                 <b-table id="projects_table" striped sort-by="name" :items="projects" :fields="fields" showEmpty>
                     <template slot="table-colgroup">
                         <col class="col-wide" />
@@ -81,13 +82,11 @@
 <script>
 import * as api from "@/helpers/api.js";
 
-import DarkModeControl from "@/components/DarkModeControl.vue";
 import Humanize from "humanize-plus";
 
 export default {
     name: "ProjectsView",
     props: {},
-    components: { DarkModeControl },
     data() {
         return {
             fields: [
