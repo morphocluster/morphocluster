@@ -10,6 +10,7 @@
   "dependencies": {
     "@mdi/font": "^2.7.94",
     "axios": "^1.6.2",
+    "humanize-plus": "^1.8.2",
     "lodash": "^4.17.15",
     "roboto-fontface": "^0.10.0",
     "vue": "^2.6.11",
@@ -19,13 +20,12 @@
     "vuetify": "^2.1.0"
   },
   "devDependencies": {
+    "@babel/eslint-parser": "^7.23.3",
     "@vue/cli-plugin-babel": "^5.0.8",
     "@vue/cli-plugin-eslint": "^5.0.8",
     "@vue/cli-plugin-router": "^5.0.8",
     "@vue/cli-service": "^3.3.1",
-    "babel-eslint": "^10.0.3",
-    "eslint": "^6.8.0",
-    "eslint-plugin-vue": "^6.1.2",
+    "eslint-plugin-vue": "^9.18.1",
     "less": "^3.11.1",
     "less-loader": "^4.1.0",
     "prettier": "1.19.1",
