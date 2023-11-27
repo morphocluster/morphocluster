@@ -80,6 +80,7 @@
 </template>
 
 <script>
+import globalState from "@/globalState.js";
 import * as api from "@/helpers/api.js";
 
 import Humanize from "humanize-plus";
@@ -105,7 +106,15 @@ export default {
 
     },
     mounted() {
+        globalState.setBreadcrumbs([
+            {
+                text: 'Projects',
+                to: { name: 'projects' },
+            }
+        ]);
+
         // Load node info
+        globalState.setLoading("Projects");
         api.getProjects()
             .then((projects) => {
                 this.projects = projects;
@@ -128,6 +137,9 @@ export default {
                     message: e.message,
                     variant: "danger",
                 });
+            })
+            .finally(() => {
+                globalState.unsetLoading("Projects");
             });
     },
 };

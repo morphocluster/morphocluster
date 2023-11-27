@@ -5,6 +5,11 @@ export default new Vue({
         return { breadcrumbs: [], loading: [] }
     },
     methods: {
+        /**
+         * Set the breadcrumbs in the app bar.
+         * @param breadcrumbs - A list of breadcrumb items
+         * @see https://v2.vuetifyjs.com/en/components/breadcrumbs/
+         */
         setBreadcrumbs(breadcrumbs) {
             console.log("setBreadcrumbs", breadcrumbs);
             this.breadcrumbs = breadcrumbs;
