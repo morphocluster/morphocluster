@@ -13,10 +13,10 @@
             </v-toolbar-title>
 
             <v-breadcrumbs :items="globalState.breadcrumbs" large></v-breadcrumbs>
-            <!-- TODO: Put dark mode control right-->
+            <v-spacer></v-spacer>
             <dark-mode-control />
         </v-app-bar>
-        <v-content>
+        <v-main>
             <v-tooltip top>
                 <template v-slot:activator="{ on }">
                     <v-progress-linear v-on="on" :active="globalState.loading.length > 0" absolute indeterminate />
@@ -24,7 +24,7 @@
                 <span>Loading {{ globalState.loading.join(", ") }}...</span>
             </v-tooltip>
             <router-view />
-        </v-content>
+        </v-main>
         <!-- <v-footer app>Footer</v-footer> -->
     </v-app>
 </template>
