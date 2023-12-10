@@ -54,7 +54,7 @@ var router = new Router({
     },
     {
       path: '/',
-      redirect: '/p'
+      redirect: '/home'
     },
     { path: '*', component: NotFound }
   ]
