@@ -19,7 +19,7 @@ export function patchNode(node_id, data) {
  *
  * @param params {leaf: bool}
  */
-export function getNextUnapprovedNode(node_id, params=null) {
+export function getNextUnapprovedNode(node_id, params = null) {
     return axios.get(`/api/nodes/${node_id}/next`, { params })
         .then(response => {
             return response.data;
@@ -31,7 +31,7 @@ export function getNextUnapprovedNode(node_id, params=null) {
  *
  * @param params {leaf: bool, preferred_first: bool, order_by: string}
  */
-export function getNextUnfilledNode(node_id, params=null) {
+export function getNextUnfilledNode(node_id, params = null) {
     return axios.get(`/api/nodes/${node_id}/next_unfilled`, { params })
         .then(response => {
             return response.data;
@@ -43,7 +43,7 @@ export function getNextUnfilledNode(node_id, params=null) {
  *
  * @param params {log: string}
  */
-export function getNodeProgress(node_id, params=null) {
+export function getNodeProgress(node_id, params = null) {
     return axios.get(`/api/nodes/${node_id}/progress`, { params })
         .then(response => {
             return response.data;
@@ -67,6 +67,35 @@ export function mergeNodeInto(node_id, dest_node_id) {
     console.log(data)
     return axios.post(`/api/nodes/${node_id}/merge_into`, data);
 }
+
+// Files
+// TODO: Documentation
+export function getDirEntry(file_path) {
+    return axios.get(`/api/files/${file_path}?download=false&info=true`)
+        .then(response => {
+            return response.data;
+        });
+}
+
+export function getFileInfo(file_path) {
+    return axios.get(`/api/files/${file_path}?download=false&info=true`)
+        .then(response => {
+            return response.data;
+        });
+}
+
+export function getFile(file_path) {
+    return axios.get(`/api/files/${file_path}?download=true&info=false`)
+        .then(response => {
+            return response.data;
+        });
+}
+
+export function uploadFiles(files, file_path) {
+    return axios.post(`/api/files/${file_path}`, files)
+        .then(response => { return response.data; });
+}
+
 
 // Project
 

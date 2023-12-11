@@ -1,10 +1,19 @@
 <template>
     <div id="project">
-        <nav class="navbar navbar-expand-lg navbar-light bg-dark text-light">
-            <router-link class="navbar-brand text-light" to="/">MorphoCluster</router-link>
-            <ul class="navbar-nav mr-auto">
-                <li class="nav-item active text-light">Projects</li>
-            </ul>
+        <nav class="navbar navbar-expand-lg navbar navbar-dark bg-dark">
+            <router-link class="navbar-brand" :to="{ name: 'home' }">MorphoCluster</router-link>
+            <div class="navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav nav-item">
+                    <li class="nav-item">
+                        <router-link class="nav-link" :to="{ name: 'projects' }">Projects</router-link>
+                    </li>
+                    <li class="nav-item">
+                        <router-link class="nav-link"
+                            :to="{ name: 'project', params: { project_id: project.project_id } }">{{
+                                project.name }}</router-link>
+                    </li>
+                </ul>
+            </div>
             <dark-mode-control />
         </nav>
         <div class="container">
@@ -65,6 +74,8 @@
 import * as api from "@/helpers/api.js";
 import axios from "axios";
 import { EventBus } from "@/event-bus.js";
+import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap";
 import DarkModeControl from "@/components/DarkModeControl.vue";
 
 export default {
@@ -100,8 +111,8 @@ export default {
                     // Wrapped in $nextTick to ensure DOM is rendered before closing
                     this.$refs.saveModal.hide();
                 });
-                this.$nextTick(()=> {
-                    window.open(result["url"]+"?download=1");
+                this.$nextTick(() => {
+                    window.open(result["url"] + "?download=1");
                 })
             });
         },

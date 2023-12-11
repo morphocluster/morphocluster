@@ -1,5 +1,5 @@
 <template>
-    <div id="dataset" class="view">
+    <div id="projects" class="view">
         <div class="scrollable">
             <div class="container">
                 <div class="alerts" v-if="alerts.length">
@@ -23,17 +23,17 @@
                         <!-- validated / grown clusters -->
                         <b-progress v-if="'progress' in data.item" :max="data.item.progress.leaves_n_nodes" class="mb-1">
                             <b-progress-bar variant="success" :value="data.item.progress.leaves_n_filled_nodes
-                            " v-b-tooltip.hover
+                                " v-b-tooltip.hover
                                 :title="`${data.item.progress.leaves_n_filled_nodes} / ${data.item.progress.leaves_n_nodes} clusters grown`" />
                             <b-progress-bar variant="warning" :value="data.item.progress.leaves_n_approved_nodes -
                                 data.item.progress.leaves_n_filled_nodes
-                            " v-b-tooltip.hover :title="`${Humanize.compactInteger(
-    data.item.progress.leaves_n_approved_nodes,
-    1
-)} / ${Humanize.compactInteger(
-    data.item.progress.leaves_n_nodes,
-    1
-)} clusters validated`" />
+                                " v-b-tooltip.hover :title="`${Humanize.compactInteger(
+        data.item.progress.leaves_n_approved_nodes,
+        1
+    )} / ${Humanize.compactInteger(
+        data.item.progress.leaves_n_nodes,
+        1
+    )} clusters validated`" />
                         </b-progress>
                         <!-- objects in clusters -->
                         <b-progress v-if="'progress' in data.item" :max="data.item.progress.n_objects_deep" class="mb-1"
@@ -49,7 +49,7 @@
                                 100
                             )}%) objects in validated clusters`">
                             <b-progress-bar variant="success" :value="data.item.progress.leaves_n_approved_objects
-                            " v-b-tooltip.hover />
+                                " v-b-tooltip.hover />
                         </b-progress>
                     </template>
                     <template v-slot:cell(action)="data">
@@ -146,13 +146,21 @@ export default {
 </script>
 
 <style>
-#projects {
+/* #projects {
     display: flex;
     flex-direction: column;
     align-items: stretch;
     flex: 1;
     overflow: hidden;
 }
+
+.scrollable {
+    overflow-y: auto;
+}
+
+.alerts {
+    padding-top: 1em;
+} */
 
 #projects_table tr td:nth-child(1) {
     width: 100%;
@@ -162,13 +170,5 @@ export default {
     width: auto;
     text-align: right;
     white-space: nowrap;
-}
-
-.scrollable {
-    overflow-y: auto;
-}
-
-.alerts {
-    padding-top: 1em;
 }
 </style>

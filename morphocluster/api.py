@@ -5,6 +5,7 @@ Created on 19.03.2018
 """
 import json
 import os
+import pathlib
 import traceback
 import uuid
 import warnings
@@ -13,6 +14,7 @@ from datetime import datetime
 from distutils.util import strtobool
 from functools import wraps
 from pprint import pprint
+from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
@@ -20,14 +22,15 @@ import werkzeug.exceptions
 from flask import Response
 from flask import current_app as app
 from flask import jsonify as flask_jsonify
-from flask import request
+from flask import request, send_file
 from flask.blueprints import Blueprint
 from flask.helpers import url_for
 from flask_restful import reqparse
 from redis.exceptions import RedisError
 from sklearn.manifold import Isomap
 from timer_cm import Timer
-from flask.helpers import send_from_directory
+from werkzeug.exceptions import NotFound
+from werkzeug.utils import secure_filename
 
 from morphocluster import background, models
 from morphocluster.classifier import Classifier
@@ -158,6 +161,30 @@ def _node_icon(node):
     return "mdi mdi-hexagon-multiple"
 
 
+def secure_path(path: str):
+    """Return a secure, version of the supplied path. To get get Filesystem-entry, incorrect but secure file_names are be allowed"""
+
+    # Make absolute and relative again, to circumvent path traversal exploits (../../foo)
+    path = os.path.relpath(os.path.join("/", path), "/")
+
+    # Convert to secure characters
+    # parts = (secure_filename(p) for p in path.split("/"))
+    # return os.path.join(*parts)
+
+    return path
+
+
+def secure_path_and_name(path: str):
+    """Return a secure, ascii-only version of the supplied path."""
+
+    # Make absolute and relative again, to circumvent path traversal exploits (../../foo)
+    path = os.path.relpath(os.path.join("/", path), "/")
+
+    # Convert to secure characters
+    parts = (secure_filename(p) for p in path.split("/"))
+    return os.path.join(*parts)
+
+
 # ===============================================================================
 # /tree
 # ===============================================================================
@@ -218,18 +245,85 @@ def get_subtree(node_id):
 # ===============================================================================
 
 
+def _format_fs_entry(
+    server_path: pathlib.Path, include_children=False, include_parents=False
+):
+    """Format a path on the server for sending to the client."""
+
+    client_path = server_path.relative_to(app.config["FILES_DIR"])
+
+    fs_entry: Dict[str, Any] = {
+        "name": client_path.name,
+        "path": str(client_path),
+        "type": "directory" if server_path.is_dir() else "file",
+        "last_modified": datetime.fromtimestamp(
+            server_path.stat().st_mtime,
+        ).isoformat(),
+    }
+
+    if include_parents:
+        # Format parents
+        fs_entry["parents"] = [
+            _format_fs_entry(pathlib.Path(app.config["FILES_DIR"], p))
+            for p in reversed(client_path.parents)
+            if str(p) != "."
+        ]
+
+    if include_children:
+        # Format children
+        directories = [_format_fs_entry(p) for p in server_path.iterdir() if p.is_dir()]
+        files = [_format_fs_entry(p) for p in server_path.iterdir() if p.is_file()]
+
+        # Sort directories first, then files
+        fs_entry["children"] = sorted(
+            directories, key=lambda entry: entry["name"]
+        ) + sorted(files, key=lambda entry: entry["name"])
+
+    return fs_entry
+
+
+@api.route("/files/", methods=["GET"])
 @api.route("/files/<path:path>", methods=["GET"])
-def get_file(path):
+def get_filesystem_entry(path=""):
     """
-    Send the requested file to the client.
+    info = true:    sends info about the file
+    info = false:   sends the file
     """
     parser = reqparse.RequestParser()
     parser.add_argument("download", type=strtobool, default=0, location="args")
+    parser.add_argument("info", type=strtobool, default=0, location="args")
     arguments = parser.parse_args(strict=False)
 
-    return send_from_directory(
-        app.config["FILES_DIR"], path, as_attachment=arguments["download"]
-    )
+    path = pathlib.PurePath(secure_path(path))
+
+    server_path = pathlib.Path(app.config["FILES_DIR"], path)
+
+    if not server_path.exists():
+        raise NotFound()
+
+    if server_path.is_dir() or arguments["info"]:
+        info = _format_fs_entry(
+            server_path, include_children=server_path.is_dir(), include_parents=True
+        )
+        return jsonify(info)
+
+    return send_file(server_path, as_attachment=arguments["download"])
+
+
+@api.route("/files/", methods=["POST"])
+@api.route("/files/<path:path>", methods=["POST"])
+def upload_files(path=""):
+    path = secure_path(path)
+
+    uploaded_files = request.files.getlist("file")
+    if uploaded_files:
+        for upload_file in uploaded_files:
+            filename = secure_path_and_name(upload_file.filename)
+            server_path = os.path.join(app.config["FILES_DIR"], path, filename)
+            upload_file.save(server_path)
+        return jsonify({"message": "Data upload successful"}), 200
+    else:
+        raise werkzeug.exceptions.BadRequest()
 
 
 # ===============================================================================
@@ -309,7 +403,8 @@ def save_project(project_id):
         tree.export_tree(root_id, tree_fn)
 
         tree_url = url_for(
-            ".get_file", path=os.path.relpath(tree_fn, api.config["FILES_DIR"])
+            ".get_filesystem_entry",
+            path=os.path.relpath(tree_fn, api.config["FILES_DIR"]),
         )
 
         return jsonify({"url": tree_url})

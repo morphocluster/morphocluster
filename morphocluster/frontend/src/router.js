@@ -26,9 +26,20 @@ var router = new Router({
       props: (route) => ({ node_id: parseInt(route.params.node_id) }),
     },
     {
+      name: 'home',
+      path: '/home',
+      component: () => import(/* webpackChunkName: "home" */ './views/Home.vue'),
+    },
+    {
       name: 'projects',
       path: '/p',
       component: () => import(/* webpackChunkName: "projects" */ './views/Projects.vue'),
+    },
+    {
+      name: 'files',
+      path: '/files/:file_path?',
+      component: () => import(/* webpackChunkName: "files" */ './views/Files.vue'),
+      props: (route) => ({ file_path: route.params.file_path || "" }),
     },
     {
       name: 'approve',
@@ -43,7 +54,7 @@ var router = new Router({
     },
     {
       path: '/',
-      redirect: '/p'
+      redirect: '/home'
     },
     { path: '*', component: NotFound }
   ]
