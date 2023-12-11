@@ -73,9 +73,6 @@
 <script>
 import * as api from "@/helpers/api.js";
 import axios from "axios";
-import { EventBus } from "@/event-bus.js";
-import "bootstrap/dist/css/bootstrap.min.css";
-import "bootstrap";
 import DarkModeControl from "@/components/DarkModeControl.vue";
 
 export default {
@@ -124,8 +121,6 @@ export default {
             .then(response => {
                 this.project = response.data;
                 console.log(response.data);
-
-                EventBus.$emit("set-title", this.project.name);
             })
             .catch(e => {
                 console.log(e);
