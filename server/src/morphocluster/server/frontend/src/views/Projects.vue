@@ -107,7 +107,7 @@ export default {
 
     },
     mounted() {
-        globalState.setBreadcrumbs([
+        this.setBreadcrumbs([
             {
                 text: 'Projects',
                 to: { name: 'projects' },
@@ -115,7 +115,7 @@ export default {
         ]);
 
         // Load node info
-        globalState.setLoading("Projects");
+        this.setLoading("Projects");
         api.getProjects()
             .then((projects) => {
                 this.projects = projects;

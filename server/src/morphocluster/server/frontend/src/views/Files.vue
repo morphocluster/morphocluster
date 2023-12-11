@@ -76,8 +76,6 @@
 <script>
 import "@mdi/font/css/materialdesignicons.css";
 import * as api from "@/helpers/api.js";
-import "bootstrap/dist/css/bootstrap.min.css";
-import "bootstrap";
 import { uploadFiles } from "../helpers/api.js";
 import DarkModeControl from "@/components/DarkModeControl.vue";
 
