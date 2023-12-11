@@ -9,7 +9,7 @@
                     </li>
                     <li class="nav-item">
                         <router-link class="nav-link"
-                            :to="{ name: 'projects', params: { project_id: project.project_id } }">{{
+                            :to="{ name: 'project', params: { project_id: project.project_id } }">{{
                                 project.name }}</router-link>
                     </li>
                 </ul>
