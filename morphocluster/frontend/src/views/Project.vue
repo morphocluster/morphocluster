@@ -1,75 +1,48 @@
 <template>
     <div id="project">
-        <nav class="navbar navbar-expand-lg navbar navbar-dark bg-dark">
-            <router-link class="navbar-brand" :to="{ name: 'home' }">MorphoCluster</router-link>
-            <div class="navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav nav-item">
-                    <li class="nav-item">
-                        <router-link class="nav-link" :to="{ name: 'projects' }">Projects</router-link>
-                    </li>
-                    <li class="nav-item">
-                        <router-link class="nav-link"
-                            :to="{ name: 'project', params: { project_id: project.project_id } }">{{
-                                project.name }}</router-link>
-                    </li>
-                </ul>
-            </div>
-            <dark-mode-control />
-        </nav>
-        <div class="container">
-            <table id="table" style="width=100%">
-                <tbody>
-                    <tr>
-                        <td>Created on</td>
-                        <td>{{ project.creation_date }}</td>
-                    </tr>
-                    <tr>
-                        <td>Name</td>
-                        <td>{{ project.name }}</td>
-                    </tr>
-                    <tr>
-                        <td>Node_id</td>
-                        <td>{{ project.node_id }}</td>
-                    </tr>
-                    <tr>
-                        <td>Project_id</td>
-                        <td>{{ project.project_id }}</td>
-                    </tr>
-                    <tr>
-                        <td>Visible</td>
-                        <td>{{ project.visible }}</td>
-                    </tr>
-                </tbody>
-            </table>
-            <div style="margin: auto ; width: 0; padding-top: 7px ">
-                <b-button size="sm" variant="primary" href="" @click.prevent="showSaveModal(project)">
-                    Save Project
-                </b-button>
-            </div>
-        </div>
-        <b-modal ref="saveModal" lazy centered :title="save_title" @ok="HandleSaveOk">
-            <div class="d-block text-center">
-                <form @submit.stop.prevent="HandleSaveOk">
-                    <b-container fluid>
-                        <b-form-row class="my-1">
-                            <b-col sm="3">
-                                <label for="form_save_name">Name:</label>
-                            </b-col>
-                            <b-col sm="9">
-                                <b-form-input type="text" placeholder="Enter a name for the saved file" id="form_save_name"
-                                    v-model="save_slug"></b-form-input>
-                            </b-col>
-                        </b-form-row>
-                        <b-row class="my-3" v-if="save_saving">
-                            <b-col sm="12"> Saving... </b-col>
-                        </b-row>
-                    </b-container>
-                </form>
-            </div>
-        </b-modal>
+        <v-container>
+            <v-card>
+                <v-card-title>Projektinformationen</v-card-title>
+                <v-card-text>
+                    <v-row v-for="(value, key) in project" :key="key">
+                        <v-col>{{ key }}</v-col>
+                        <v-col>{{ value }}</v-col>
+                    </v-row>
+                </v-card-text>
+            </v-card>
+            <v-row justify="center" class="my-2">
+
+                <v-btn color="primary" @click.prevent="showSaveModal">Save Project</v-btn>
+            </v-row>
+        </v-container>
+
+        <v-dialog v-model="saveModalVisible" max-width="500">
+            <v-card>
+                <v-card-title>{{ saveTitle }}</v-card-title>
+                <v-card-text>
+                    <v-form @submit.prevent="handleSaveOk">
+                        <v-container>
+                            <v-row>
+                                <v-col cols="12">
+                                    <v-text-field v-model="saveSlug" label="Name"
+                                        placeholder="Enter a name for the saved file"></v-text-field>
+                                </v-col>
+                            </v-row>
+                            <v-row v-if="saveSaving">
+                                <v-col cols="12">Saving...</v-col>
+                            </v-row>
+                        </v-container>
+                    </v-form>
+                </v-card-text>
+                <v-card-actions>
+                    <v-btn @click="handleSaveOk">OK</v-btn>
+                    <v-btn @click="saveModalVisible = false">Cancel</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
-
+  
 <script>
 import * as api from "@/helpers/api.js";
 import axios from "axios";
@@ -82,53 +55,53 @@ export default {
     data() {
         return {
             project: null,
-            save_slug: "",
-            save_title: "",
-            save_project_id: null,
-            save_saving: false,
+            saveSlug: "",
+            saveTitle: "",
+            saveProjectId: null,
+            saveSaving: false,
+            saveModalVisible: false,
         };
     },
     methods: {
-        showSaveModal(project) {
-            console.log("project", project);
-            this.save_slug = project.name;
-            this.save_project_id = project.project_id;
-            this.save_title = `Save ${project.name} (${this.save_project_id})`;
-            this.$refs.saveModal.show();
+        showSaveModal() {
+            this.saveSlug = this.project.name;
+            this.saveProjectId = this.project.project_id;
+            this.saveTitle = `Save ${this.project.name} (${this.saveProjectId})`;
+            this.saveModalVisible = true;
         },
-        HandleSaveOk(evt) {
+        handleSaveOk(evt) {
             evt.preventDefault();
 
-            console.log("Saving", this.save_project_id, "...");
-            this.save_saving = true;
-            api.saveProject(this.save_project_id).then((result) => {
-                console.log("Project saved: " + result["url"]);
-                this.save_saving = false;
-                this.$nextTick(() => {
-                    // Wrapped in $nextTick to ensure DOM is rendered before closing
-                    this.$refs.saveModal.hide();
-                });
-                this.$nextTick(() => {
-                    window.open(result["url"] + "?download=1");
+            console.log("Saving", this.saveProjectId, "...");
+            this.saveSaving = true;
+            api.saveProject(this.saveProjectId)
+                .then((result) => {
+                    console.log("Project saved: " + result.url);
+                    this.saveSaving = false;
+                    this.$nextTick(() => {
+                        this.saveModalVisible = false;
+                    });
+                    this.$nextTick(() => {
+                        window.open(result.url + "?download=1");
+                    });
                 })
-            });
         },
     },
     mounted() {
         // Load node info
         axios
             .get(`/api/projects/${this.project_id}`)
-            .then(response => {
+            .then((response) => {
                 this.project = response.data;
                 console.log(response.data);
             })
-            .catch(e => {
+            .catch((e) => {
                 console.log(e);
             });
-    }
+    },
 };
 </script>
-
+  
 <style>
 #project {
     display: flex;
@@ -138,3 +111,4 @@ export default {
     overflow: hidden;
 }
 </style>
+  
