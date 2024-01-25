@@ -13,18 +13,10 @@
 
 
 <script>
-
-import state from "../globalState.js";
-
 export default {
-  name: "ProjectsView",
-  methods: {
-    async initialize() {
-      state.setBreadcrumbs([], "home");
-    }
-  },
+  name: "HomeView",
   mounted() {
-    this.initialize();
+    this.setBreadcrumbs([{ name: "home" }]);
   },
 }
 </script>
