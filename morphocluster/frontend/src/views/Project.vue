@@ -2,7 +2,7 @@
     <div id="project">
         <v-container>
             <v-card>
-                <v-card-title>Projektinformationen</v-card-title>
+                <v-card-title>Project: {{ this.project.name }}</v-card-title>
                 <v-card-text>
                     <v-row v-for="(value, key) in project" :key="key">
                         <v-col>{{ key }}</v-col>
@@ -46,13 +46,12 @@
 <script>
 import * as api from "@/helpers/api.js";
 import axios from "axios";
-import DarkModeControl from "@/components/DarkModeControl.vue";
-import state from "../globalState.js";
+import mixins from "@/mixins.js";
 
 export default {
     name: "ProjectView",
+    mixins: [mixins],
     props: { "project_id": Number },
-    components: { DarkModeControl },
     data() {
         return {
             project: null,
@@ -64,9 +63,6 @@ export default {
         };
     },
     methods: {
-        async initialize() {
-            state.setBreadcrumbs(["project", this.project_id], "project");
-        },
         showSaveModal() {
             this.saveSlug = this.project.name;
             this.saveProjectId = this.project.project_id;
@@ -93,12 +89,12 @@ export default {
     },
     mounted() {
         // Load node info
-        this.initialize();
         axios
             .get(`/api/projects/${this.project_id}`)
             .then((response) => {
-                this.project = response.data;
                 console.log(response.data);
+                this.project = response.data;
+                this.setBreadcrumbs([{ name: 'projects', text: "Projects" }, { name: "project", text: this.project.name, params: { project_id: this.project.project_id } }]);
             })
             .catch((e) => {
                 console.log(e);

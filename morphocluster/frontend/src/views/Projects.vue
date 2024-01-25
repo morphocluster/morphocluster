@@ -7,45 +7,45 @@
                 </v-alert>
             </div>
             <v-data-table sort-by="name" :items="projects" :headers="headers" showEmpty hide-default-footer>
-                <template v-slot:item.name="{ item }">
+                <template v-slot:[`item.name`]="{ item }">
                     <router-link :to="{
                         name: 'project',
                         params: { project_id: item.project_id },
                     }">{{ item.name }}</router-link>
                 </template>
 
-                <template v-slot:item.progress="data">
+                <template v-slot:[`item.progress`]="{ item }">
                     <!-- validated / grown clusters -->
                     <div style="border: 2px solid #717171; border-radius: 6px; margin-bottom: 5px; ">
                         <v-progress-linear rounded variant="success"
-                            :value="data.item.progress.leaves_n_filled_nodes / data.item.progress.leaves_n_nodes * 100"
-                            :buffer-value="data.item.progress.leaves_n_approved_nodes / data.item.progress.leaves_n_nodes * 100"
-                            background-color="yellow" color="green" height="7" style="margin: 0;" :title="`${data.item.progress.leaves_n_filled_nodes} / ${data.item.progress.leaves_n_nodes} clusters grown, ${Humanize.compactInteger(
-                                data.item.progress.leaves_n_approved_nodes,
+                            :value="item.progress.leaves_n_filled_nodes / item.progress.leaves_n_nodes * 100"
+                            :buffer-value="item.progress.leaves_n_approved_nodes / item.progress.leaves_n_nodes * 100"
+                            background-color="yellow" color="green" height="7" style="margin: 0;" :title="`${item.progress.leaves_n_filled_nodes} / ${item.progress.leaves_n_nodes} clusters grown, ${Humanize.compactInteger(
+                                item.progress.leaves_n_approved_nodes,
                                 1
                             )} / ${Humanize.compactInteger(
-                                data.item.progress.leaves_n_nodes,
+                                item.progress.leaves_n_nodes,
                                 1
                             )} clusters validated`" />
                     </div>
 
                     <div style="border: 2px solid #717171; border-radius: 6px; margin-bottom: 5px; ">
                         <v-progress-linear rounded variant="success"
-                            :value="data.item.progress.leaves_n_approved_objects / data.item.progress.n_objects_deep * 100"
+                            :value="item.progress.leaves_n_approved_objects / item.progress.n_objects_deep * 100"
                             background-color="white" color="green" height="7" style="margin: 0;" :title="`${Humanize.compactInteger(
-                                data.item.progress.leaves_n_approved_objects,
+                                item.progress.leaves_n_approved_objects,
                                 1
                             )} / ${Humanize.compactInteger(
-                                data.item.progress.n_objects_deep,
+                                item.progress.n_objects_deep,
                                 1
                             )} (${Math.round(
-                                (data.item.progress.leaves_n_approved_objects /
-                                    data.item.progress.n_objects_deep) *
+                                (item.progress.leaves_n_approved_objects /
+                                    item.progress.n_objects_deep) *
                                 100
                             )}%) objects in validated clusters`" />
                     </div>
                 </template>
-                <template v-slot:item.action="{ item }">
+                <template v-slot:[`item.action`]="{ item }">
                     <v-btn small variant="primary" class="mr-2" :to="{
                         name: 'approve',
                         params: { project_id: item.project_id },
@@ -76,11 +76,13 @@
 <script>
 import globalState from "@/globalState.js";
 import * as api from "@/helpers/api.js";
-import state from "../globalState.js";
 import Humanize from "humanize-plus";
+import mixins from "@/mixins.js";
+
 
 export default {
     name: "ProjectsView",
+    mixins: [mixins],
     props: {},
     data() {
         return {
@@ -94,17 +96,11 @@ export default {
             Humanize,
         };
     },
-    methods: {
-        async initialize() {
-            state.setBreadcrumbs(["projects"], "projects");
-        }
-    },
     mounted() {
-        this.initialize();
+        this.setBreadcrumbs([{ name: 'projects', text: "Projects" }]);
         api.getProjects()
             .then((projects) => {
                 this.projects = projects;
-                console.log(projects[0].name);
                 const getProgressPromises = this.projects.map((p) => {
                     return api.getNodeProgress(p.node_id)
                         .then((progress) => {
@@ -119,14 +115,7 @@ export default {
             })
             .catch((error) => {
                 console.error(error);
-                if (axiosErrorHandler) {
-                    axiosErrorHandler(error);
-                } else {
-                    this.alerts.unshift({
-                        message: "Error fetching projects.",
-                        variant: "danger",
-                    });
-                }
+                this.axiosErrorHandler(error);
             })
             .finally(() => {
                 globalState.unsetLoading("Projects");

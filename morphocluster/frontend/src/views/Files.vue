@@ -11,7 +11,7 @@
                 </div>
 
                 <v-data-table :items="entry.children" :headers="headers" hide-default-footer>
-                    <template v-slot:item.name="{ item }">
+                    <template v-slot:[`item.name`]="{ item }">
                         <router-link v-if="item.type === 'directory'"
                             :to="{ name: 'files', params: { file_path: item.path } }">
                             <i class="mdi mdi-folder" /> {{ item.name }}
@@ -73,14 +73,13 @@
 import "@mdi/font/css/materialdesignicons.css";
 import * as api from "@/helpers/api.js";
 import { uploadFiles } from "../helpers/api.js";
-import state from "../globalState.js";
-import DarkModeControl from "@/components/DarkModeControl.vue";
+import mixins from "@/mixins.js";
 
 export default {
     name: "FilesView",
+    mixins: [mixins],
     props: { file_path: String },
     response: "",
-    components: { DarkModeControl },
     data() {
         return {
             headers: [
@@ -113,7 +112,7 @@ export default {
                     this.breadcrumb = []; // Oder eine andere Aktion, um das unerwünschte Element zu entfernen
                 }
                 this.breadcrumb = ["files"].concat(this.breadcrumb);
-                state.setBreadcrumbs(this.breadcrumb, "files");
+                this.setBreadcrumbs(this.breadcrumb, "files");
             } catch (error) {
                 console.error(error);
                 this.alerts.unshift({

@@ -74,7 +74,6 @@ import * as api from "@/helpers/api.js";
 
 import MemberPreview from "@/components/MemberPreview.vue";
 import MessageLog from "@/components/MessageLog.vue";
-import DarkModeControl from "../components/DarkModeControl.vue";
 
 export default {
     name: "ApproveView",
@@ -108,7 +107,6 @@ export default {
         MemberPreview,
         MessageLog,
         InfiniteLoading,
-        DarkModeControl,
     },
     mixins: [mixins],
     watch: {
