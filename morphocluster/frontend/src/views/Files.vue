@@ -1,6 +1,7 @@
 <template>
     <div id="files">
         <div class="scrollable">
+            <h1>{{ this.breadcrumb }}</h1>
 
             <div class="container" v-if="this.entry.type === 'directory'">
                 <div class="alerts" v-if="alerts.length">
@@ -67,9 +68,12 @@
 </template>
 
 <script>
+// FilesView.vue
+
 import "@mdi/font/css/materialdesignicons.css";
 import * as api from "@/helpers/api.js";
 import { uploadFiles } from "../helpers/api.js";
+import state from "../globalState.js";
 import DarkModeControl from "@/components/DarkModeControl.vue";
 
 export default {
@@ -104,6 +108,12 @@ export default {
         async initialize() {
             try {
                 this.entry = await api.getFileInfo(this.file_path);
+                this.breadcrumb = this.entry.path.split('/');
+                if (this.breadcrumb.includes(".")) {
+                    this.breadcrumb = []; // Oder eine andere Aktion, um das unerwünschte Element zu entfernen
+                }
+                this.breadcrumb = ["files"].concat(this.breadcrumb);
+                state.setBreadcrumbs(this.breadcrumb, "files");
             } catch (error) {
                 console.error(error);
                 this.alerts.unshift({
@@ -135,6 +145,7 @@ export default {
         },
     },
 };
+
 </script>
 
 <style>

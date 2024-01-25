@@ -1,122 +1,65 @@
 <template>
     <div id="approve">
-        <nav class="navbar navbar-expand-lg navbar-light bg-dark text-light">
-            <router-link class="navbar-brand text-light" to="/"
-                >MorphoCluster</router-link
-            >
-            <div class="collapse navbar-collapse">
-                <ul class="navbar-nav mr-auto">
-                    <li class="nav-item nav-link text-light" v-if="project">
-                        {{ project.name }}
-                    </li>
-                    <li class="nav-item nav-link text-light">Approve</li>
-                    <li class="nav-item nav-link text-light" v-if="node">
-                        {{ node.name }}
-                    </li>
-                </ul>
-                <dark-mode-control />
-            </div>
-        </nav>
         <div v-if="loading">Loading...</div>
         <div id="node-info">
-            <div
-                class="info-hint mdi mdi-information-outline"
-                v-b-tooltip.hover.html
-                title="All members of this node, most extreme appearance first."
-            />
+            <div class="info-hint mdi mdi-information-outline" v-b-tooltip.hover.html
+                title="All members of this node, most extreme appearance first." />
             <!--<node-header :node="node" v-if="node" />-->
 
             <div class="row" v-if="node_members">
-                <div
-                    v-for="m of node_members"
-                    :key="getUniqueId(m)"
-                    class="col col-2"
-                >
-                    <member-preview
-                        :member="m"
-                        :controls="member_controls"
-                        v-on:moveup="moveupMember"
-                    />
+                <div v-for="m of node_members" :key="getUniqueId(m)" class="col col-2">
+                    <member-preview :member="m" :controls="member_controls" v-on:moveup="moveupMember" />
                 </div>
             </div>
-            <infinite-loading
-                v-if="node"
-                @infinite="updateMembers"
-                spinner="circles"
-            >
+            <infinite-loading v-if="node" @infinite="updateMembers" spinner="circles">
                 <div slot="no-more" />
             </infinite-loading>
         </div>
-        <div
-            id="progress"
-            v-if="progress"
-            v-b-tooltip.hover
-            :title="
-                progress.leaves_n_approved_objects.toLocaleString('en-US') +
-                ' / ' +
-                progress.leaves_n_objects.toLocaleString('en-US')
-            "
-        >
-            <div
-                :style="{ flexGrow: progress.leaves_n_approved_objects }"
-                class="bg-success"
-            />
-            <div
-                :style="{
-                    flexGrow:
-                        progress.leaves_n_objects -
-                        progress.leaves_n_approved_objects,
-                }"
-                class="bg-danger"
-            />
+        <div id="progress" v-if="progress" v-b-tooltip.hover :title="progress.leaves_n_approved_objects.toLocaleString('en-US') +
+            ' / ' +
+            progress.leaves_n_objects.toLocaleString('en-US')
+            ">
+            <div :style="{ flexGrow: progress.leaves_n_approved_objects }" class="bg-success" />
+            <div :style="{
+                flexGrow:
+                    progress.leaves_n_objects -
+                    progress.leaves_n_approved_objects,
+            }" class="bg-danger" />
         </div>
         <div id="decision">
-            <b-button
-                id="btn-approve"
-                variant="success"
-                @click.prevent="approve(true)"
-                v-b-tooltip.hover.html
-                title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>"
-            >
+            <v-btn id="btn-approve" variant="success" @click.prevent="approve(true)" v-b-tooltip.hover.html
+                title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>">
                 <i class="mdi mdi-check-all" /><i class="mdi mdi-flag" />
                 Approve + Flag
-            </b-button>
-            <b-button
-                id="btn-approve"
-                variant="success"
-                @click.prevent="approve(false)"
-                v-b-tooltip.hover.html
-                title="All members look alike. Approve. <kbd>A</kbd>"
-            >
+            </v-btn>
+            <v-btn id="btn-approve" variant="success" @click.prevent="approve(false)" v-b-tooltip.hover.html
+                title="All members look alike. Approve. <kbd>A</kbd>">
                 <i class="mdi mdi-check-all" /> Approve
-            </b-button>
-            <b-button
-                id="btn-merge"
-                variant="danger"
-                @click.prevent="merge"
-                v-b-tooltip.hover.html
-                title="Members are too dissimilar. Merge into parent. <kbd>M</kbd>"
-            >
+            </v-btn>
+            <v-btn id="btn-merge" variant="danger" @click.prevent="merge" v-b-tooltip.hover.html
+                title="Members are too dissimilar. Merge into parent. <kbd>M</kbd>">
                 <i class="mdi mdi-call-merge" /> Merge into parent
-            </b-button>
+            </v-btn>
         </div>
         <message-log class="bg-light" :messages="messages" />
-        <b-modal
-            ref="doneModal"
-            centered
-            no-fade
-            header-bg-variant="success"
-            title="Approval done"
-        >
-            <div class="d-block text-center">
-                Approval is done for this project.
-            </div>
-            <footer slot="modal-footer">
-                <b-button variant="primary" :to="{ name: 'projects' }"
-                    >Back to projects</b-button
-                >
-            </footer>
-        </b-modal>
+        <v-dialog v-model="doneModal" centered no-title no-fade>
+            <v-card>
+                <v-card-title class="success">
+                    Approval done
+                </v-card-title>
+                <v-card-text>
+                    <div class="text-center">
+                        Approval is done for this project.
+                    </div>
+                </v-card-text>
+                <v-card-actions>
+                    <v-btn @click="$router.push({ name: 'projects' })" color="primary">
+                        Back to projects
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
     </div>
 </template>
 
@@ -252,9 +195,8 @@ export default {
 
             if (!this.members_url) {
                 const nodes = this.node.children;
-                this.members_url = `/api/nodes/${
-                    this.node.node_id
-                }/members?objects=${!nodes}&nodes=${nodes}&arrange_by=interleaved&`;
+                this.members_url = `/api/nodes/${this.node.node_id
+                    }/members?objects=${!nodes}&nodes=${nodes}&arrange_by=interleaved&`;
                 this.page = 0;
                 updateMembersUrl = true;
             }
