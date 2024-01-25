@@ -76,7 +76,7 @@
 <script>
 import globalState from "@/globalState.js";
 import * as api from "@/helpers/api.js";
-
+import state from "../globalState.js";
 import Humanize from "humanize-plus";
 
 export default {
@@ -95,10 +95,12 @@ export default {
         };
     },
     methods: {
-
+        async initialize() {
+            state.setBreadcrumbs(["projects"], "projects");
+        }
     },
     mounted() {
-
+        this.initialize();
         api.getProjects()
             .then((projects) => {
                 this.projects = projects;

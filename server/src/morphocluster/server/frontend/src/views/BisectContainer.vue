@@ -5,7 +5,7 @@
             <div class="collapse navbar-collapse">
                 <ul class="navbar-nav mr-auto">
                     <li class="nav-item nav-link text-light" v-if="project">
-                        {{project.name}}
+                        {{ project.name }}
                     </li>
                     <li class="nav-item nav-link  text-light">
                         Bisect
@@ -21,14 +21,24 @@
         <div class="spinner-container" v-else>
             <spinner></spinner>
         </div>
-        <b-modal ref="doneModal" lazy centered no-fade header-bg-variant="success" title="Growing done">
-            <div class="d-block text-center">
-                Growing is done for this project.
-            </div>
-            <footer slot="modal-footer">
-                <b-button variant="primary" :to="{name: 'projects'}">Back to projects</b-button>
-            </footer>
-        </b-modal>
+        <v-dialog v-model="doneModal" lazy centered no-title no-fade>
+            <v-card>
+                <v-card-title class="success">
+                    Growing done
+                </v-card-title>
+                <v-card-text>
+                    <div class="text-center">
+                        Growing is done for this project.
+                    </div>
+                </v-card-text>
+                <v-card-actions>
+                    <v-btn @click="$router.push({ name: 'projects' })" color="primary">
+                        Back to projects
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
     </div>
 </template>
 
@@ -192,7 +202,7 @@ export default {
 
             // Get the URL for the cached recommendations
             var recommendationsUrlPromise = api
-                .getNodeRecommendedObjects(node_id, {max_n: MAX_N_RECOMMENDATIONS})
+                .getNodeRecommendedObjects(node_id, { max_n: MAX_N_RECOMMENDATIONS })
                 .then(data => {
                     return data.links.self;
                 });
@@ -214,7 +224,7 @@ export default {
             return allPromise;
         },
 
-        membersOk: function() {
+        membersOk: function () {
             this.rec_interval_left = this.rec_current_page + 1;
 
             if (!this.found_right) {
@@ -229,7 +239,7 @@ export default {
 
             this.showNext();
         },
-        membersNotOk: function() {
+        membersNotOk: function () {
             this.rec_interval_right = this.rec_current_page;
             this.found_right = true;
 
@@ -240,10 +250,10 @@ export default {
         updateCurrentPage(frac = 0.5) {
             this.rec_current_page = Math.trunc(
                 (1 - frac) * this.rec_interval_left +
-                    frac * this.rec_interval_right
+                frac * this.rec_interval_right
             );
         },
-        showNext: function() {
+        showNext: function () {
             console.log(
                 this.rec_current_page,
                 this.rec_interval_left,
@@ -359,7 +369,7 @@ export default {
     overflow: hidden;
 }
 
-#bisect > * {
+#bisect>* {
     padding: 0 10px;
 }
 

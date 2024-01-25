@@ -266,7 +266,7 @@ def _format_fs_entry(
         fs_entry["parents"] = [
             _format_fs_entry(pathlib.Path(app.config["FILES_DIR"], p))
             for p in reversed(client_path.parents)
-            if str(p) != "."
+            if _format_fs_entry(pathlib.Path(app.config["FILES_DIR"], p)) != "."
         ]
 
     if include_children:

@@ -13,8 +13,19 @@
 
 
 <script>
+
+import state from "../globalState.js";
+
 export default {
   name: "ProjectsView",
+  methods: {
+    async initialize() {
+      state.setBreadcrumbs([], "home");
+    }
+  },
+  mounted() {
+    this.initialize();
+  },
 }
 </script>
 

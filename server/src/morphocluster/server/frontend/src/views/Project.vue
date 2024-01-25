@@ -47,6 +47,7 @@
 import * as api from "@/helpers/api.js";
 import axios from "axios";
 import DarkModeControl from "@/components/DarkModeControl.vue";
+import state from "../globalState.js";
 
 export default {
     name: "ProjectView",
@@ -63,6 +64,9 @@ export default {
         };
     },
     methods: {
+        async initialize() {
+            state.setBreadcrumbs(["project", this.project_id], "project");
+        },
         showSaveModal() {
             this.saveSlug = this.project.name;
             this.saveProjectId = this.project.project_id;
@@ -89,6 +93,7 @@ export default {
     },
     mounted() {
         // Load node info
+        this.initialize();
         axios
             .get(`/api/projects/${this.project_id}`)
             .then((response) => {
