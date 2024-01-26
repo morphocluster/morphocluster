@@ -72,7 +72,6 @@
 
 import "@mdi/font/css/materialdesignicons.css";
 import * as api from "@/helpers/api.js";
-import { uploadFiles } from "../helpers/api.js";
 import mixins from "@/mixins.js";
 
 export default {
@@ -135,7 +134,7 @@ export default {
                 const file = selectedFiles[i];
                 formData.append('file', file);
             }
-            const response = await uploadFiles(formData, this.entry.path);
+            const response = await api.uploadFiles(formData, this.entry.path);
             console.log("Data upload successful", response.message);
             this.initialize();
         },

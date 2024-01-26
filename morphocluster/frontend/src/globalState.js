@@ -7,8 +7,11 @@ export default new Vue({
     methods: {
         /**
          * Set the breadcrumbs in the app bar.
-         * @param breadcrumbs - A list of breadcrumb items
+         * @param breadcrumbs - A list of router location objects which will be rendered as breadcrumbs.
+         * @see https://v3.router.vuejs.org/guide/essentials/navigation.html
          * @see https://v2.vuetifyjs.com/en/components/breadcrumbs/
+         * @example
+         *      setBreadcrumbs([{name: "foo", text: "Foo"}, {name: "foo", params: {route_parameter: "bar"}, text: "Bar"}])
          */
         setBreadcrumbs(breadcrumbs) {
             console.log("setBreadcrumbs", breadcrumbs);

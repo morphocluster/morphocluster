@@ -4,5 +4,13 @@
         "extensions": [
             ".vue"
         ],
+    },
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@/*": [
+                "src/*"
+            ],
+        }
     }
 }
