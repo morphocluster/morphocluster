@@ -68,8 +68,6 @@
 </template>
 
 <script>
-// FilesView.vue
-
 import "@mdi/font/css/materialdesignicons.css";
 import * as api from "@/helpers/api.js";
 import mixins from "@/mixins.js";
