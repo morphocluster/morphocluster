@@ -1,15 +1,17 @@
 <template>
-    <div id="project">
+    <div id="project" class="scrollable">
         <v-container>
-            <v-card>
-                <v-card-title>Project: {{ this.project.name }}</v-card-title>
-                <v-card-text>
-                    <v-row v-for="(value, key) in project" :key="key">
-                        <v-col>{{ key }}</v-col>
-                        <v-col>{{ value }}</v-col>
-                    </v-row>
-                </v-card-text>
-            </v-card>
+            <h2>Project: {{ this.project.name }}</h2>
+            <div style="display: flex; justify-content: center;">
+                <table>
+                    <tr v-for="(value, key) in project" :key="key">
+                        <td>{{ key }}</td>
+                        <td>{{ value }}</td>
+                    </tr>
+                </table>
+            </div>
+
+
             <v-row justify="center" class="my-2">
 
                 <v-btn color="primary" @click.prevent="showSaveModal">Save Project</v-btn>
@@ -110,6 +112,24 @@ export default {
     align-items: stretch;
     flex: 1;
     overflow: hidden;
+}
+
+
+#project table {
+    font-family: arial, sans-serif;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+#project td,
+#project th {
+    border: 1px solid #251919;
+    text-align: left;
+    padding: 8px;
+}
+
+#project tr:nth-child(even) {
+    background-color: #dddddd;
 }
 </style>
   

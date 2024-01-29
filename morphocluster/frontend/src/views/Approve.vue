@@ -1,5 +1,5 @@
 <template>
-    <div id="approve">
+    <div id="approve" class="scrollable">
         <div v-if="loading">Loading...</div>
         <div id="node-info">
             <div class="info-hint mdi mdi-information-outline" v-b-tooltip.hover.html
@@ -27,16 +27,16 @@
             }" class="bg-danger" />
         </div>
         <div id="decision">
-            <v-btn id="btn-approve" variant="success" @click.prevent="approve(true)" v-b-tooltip.hover.html
+            <v-btn id="btn-approve" color="success" @click.prevent="approve(true)" v-b-tooltip.hover.html
                 title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>">
                 <i class="mdi mdi-check-all" /><i class="mdi mdi-flag" />
                 Approve + Flag
             </v-btn>
-            <v-btn id="btn-approve" variant="success" @click.prevent="approve(false)" v-b-tooltip.hover.html
+            <v-btn id="btn-approve" color="success" @click.prevent="approve(false)" v-b-tooltip.hover.html
                 title="All members look alike. Approve. <kbd>A</kbd>">
                 <i class="mdi mdi-check-all" /> Approve
             </v-btn>
-            <v-btn id="btn-merge" variant="danger" @click.prevent="merge" v-b-tooltip.hover.html
+            <v-btn id="btn-merge" color="error" @click.prevent="merge" v-b-tooltip.hover.html
                 title="Members are too dissimilar. Merge into parent. <kbd>M</kbd>">
                 <i class="mdi mdi-call-merge" /> Merge into parent
             </v-btn>
@@ -59,7 +59,6 @@
                 </v-card-actions>
             </v-card>
         </v-dialog>
-
     </div>
 </template>
 
@@ -365,5 +364,12 @@ export default {
 
 #progress div {
     height: 0.2em;
+}
+
+.scrollable {
+    overflow-y: auto;
+    /* Vertikales Scrollen aktivieren */
+    max-height: 100%;
+    /* Maximalhöhe des Containers festlegen */
 }
 </style>

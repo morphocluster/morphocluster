@@ -1,6 +1,6 @@
 <template>
-    <div id="projects">
-        <div class="container">
+    <div id="projects" class="scrollable">
+        <v-container>
             <div class="alerts" v-if="alerts.length">
                 <v-alert :key="a" v-for="a of alerts" dismissible show :variant="a.variant">
                     {{ a.message }}
@@ -68,8 +68,7 @@
                     Expert mode
                 </v-btn>
             </div>
-
-        </div>
+        </v-container>
     </div>
 </template>
 
@@ -134,5 +133,12 @@ export default {
     width: auto;
     text-align: right;
     white-space: nowrap;
+}
+
+.scrollable {
+    overflow-y: scroll;
+    /* Vertikales Scrollen aktivieren */
+    max-height: 100%;
+
 }
 </style>
