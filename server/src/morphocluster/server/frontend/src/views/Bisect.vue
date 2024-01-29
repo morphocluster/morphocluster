@@ -1,121 +1,123 @@
 <template>
     <div id="bisect">
-        <div v-if="node_status == 'loading'">Loading node...</div>
-        <div class="bg-light section-heading border-bottom border-top">
-            Node members
-            <span v-if="node">({{ node.n_objects }} objects)</span>
-            <span class="float-right mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html
-                title="All members of this node, randomly ordered." />
-        </div>
-        <div id="node-members" class="row scrollable">
-            <div v-if="node" class="col col-1">
-                <member-preview v-bind:member="node" />
+        <div class="scrollable">
+            <div v-if="node_status == 'loading'">Loading node...</div>
+            <div class="bg-light section-heading border-bottom border-top">
+                Node members
+                <span v-if="node">({{ node.n_objects }} objects)</span>
+                <span class="float-right mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html
+                    title="All members of this node, randomly ordered." />
             </div>
-
-            <div :key="getUniqueId(m)" v-for="m of node_members" class="col col-1">
-                <member-preview v-bind:member="m" />
-            </div>
-
-            <infinite-loading ref="infload" v-if="node" @infinite="updateNodeMembers" spinner="circles">
-                <div slot="no-more">
-                    <span v-b-tooltip.hover.html title="End of list.">&#8718;</span>
+            <div id="node-members" class="row scrollable">
+                <div v-if="node" class="col col-1">
+                    <member-preview v-bind:member="node" />
                 </div>
-            </infinite-loading>
-        </div>
-        <div v-if="rec_status == 'loading'">Loading recommendations...</div>
-        <div v-if="rec_members.length && !done" class="bg-light section-heading border-bottom border-top">
-            Recommended members
-            <span v-if="typeof rec_current_page != 'undefined'">(Page {{ rec_current_page + 1 }} / {{ rec_n_pages }})</span>
-            <span class="float-right mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html
-                title="Recommendations for this node, page by page." />
-        </div>
-        <div id="recommended-members" v-if="rec_members && !done" class="row scrollable">
-            <div class="col col-12 spinner-container" v-if="rec_status == 'loading'">
-                <spinner spinner="circles" />
+
+                <div :key="getUniqueId(m)" v-for="m of node_members" class="col col-1">
+                    <member-preview v-bind:member="m" />
+                </div>
+
+                <infinite-loading ref="infload" v-if="node" @infinite="updateNodeMembers" spinner="circles">
+                    <div slot="no-more">
+                        <span v-b-tooltip.hover.html title="End of list.">&#8718;</span>
+                    </div>
+                </infinite-loading>
             </div>
-            <div :key="getUniqueId(m)" v-for="m of rec_members" class="col col-1">
-                <member-preview :member="m" :controls="rec_member_controls" v-on:remove="removeMember"
-                    v-on:accept="acceptMember" />
+            <div v-if="rec_status == 'loading'">Loading recommendations...</div>
+            <div v-if="rec_members.length && !done" class="bg-light section-heading border-bottom border-top">
+                Recommended members
+                <span v-if="typeof rec_current_page != 'undefined'">(Page {{ rec_current_page + 1 }} / {{ rec_n_pages
+                }})</span>
+                <span class="float-right mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html
+                    title="Recommendations for this node, page by page." />
             </div>
-        </div>
-        <div v-if="done" class="bg-light section-heading">Report</div>
-        <div id="report" v-if="done" class="scrollable">
-            Bisection done.
-            <table>
-                <tr>
-                    <th>Total number of pages:</th>
-                    <td>{{ rec_n_pages }}</td>
-                </tr>
-                <tr>
-                    <th>Number of valid pages:</th>
-                    <td>{{ n_valid_pages }}</td>
-                </tr>
-                <tr>
-                    <th>Number of invalid pages:</th>
-                    <td>{{ n_invalid_pages }}</td>
-                </tr>
-                <tr>
-                    <th>Number of rejected members:</th>
-                    <td>{{ rejected_members.length }}</td>
-                </tr>
-            </table>
-            <p v-if="n_valid_pages == rec_n_pages">
-                You accepted all recommendations. You may want to
-                <i>start over</i> to get more.
-            </p>
-            <p v-if="saving">Your input is being saved...</p>
-            <p v-if="saved">
-                Your input has been saved. Go on with the next node.
-            </p>
-            <p v-if="saving_total_ms">
-                Saving took {{ saving_total_ms / 1000 }}s.
-            </p>
-        </div>
-        <div id="progress">
-            <div :style="{ flexGrow: n_valid_pages }" class="bg-success" />
-            <div :style="{ flexGrow: n_unsure_pages }" class="bg-warning" />
-            <div :style="{ flexGrow: n_invalid_pages }" class="bg-danger" />
-        </div>
-        <div id="decision" v-if="rec_status == 'loaded' && node_status == 'loaded'">
-            <v-checkbox v-model="turtle_mode" label="Turtle mode"></v-checkbox>
-            <v-btn :disabled="saving" variant="success" v-b-tooltip.hover.html
-                title="All visible recommendations match without exception. Increase left limit. <kbd>F</kbd>"
-                @click.prevent="membersOk">
-                <i class="mdi mdi-check-all" /> OK</v-btn>
-            <v-btn id="button-not-ok" :disabled="saving" variant="danger" v-b-tooltip.hover.html :title="not_ok_tooltip"
-                @click.prevent="membersNotOk">
-                <i class="mdi mdi-close" /> Not OK</v-btn>
-            <v-btn :disabled="!saved" variant="secondary" v-b-tooltip.hover.html
-                title="Discard progress and start over. <kbd>R</kbd>" @click.prevent="initialize">
-                <i class="mdi mdi-restart" /> Start over</v-btn>
-            <!-- <b-button variant="outline-success" v-b-tooltip.hover title="Assign all safe objects to the current node." @click.prevent="saveResult">Save result</b-button> -->
-            <!-- <div>
+            <div id="recommended-members" v-if="rec_members && !done" class="row scrollable">
+                <div class="col col-12 spinner-container" v-if="rec_status == 'loading'">
+                    <spinner spinner="circles" />
+                </div>
+                <div :key="getUniqueId(m)" v-for="m of rec_members" class="col col-1">
+                    <member-preview :member="m" :controls="rec_member_controls" v-on:remove="removeMember"
+                        v-on:accept="acceptMember" />
+                </div>
+            </div>
+            <div v-if="done" class="bg-light section-heading">Report</div>
+            <div id="report" v-if="done" class="scrollable">
+                Bisection done.
+                <table>
+                    <tr>
+                        <th>Total number of pages:</th>
+                        <td>{{ rec_n_pages }}</td>
+                    </tr>
+                    <tr>
+                        <th>Number of valid pages:</th>
+                        <td>{{ n_valid_pages }}</td>
+                    </tr>
+                    <tr>
+                        <th>Number of invalid pages:</th>
+                        <td>{{ n_invalid_pages }}</td>
+                    </tr>
+                    <tr>
+                        <th>Number of rejected members:</th>
+                        <td>{{ rejected_members.length }}</td>
+                    </tr>
+                </table>
+                <p v-if="n_valid_pages == rec_n_pages">
+                    You accepted all recommendations. You may want to
+                    <i>start over</i> to get more.
+                </p>
+                <p v-if="saving">Your input is being saved...</p>
+                <p v-if="saved">
+                    Your input has been saved. Go on with the next node.
+                </p>
+                <p v-if="saving_total_ms">
+                    Saving took {{ saving_total_ms / 1000 }}s.
+                </p>
+            </div>
+            <div id="progress">
+                <div :style="{ flexGrow: n_valid_pages }" class="bg-success" />
+                <div :style="{ flexGrow: n_unsure_pages }" class="bg-warning" />
+                <div :style="{ flexGrow: n_invalid_pages }" class="bg-danger" />
+            </div>
+            <div id="decision" v-if="rec_status == 'loaded' && node_status == 'loaded'">
+                <v-checkbox v-model="turtle_mode" label="Turtle mode"></v-checkbox>
+                <v-btn :disabled="saving" variant="success" v-b-tooltip.hover.html
+                    title="All visible recommendations match without exception. Increase left limit. <kbd>F</kbd>"
+                    @click.prevent="membersOk">
+                    <i class="mdi mdi-check-all" /> OK</v-btn>
+                <v-btn id="button-not-ok" :disabled="saving" variant="danger" v-b-tooltip.hover.html :title="not_ok_tooltip"
+                    @click.prevent="membersNotOk">
+                    <i class="mdi mdi-close" /> Not OK</v-btn>
+                <v-btn :disabled="!saved" variant="secondary" v-b-tooltip.hover.html
+                    title="Discard progress and start over. <kbd>R</kbd>" @click.prevent="initialize">
+                    <i class="mdi mdi-restart" /> Start over</v-btn>
+                <!-- <b-button variant="outline-success" v-b-tooltip.hover title="Assign all safe objects to the current node." @click.prevent="saveResult">Save result</b-button> -->
+                <!-- <div>
         n_valid_pages: {{n_valid_pages}}, n_unsure_pages: {{n_unsure_pages}}, n_invalid_pages: {{n_invalid_pages}}, rec_interval_left: {{rec_interval_left}}, rec_interval_right: {{rec_interval_right}}
       </div> -->
-            <v-btn :disabled="!saved" variant="secondary" v-b-tooltip.hover.html
-                title="Continue with next node. <kbd>N</kbd>" @click.prevent="next">
-                <i class="mdi mdi-chevron-right" /> Next
-            </v-btn>
+                <v-btn :disabled="!saved" variant="secondary" v-b-tooltip.hover.html
+                    title="Continue with next node. <kbd>N</kbd>" @click.prevent="next">
+                    <i class="mdi mdi-chevron-right" /> Next
+                </v-btn>
+            </div>
+            <message-log class="bg-light" :messages="messages" />
+            <v-dialog v-model="doneModal" centered no-title no-fade>
+                <v-card>
+                    <v-card-title class="success">
+                        Growing done
+                    </v-card-title>
+                    <v-card-text>
+                        <div class="text-center">
+                            Growing is done for this project.
+                        </div>
+                    </v-card-text>
+                    <v-card-actions>
+                        <v-btn @click="$router.push({ name: 'projects' })" color="primary">
+                            Back to projects
+                        </v-btn>
+                    </v-card-actions>
+                </v-card>
+            </v-dialog>
         </div>
-        <message-log class="bg-light" :messages="messages" />
-        <v-dialog v-model="doneModal" centered no-title no-fade>
-            <v-card>
-                <v-card-title class="success">
-                    Growing done
-                </v-card-title>
-                <v-card-text>
-                    <div class="text-center">
-                        Growing is done for this project.
-                    </div>
-                </v-card-text>
-                <v-card-actions>
-                    <v-btn @click="$router.push({ name: 'projects' })" color="primary">
-                        Back to projects
-                    </v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
     </div>
 </template>
 
@@ -662,7 +664,7 @@ export default {
 
 .scrollable {
     margin: 0;
-    overflow-y: auto;
+    overflow-y: scroll;
 }
 
 #decision {
@@ -709,5 +711,12 @@ export default {
 .spinner-container {
     text-align: center;
     margin: 28px 0;
+}
+
+.scrollable {
+    overflow-y: scroll;
+    /* Vertikales Scrollen aktivieren */
+    max-height: 100%;
+    /* Maximalhöhe des Containers festlegen */
 }
 </style>

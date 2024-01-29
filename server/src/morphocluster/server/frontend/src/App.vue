@@ -12,7 +12,13 @@
                 <router-link to="/">MorphoCluster</router-link>
             </v-toolbar-title>
 
-            <v-breadcrumbs :items="globalState.breadcrumbs" large></v-breadcrumbs>
+            <v-breadcrumbs :items="globalState.breadcrumbs" large>
+                <template v-slot:item="{ item }">
+                    <router-link :to="{ name: item.name, params: { file_path: item.path } }">
+                        {{ item.text }}
+                    </router-link>
+                </template>
+            </v-breadcrumbs>
             <v-spacer></v-spacer>
             <dark-mode-control />
         </v-app-bar>

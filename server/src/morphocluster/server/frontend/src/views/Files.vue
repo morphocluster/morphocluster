@@ -1,9 +1,7 @@
 <template>
-    <div id="files">
-        <div class="scrollable">
-            <h1>{{ this.breadcrumb }}</h1>
-
-            <div class="container" v-if="this.entry.type === 'directory'">
+    <div id="files" class="scrollable">
+        <v-container>
+            <div v-if="this.entry.type === 'directory'">
                 <div class="alerts" v-if="alerts.length">
                     <v-alert :key="a" v-for="a of alerts" dismissible show :variant="a.variant">
                         {{ a.message }}
@@ -26,11 +24,11 @@
                     Upload Files
                 </div>
                 <input type="file" id="fileInput" style="display: none" @change="handleFileSelect" multiple />
-                <div class="container mt-4 text-center">
+                <div class="mt-4 text-center">
                     <v-btn large color="primary" class="mr-2" @click="openFileInput">Select File</v-btn>
                 </div>
             </div>
-            <div class="container" v-if="this.entry.type === 'file'">
+            <div v-if="this.entry.type === 'file'">
                 <v-card>
                     <v-card-title>Entry Information</v-card-title>
                     <v-card-text>
@@ -63,7 +61,7 @@
                     </v-row>
                 </div>
             </div>
-        </div>
+        </v-container>
     </div>
 </template>
 
@@ -104,12 +102,8 @@ export default {
         async initialize() {
             try {
                 this.entry = await api.getFileInfo(this.file_path);
-                this.breadcrumb = this.entry.path.split('/');
-                if (this.breadcrumb.includes(".")) {
-                    this.breadcrumb = []; // Oder eine andere Aktion, um das unerwünschte Element zu entfernen
-                }
-                this.breadcrumb = ["files"].concat(this.breadcrumb);
-                this.setBreadcrumbs(this.breadcrumb, "files");
+                this.breadcrumb = this.entry.parents.map(p => ({ name: "files", params: { file_path: p.path }, text: p.name }));
+                this.setBreadcrumbs(this.breadcrumb);
             } catch (error) {
                 console.error(error);
                 this.alerts.unshift({
