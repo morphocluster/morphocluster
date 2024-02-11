@@ -1,67 +1,70 @@
 <template>
-    <div id="files" class="scrollable">
-        <v-container>
-            <div v-if="this.entry.type === 'directory'">
-                <div class="alerts" v-if="alerts.length">
-                    <v-alert :key="a" v-for="a of alerts" dismissible show :variant="a.variant">
-                        {{ a.message }}
-                    </v-alert>
-                </div>
+    <div id="files">
+        <div class="scrollable">
+            <v-container>
+                <div v-if="this.entry.type === 'directory'">
+                    <div class="alerts" v-if="alerts.length">
+                        <v-alert :key="a" v-for="a of alerts" dismissible show :variant="a.variant">
+                            {{ a.message }}
+                        </v-alert>
+                    </div>
 
-                <v-data-table :items="entry.children" :headers="headers" hide-default-footer>
-                    <template v-slot:[`item.name`]="{ item }">
-                        <router-link v-if="item.type === 'directory'"
-                            :to="{ name: 'files', params: { file_path: item.path } }">
-                            <i class="mdi mdi-folder" /> {{ item.name }}
-                        </router-link>
-                        <router-link v-if="item.type === 'file'" :to="{ name: 'files', params: { file_path: item.path } }">
-                            <i class="mdi mdi-file" /> {{ item.name }}
-                        </router-link>
-                    </template>
-                </v-data-table>
+                    <v-data-table :items="entry.children" :headers="headers" hide-default-footer>
+                        <template v-slot:[`item.name`]="{ item }">
+                            <router-link v-if="item.type === 'directory'"
+                                :to="{ name: 'files', params: { file_path: item.path } }">
+                                <i class="mdi mdi-folder" /> {{ item.name }}
+                            </router-link>
+                            <router-link v-if="item.type === 'file'"
+                                :to="{ name: 'files', params: { file_path: item.path } }">
+                                <i class="mdi mdi-file" /> {{ item.name }}
+                            </router-link>
+                        </template>
+                    </v-data-table>
 
-                <div class="dropzone" @dragover.prevent @dragenter.prevent @dragleave.prevent @drop="handleDrop">
-                    Upload Files
+                    <div class="dropzone" @dragover.prevent @dragenter.prevent @dragleave.prevent @drop="handleDrop">
+                        Upload Files
+                    </div>
+                    <input type="file" id="fileInput" style="display: none" @change="handleFileSelect" multiple />
+                    <div class="mt-4 text-center">
+                        <v-btn large color="primary" class="mr-2" @click="openFileInput">Select File</v-btn>
+                    </div>
                 </div>
-                <input type="file" id="fileInput" style="display: none" @change="handleFileSelect" multiple />
-                <div class="mt-4 text-center">
-                    <v-btn large color="primary" class="mr-2" @click="openFileInput">Select File</v-btn>
-                </div>
-            </div>
-            <div v-if="this.entry.type === 'file'">
-                <v-card>
-                    <v-card-title>Entry Information</v-card-title>
-                    <v-card-text>
-                        <v-row style="line-height: 1.5;">
-                            <v-col cols=" 6">
-                                <strong>Name:</strong>
-                            </v-col>
-                            <v-col cols="6">
-                                <strong style="font-weight: bold;">{{ entry.name }}
-                                </strong> </v-col>
+                <div v-if="this.entry.type === 'file'">
+                    <v-card>
+                        <v-card-title>Entry Information</v-card-title>
+                        <v-card-text>
+                            <v-row style="line-height: 1.5;">
+                                <v-col cols=" 6">
+                                    <strong>Name:</strong>
+                                </v-col>
+                                <v-col cols="6">
+                                    <strong style="font-weight: bold;">{{ entry.name }}
+                                    </strong> </v-col>
+                            </v-row>
+                            <v-row>
+                                <v-col cols="6">
+                                    <strong>Created On:</strong>
+                                </v-col>
+                                <v-col cols="6">
+                                    {{ entry.last_modified }}
+                                </v-col>
+                            </v-row>
+                        </v-card-text>
+                    </v-card>
+                    <div class=" d-flex justify-content-center">
+                        <v-row justify="center" class="my-2">
+                            <v-btn color="primary" class="mr-2" @click.prevent="downloadFile">
+                                Download
+                            </v-btn>
+                            <v-btn color="primary" class="mr-2">
+                                Import as project
+                            </v-btn>
                         </v-row>
-                        <v-row>
-                            <v-col cols="6">
-                                <strong>Created On:</strong>
-                            </v-col>
-                            <v-col cols="6">
-                                {{ entry.last_modified }}
-                            </v-col>
-                        </v-row>
-                    </v-card-text>
-                </v-card>
-                <div class=" d-flex justify-content-center">
-                    <v-row justify="center" class="my-2">
-                        <v-btn color="primary" class="mr-2" @click.prevent="downloadFile">
-                            Download
-                        </v-btn>
-                        <v-btn color="primary" class="mr-2">
-                            Import as project
-                        </v-btn>
-                    </v-row>
+                    </div>
                 </div>
-            </div>
-        </v-container>
+            </v-container>
+        </div>
     </div>
 </template>
 
@@ -159,6 +162,7 @@ export default {
 
 .scrollable {
     overflow-y: auto;
+    max-height: 70vh;
 }
 
 .alerts {

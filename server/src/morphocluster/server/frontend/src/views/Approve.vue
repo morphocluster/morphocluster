@@ -2,7 +2,7 @@
     <div id="approve" class="scrollable">
         <div v-if="loading">Loading...</div>
         <div id="node-info">
-            <div class="info-hint mdi mdi-information-outline" v-b-tooltip.hover.html
+            <div class="info-hint mdi mdi-information-outline" v-tooltip.hover.html
                 title="All members of this node, most extreme appearance first." />
             <!--<node-header :node="node" v-if="node" />-->
 
@@ -15,28 +15,24 @@
                 <div slot="no-more" />
             </infinite-loading>
         </div>
-        <div id="progress" v-if="progress" v-b-tooltip.hover :title="progress.leaves_n_approved_objects.toLocaleString('en-US') +
-            ' / ' +
-            progress.leaves_n_objects.toLocaleString('en-US')
-            ">
-            <div :style="{ flexGrow: progress.leaves_n_approved_objects }" class="bg-success" />
-            <div :style="{
-                flexGrow:
-                    progress.leaves_n_objects -
-                    progress.leaves_n_approved_objects,
-            }" class="bg-danger" />
+        <div id="progress" v-if="progress" v-tooltip.hover
+            :title="`${progress.leaves_n_approved_objects.toLocaleString('en-US')} / ${progress.leaves_n_objects.toLocaleString('en-US')}`">
+            <div id="progress-bar-wrapper">
+                <div :style="{ width: progress.leaves_n_approved_objects / progress.leaves_n_objects + '%' }"
+                    class="progress-bar"></div>
+            </div>
         </div>
         <div id="decision">
-            <v-btn id="btn-approve" color="success" @click.prevent="approve(true)" v-b-tooltip.hover.html
+            <v-btn id="btn-approve" color="success" @click.prevent="approve(true)" v-tooltip.hover.html
                 title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>">
                 <i class="mdi mdi-check-all" /><i class="mdi mdi-flag" />
                 Approve + Flag
             </v-btn>
-            <v-btn id="btn-approve" color="success" @click.prevent="approve(false)" v-b-tooltip.hover.html
+            <v-btn id="btn-approve" color="success" @click.prevent="approve(false)" v-tooltip.hover.html
                 title="All members look alike. Approve. <kbd>A</kbd>">
                 <i class="mdi mdi-check-all" /> Approve
             </v-btn>
-            <v-btn id="btn-merge" color="error" @click.prevent="merge" v-b-tooltip.hover.html
+            <v-btn id="btn-merge" color="error" @click.prevent="merge" v-tooltip.hover.html
                 title="Members are too dissimilar. Merge into parent. <kbd>M</kbd>">
                 <i class="mdi mdi-call-merge" /> Merge into parent
             </v-btn>
@@ -78,7 +74,7 @@ export default {
     name: "ApproveView",
     data() {
         return {
-            loading: false,
+            loading: true,
             project: null,
             node: null,
             node_members: [],
@@ -350,6 +346,7 @@ export default {
 
 #decision {
     margin: 0 auto;
+    margin-bottom: 10px;
 }
 
 #decision button {
@@ -357,19 +354,23 @@ export default {
 }
 
 #progress {
-    display: flex;
-    flex-wrap: nowrap;
-    margin: 0.2em 0;
+    margin-top: 10px;
+    margin-bottom: 10px;
 }
 
-#progress div {
-    height: 0.2em;
+#progress-bar-wrapper {
+    height: 5px;
+    background-color: #ff0000;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background-color: rgb(13, 163, 50);
 }
 
 .scrollable {
     overflow-y: auto;
-    /* Vertikales Scrollen aktivieren */
     max-height: 100%;
-    /* Maximalhöhe des Containers festlegen */
 }
 </style>
