@@ -14,9 +14,9 @@
 
             <v-breadcrumbs :items="globalState.breadcrumbs" large>
                 <template v-slot:item="{ item }">
-                    <router-link :to="{ name: item.name, params: { file_path: item.path } }">
+                    <v-breadcrumbs-item :to="{ name: item.name, params: item.params }" exact>
                         {{ item.text }}
-                    </router-link>
+                    </v-breadcrumbs-item>
                 </template>
             </v-breadcrumbs>
             <v-spacer></v-spacer>

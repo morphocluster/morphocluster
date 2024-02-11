@@ -13,8 +13,11 @@
 
 
 <script>
+import mixins from "@/mixins.js";
+
 export default {
   name: "HomeView",
+  mixins: [mixins],
   mounted() {
     this.setBreadcrumbs([{ name: "home" }]);
   },
