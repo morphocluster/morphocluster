@@ -3,14 +3,8 @@
         <div class="member-header" :title="title">
             <div class="member-title" v-if="show_title">{{ title }}</div>
             <div class="member-controls">
-                <i
-                    v-for="c of controls"
-                    :key="c.event"
-                    class="mdi mdi-dark"
-                    :class="c.icon"
-                    :title="c.title"
-                    v-on:click="$emit(c.event, member)"
-                />
+                <i v-for="c of controls" :key="c.event" class="mdi mdi-dark" :class="c.icon" :title="c.title"
+                    v-on:click="$emit(c.event, member)" />
             </div>
         </div>
         <div class="member-body" :class="{ oneImage: image_urls.length == 1 }">
@@ -31,7 +25,7 @@ export default {
         };
     },
     methods: {},
-    mounted() {},
+    mounted() { },
     computed: {
         title: function () {
             return "object_id" in this.member
@@ -62,46 +56,37 @@ export default {
 .member-preview {
     margin-bottom: 15px;
     color: black;
+    border: 1px solid #2196F3;
+    border-radius: 4px;
 }
 
 .member-header {
-    border-top-right-radius: calc(0.25rem - 1px);
-    border-top-left-radius: calc(0.25rem - 1px);
-    padding-top: 3px;
-    height: auto;
-    /* display: flex; */
+    background-color: #90caf9;
+    border-top-right-radius: 4px;
+    border-top-left-radius: 4px;
+    padding: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .member-body {
-    /*background-color: white;*/
-    background-color: var(--background-color);
-}
-
-.member-title {
-    flex-grow: 1;
-    overflow: hidden;
-    /*
-	white-space: nowrap;
-	text-overflow: ellipsis;
-	*/
+    background-color: rgb(90, 86, 86);
+    padding: 10px;
 }
 
 .member-body img {
-    width: 33.333333%;
-}
-
-.member-body.oneImage img {
     max-width: 100%;
-    width: unset;
     max-height: 150px;
-    margin: 0 auto;
-    display: block;
+    width: auto;
+    height: auto;
+    margin-top: 10px;
+    border: 2px solid #000000;
+    border-radius: 4px;
 }
 
 .member-controls {
     font-size: x-large;
-    /* margin-left: auto; */
-    float: right;
 }
 
 .member-controls i {
@@ -109,3 +94,4 @@ export default {
     margin-left: 0.25em;
 }
 </style>
+
