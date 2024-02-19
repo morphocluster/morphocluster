@@ -1,21 +1,17 @@
 <template>
-    <div id="labeling2">
-        <h2 v-if="this.node">{{this.node.name}}</h2>
-        <div id="node-info" class="scrollable">
-            <node-header v-if="node" :node="node"/>
+  <div id="labeling2">
+    <h2 v-if="this.node">{{ this.node.name }}</h2>
+    <div id="node-info" class="overflow-y-auto">
+      <node-header v-if="node" :node="node" />
 
-            <div class="row">
-                <div v-for="m in node_members" class="col col-1" :key="getUniqueId(m)">
-                    <member-preview
-                        v-bind:member="m"
-                        />
-                </div>
-            </div>
-            <infinite-loading
-                @infinite="updateMembers"
-                spinner="circles" />
+      <div class="row">
+        <div v-for="m in node_members" class="col col-1" :key="getUniqueId(m)">
+          <member-preview v-bind:member="m" />
         </div>
+      </div>
+      <infinite-loading @infinite="updateMembers" spinner="circles" />
     </div>
+  </div>
 </template>
 
 <script>
@@ -45,16 +41,15 @@ export default {
     };
   },
   methods: {
-    setMessage: function(msg) {
+    setMessage: function (msg) {
       this.message = msg;
     },
     updateMembers($state) {
       var updateMembersUrl = false;
 
       if (!this.members_url) {
-        this.members_url = `/api/nodes/${
-          this.node_id
-        }/members?objects=true&arrange_by=interleaved`;
+        this.members_url = `/api/nodes/${this.node_id
+          }/members?objects=true&arrange_by=interleaved`;
         this.page = 0;
         updateMembersUrl = true;
       } else {
@@ -107,13 +102,8 @@ export default {
   overflow: hidden;
 }
 
-#labeling2 > * {
+#labeling2>* {
   padding: 0 10px;
-}
-
-.scrollable {
-  margin: 0;
-  overflow-y: auto;
 }
 
 #node-members .col,

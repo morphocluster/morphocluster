@@ -1,15 +1,13 @@
 <template>
-    <div id="project" class="scrollable">
+    <div id="project" class="fill-height overflow-y-auto">
         <v-container>
             <h2>Project: {{ this.project.name }}</h2>
-            <div style="display: flex; justify-content: center;">
-                <table>
-                    <tr v-for="(value, key) in project" :key="key">
-                        <td>{{ key }}</td>
-                        <td>{{ value }}</td>
-                    </tr>
-                </table>
-            </div>
+            <table class="m-x-auto">
+                <tr v-for="(value, key) in project" :key="key">
+                    <td>{{ key }}</td>
+                    <td>{{ value }}</td>
+                </tr>
+            </table>
 
 
             <v-row justify="center" class="my-2">

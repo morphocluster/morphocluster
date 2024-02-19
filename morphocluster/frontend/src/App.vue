@@ -1,5 +1,5 @@
 <template>
-    <v-app>
+    <v-app class="fill-height">
         <v-app-bar app color="grey darken-3" dark>
             <div class="d-flex align-center">
                 <router-link to="/">
@@ -22,7 +22,7 @@
             <v-spacer></v-spacer>
             <dark-mode-control />
         </v-app-bar>
-        <v-main>
+        <v-main class="fill-height">
             <v-tooltip top>
                 <template v-slot:activator="{ on }">
                     <v-progress-linear v-on="on" :active="globalState.loading.length > 0" absolute indeterminate />

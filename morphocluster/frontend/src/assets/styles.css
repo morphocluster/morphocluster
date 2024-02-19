@@ -1,4 +1,5 @@
-html, body {
+html,
+body {
 	height: 100%;
 	margin: 0;
 	overflow: hidden !important;
@@ -16,19 +17,11 @@ html, body {
 	/*color: gray;*/
 }
 
-.view {
-	padding: 64px 0 0 0;
+/* Different flexing strengths for flex elements */
+.v-application .flex-1 {
+	flex: 1 1 !important;
 }
 
-.v-application {
-	height: 100%;
-}
-
-main {
-	height: calc(100% - 56px - 36px);
-}
-
-.container {
-	height: 100%;
-	overflow: auto;
+.v-application .flex-2 {
+	flex: 2 2 !important;
 }

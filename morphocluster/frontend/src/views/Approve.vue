@@ -1,12 +1,12 @@
 <template>
-    <div id="approve" class="scrollable">
+    <div id="approve">
         <div v-if="loading">Loading...</div>
         <div id="node-info">
             <div class="info-hint mdi mdi-information-outline" v-tooltip.hover.html
                 title="All members of this node, most extreme appearance first." />
             <!--<node-header :node="node" v-if="node" />-->
 
-            <div class="row" v-if="node_members">
+            <div class="row overflow-y-auto" v-if="node_members">
                 <div v-for="m of node_members" :key="getUniqueId(m)" class="col col-2">
                     <member-preview :member="m" :controls="member_controls" v-on:moveup="moveupMember" />
                 </div>
@@ -367,10 +367,5 @@ export default {
 .progress-bar {
     height: 100%;
     background-color: rgb(13, 163, 50);
-}
-
-.scrollable {
-    overflow-y: auto;
-    max-height: 100%;
 }
 </style>
