@@ -1,5 +1,5 @@
 <template>
-    <div id="projects" class="scrollable">
+    <div id="projects" class="fill-height overflow-y-auto">
         <v-container>
             <div class="alerts" v-if="alerts.length">
                 <v-alert :key="a" v-for="a of alerts" dismissible show :variant="a.variant">
@@ -133,12 +133,5 @@ export default {
     width: auto;
     text-align: right;
     white-space: nowrap;
-}
-
-.scrollable {
-    overflow-y: scroll;
-    /* Vertikales Scrollen aktivieren */
-    max-height: 100%;
-
 }
 </style>
