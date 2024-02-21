@@ -181,7 +181,7 @@ def init_app(app):
         print(f"Loading {archive_fn} into {images_dir}...")
         with database.engine.begin() as conn, zipfile.ZipFile(archive_fn) as zf:
             with zf.open("index.csv") as f:
-                index: pd.DataFrame = pd.read_csv(f, usecols=["object_id", "path"])  # type: ignore
+                index: pd.DataFrame = pd.read_csv(f, usecols=["object_id", "path"], dtype=str)  # type: ignore
 
             if not index["object_id"].is_unique:
                 value_counts = index["object_id"].value_counts()
@@ -259,7 +259,10 @@ def init_app(app):
             vectors = pca_transformer.fit_transform(vectors)
             time_fit = time.perf_counter() - start
             print("Dimensionality reduction took {:.0f}s".format(time_fit))
-            print("Explained variance ratio:", pca_transformer.explained_variance_ratio_.sum())
+            print(
+                "Explained variance ratio:",
+                pca_transformer.explained_variance_ratio_.sum(),
+            )
             del pca_transformer
 
         if vectors.shape[1] > 100:
