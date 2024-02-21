@@ -9,8 +9,6 @@ services:
     # ports:
     #   # Expose port 8000 (web service)
     #   - "8000:8000"
-    #   ## TODO: Expose port 22 for external SSH access:
-    #   #- "8022:22"
     depends_on:
       - postgres
       - redis-lru

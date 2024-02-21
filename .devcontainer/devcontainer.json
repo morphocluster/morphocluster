@@ -106,5 +106,13 @@
 		// when using the terminal
 		"terminal.integrated.allowChords": false,
 		"terminal.integrated.inheritEnv": false
+	},
+	"portsAttributes": {
+		"5000": {
+			"label": "flask"
+		},
+		"8080": {
+			"label": "Vue"
+		}
 	}
 }
