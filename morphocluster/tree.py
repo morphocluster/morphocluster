@@ -813,16 +813,18 @@ class Tree(object):
         else:
             return [o["object_id"] for o in objects_[:9]]
 
-    def _calc_own_type_objects(self, children, objects_):
+    def _calc_own_type_objects(self, children: MemberCollection, objects_):
         """
         Calculate nine own type objects_ for a node as
             a) the nine objects_ with maximum distance to the children, or
             b) [], if the node is a leaf.
         """
 
-        if len(children) > 0 and len(objects_) > 0:
+        children_vectors = children.vectors
+
+        if children_vectors.size and len(objects_) > 0:
             try:
-                classifier = Classifier(children.vectors)
+                classifier = Classifier(children_vectors)
                 distances = classifier.distances(objects_.vectors)
                 max_dist = np.max(distances, axis=0)
                 max_dist_idx = np.argsort(max_dist)[::-1]
@@ -834,7 +836,7 @@ class Tree(object):
                 return [objects_[i]["object_id"] for i in max_dist_idx[:9]]
 
             except:
-                print("child_vectors", children.vectors.shape)
+                print("child_vectors", children_vectors.shape)
                 print("object_vectors", objects_.vectors.shape)
                 raise
 
@@ -1630,9 +1632,9 @@ class Tree(object):
 
                             child_selector = invalid_subtree["parent_id"] == node_id
                             children = invalid_subtree.loc[child_selector]
-                            # Build collection of children. (Set centroid of children without a vector to zero to allow alignment with cardinalities.)
+                            # Build collection of children.
                             children_dict = MemberCollection(
-                                children.reset_index().to_dict("records"), "zero"
+                                children.reset_index().to_dict("records"), "remove"
                             )
 
                             # 2. _n_objects_deep
@@ -1679,28 +1681,23 @@ class Tree(object):
 
                             # 4. _centroid
                             with t.child("_centroid"):
-                                _centroid = []
-                                _centroid_support = 0
+                                _centroid_vectors = []
+                                _centroid_supports = 0
 
                                 if len(objects_) > 0:
                                     # Object mean, weighted with number of objects
-                                    _centroid.append(np.sum(objects_.vectors, axis=0))
-                                    _centroid_support += len(objects_)
+                                    _centroid_vectors.append(np.sum(objects_.vectors, axis=0))
+                                    _centroid_supports += len(objects_)
 
                                 if len(children_dict) > 0:
-                                    # Children mean
-                                    cardinalities = children_dict.cardinalities
-                                    children_mean = np.sum(
-                                        cardinalities[:, np.newaxis]
-                                        * children_dict.vectors,
-                                        axis=0,
-                                    )
-                                    _centroid.append(children_mean)
-                                    _centroid_support += cardinalities.sum()
+                                    children_support, children_vector = children_dict.get_support_and_vector()
+                                    if children_support > 0:
+                                        _centroid_vectors.append(children_vector)
+                                        _centroid_supports += children_support
 
-                                if len(_centroid) > 0 and _centroid_support > 0:
+                                if len(_centroid_vectors) > 0 and _centroid_supports > 0:
                                     _centroid = (
-                                        np.sum(_centroid, axis=0) / _centroid_support
+                                        np.sum(_centroid_vectors, axis=0) / _centroid_supports
                                     )
                                 else:
                                     _centroid = None
