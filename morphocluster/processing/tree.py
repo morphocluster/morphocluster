@@ -517,6 +517,9 @@ class Tree(object):
         Returns a DataFrame with object_id and label.
 
         Ignores objects without named ancestors.
+
+        Args:
+            clean_name (bool): Remove repetitive segments from each cluster label.
         """
 
         node_idx = pd.Index(self.nodes["node_id"])
