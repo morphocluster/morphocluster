@@ -1,43 +1,58 @@
 <template>
-    <div id="bisect">
+    <div id="bisect" class="d-flex flex-column fill-height">
         <div v-if="node_status == 'loading'">Loading node...</div>
         <div class="bg-light section-heading border-bottom border-top">
             Node members
             <span v-if="node">({{ node.n_objects }} objects)</span>
-            <span class="float-right mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html
-                title="All members of this node, randomly ordered." />
+            <span class="float-right mdi mdi-dark mdi-information-outline">
+                <v-tooltip bottom>
+                    <template v-slot:activator="{ on }">
+                        <span v-on="on" v-tooltip="{ text: 'All members of this node, randomly ordered.' }" />
+                    </template>
+                    All members of this node, randomly ordered.
+                </v-tooltip>
+            </span>
         </div>
-        <div id="node-members" class="row overflow-y-auto">
-            <div v-if="node" class="col col-1">
-                <member-preview v-bind:member="node" />
-            </div>
-
-            <div :key="getUniqueId(m)" v-for="m of node_members" class="col col-1">
-                <member-preview v-bind:member="m" />
-            </div>
-
+        <div id="node-members" class="flex-1 overflow-y-auto">
+            <v-row>
+                <v-col cols="12" md="4">
+                    <member-preview v-if="node" :member="node" />
+                </v-col>
+                <v-col v-for="m of node_members" :key="getUniqueId(m)" cols="12" md="1">
+                    <member-preview :member="m" />
+                </v-col>
+            </v-row>
             <infinite-loading ref="infload" v-if="node" @infinite="updateNodeMembers" spinner="circles">
                 <div slot="no-more">
-                    <span v-b-tooltip.hover.html title="End of list.">&#8718;</span>
+                    <v-tooltip bottom>
+                        <template v-slot:activator="{ on }">
+                            <span v-on="on" v-tooltip="{ text: 'End of list.' }">&#8718;</span>
+                        </template>
+                        End of list.
+                    </v-tooltip>
                 </div>
             </infinite-loading>
         </div>
         <div v-if="rec_status == 'loading'">Loading recommendations...</div>
         <div v-if="rec_members.length && !done" class="bg-light section-heading border-bottom border-top">
             Recommended members
-            <span v-if="typeof rec_current_page != 'undefined'">(Page {{ rec_current_page + 1 }} / {{ rec_n_pages
-            }})</span>
-            <span class="float-right mdi mdi-dark mdi-information-outline" v-b-tooltip.hover.html
-                title="Recommendations for this node, page by page." />
+            <span v-if="typeof rec_current_page != 'undefined'">(Page {{ rec_current_page + 1 }} / {{ rec_n_pages }})</span>
+            <span class="float-right mdi mdi-dark mdi-information-outline">
+                <v-tooltip bottom>
+                    <template v-slot:activator="{ on }">
+                        <span v-on="on" v-tooltip="{ text: 'Recommendations for this node, page by page.' }" />
+                    </template>
+                    Recommendations for this node, page by page.
+                </v-tooltip>
+            </span>
         </div>
-        <div id="recommended-members" v-if="rec_members && !done" class="row overflow-y-auto">
-            <div class="col col-12 spinner-container" v-if="rec_status == 'loading'">
-                <spinner spinner="circles" />
-            </div>
-            <div :key="getUniqueId(m)" v-for="m of rec_members" class="col col-1">
-                <member-preview :member="m" :controls="rec_member_controls" v-on:remove="removeMember"
-                    v-on:accept="acceptMember" />
-            </div>
+        <div id="recommended-members" v-if="rec_members && !done" class="flex-2 overflow-y-auto fill-height">
+            <v-row>
+                <v-col v-for="m of rec_members" :key="getUniqueId(m)" cols="12" md="1">
+                    <member-preview :member="m" :controls="rec_member_controls" v-on:remove="removeMember"
+                        v-on:accept="acceptMember" />
+                </v-col>
+            </v-row>
         </div>
         <div v-if="done" class="bg-light section-heading">Report</div>
         <div id="report" v-if="done" class="overflow-y-auto">
@@ -77,26 +92,40 @@
             <div :style="{ flexGrow: n_unsure_pages }" class="bg-warning" />
             <div :style="{ flexGrow: n_invalid_pages }" class="bg-danger" />
         </div>
-        <div id="decision" v-if="rec_status == 'loaded' && node_status == 'loaded'">
-            <v-checkbox v-model="turtle_mode" label="Turtle mode"></v-checkbox>
-            <v-btn :disabled="saving" variant="success" v-b-tooltip.hover.html
-                title="All visible recommendations match without exception. Increase left limit. <kbd>F</kbd>"
-                @click.prevent="membersOk">
-                <i class="mdi mdi-check-all" /> OK</v-btn>
-            <v-btn id="button-not-ok" :disabled="saving" variant="danger" v-b-tooltip.hover.html :title="not_ok_tooltip"
-                @click.prevent="membersNotOk">
-                <i class="mdi mdi-close" /> Not OK</v-btn>
-            <v-btn :disabled="!saved" variant="secondary" v-b-tooltip.hover.html
-                title="Discard progress and start over. <kbd>R</kbd>" @click.prevent="initialize">
-                <i class="mdi mdi-restart" /> Start over</v-btn>
-            <!-- <b-button variant="outline-success" v-b-tooltip.hover title="Assign all safe objects to the current node." @click.prevent="saveResult">Save result</b-button> -->
-            <!-- <div>
-        n_valid_pages: {{n_valid_pages}}, n_unsure_pages: {{n_unsure_pages}}, n_invalid_pages: {{n_invalid_pages}}, rec_interval_left: {{rec_interval_left}}, rec_interval_right: {{rec_interval_right}}
-      </div> -->
-            <v-btn :disabled="!saved" variant="secondary" v-b-tooltip.hover.html
-                title="Continue with next node. <kbd>N</kbd>" @click.prevent="next">
-                <i class="mdi mdi-chevron-right" /> Next
-            </v-btn>
+        <div id="decision" v-if="rec_status == 'loaded' && node_status == 'loaded'" class="d-flex align-items-center">
+            <v-checkbox v-model="turtle_mode" label="Turtle mode" class="mr-2"></v-checkbox>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn :disabled="saving" color="success" v-on="on" class="mr-2">
+                        <i class="mdi mdi-check-all" /> OK
+                    </v-btn>
+                </template>
+                <span>All visible recommendations match without exception. Increase left limit.</span>
+            </v-tooltip>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn id="button-not-ok" :disabled="saving" color="error" v-on="on" class="mr-2">
+                        <i class="mdi mdi-close" /> Not OK
+                    </v-btn>
+                </template>
+                <span>{{ not_ok_tooltip }}</span>
+            </v-tooltip>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn :disabled="!saved" variant="secondary" v-on="on" class="mr-2">
+                        <i class="mdi mdi-restart" /> Start over
+                    </v-btn>
+                </template>
+                <span>Discard progress and start over.</span>
+            </v-tooltip>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn :disabled="!saved" variant="secondary" v-on="on">
+                        <i class="mdi mdi-chevron-right" /> Next
+                    </v-btn>
+                </template>
+                <span>Continue with next node.</span>
+            </v-tooltip>
         </div>
         <message-log class="bg-light" :messages="messages" />
         <v-dialog v-model="doneModal" centered no-title no-fade>
@@ -118,6 +147,7 @@
         </v-dialog>
     </div>
 </template>
+  
 
 <script>
 import axios from "axios";
