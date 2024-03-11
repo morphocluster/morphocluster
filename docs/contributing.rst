@@ -81,6 +81,14 @@ To contribute, please follow these steps:
 .. _repository: https://github.com/morphocut/morphocut
    
 
+Used frameworks
+~~~~~~~~~~~~~~~
+
+MorphoCluster currently uses the following (outdated) versions of certain dependencies:
+
+- `Flask v1.1 <https://flask.palletsprojects.com/en/1.1.x/>` (Not v3!)
+- `Vuetify v2 <https://v2.vuetifyjs.com/en/>` (Not v3!)
+
 
 VS Code Dev Container
 ~~~~~~~~~~~~~~~~~~~~~
