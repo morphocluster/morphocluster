@@ -53,8 +53,19 @@ export default {
 </script>
 
 <style scoped>
+.member-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.smaller-title {
+    font-size: 0.8em;
+}
+
 .member-preview {
     margin-bottom: 15px;
+    max-height: 200px;
     color: black;
     border: 1px solid #2196F3;
     border-radius: 4px;
@@ -71,18 +82,16 @@ export default {
 }
 
 .member-body {
-    background-color: rgb(90, 86, 86);
-    padding: 10px;
+    background-color: rgb(255, 255, 255);
 }
 
 .member-body img {
-    max-width: 100%;
+    max-width: 90%;
+    max-height: 90%;
     max-height: 150px;
     width: auto;
     height: auto;
-    margin-top: 10px;
-    border: 2px solid #000000;
-    border-radius: 4px;
+    margin-right: 2px;
 }
 
 .member-controls {
@@ -94,4 +103,3 @@ export default {
     margin-left: 0.25em;
 }
 </style>
-

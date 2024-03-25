@@ -23,19 +23,32 @@
             </div>
         </div>
         <div id="decision">
-            <v-btn id="btn-approve" color="success" @click.prevent="approve(true)" v-tooltip.hover.html
-                title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>">
-                <i class="mdi mdi-check-all" /><i class="mdi mdi-flag" />
-                Approve + Flag
-            </v-btn>
-            <v-btn id="btn-approve" color="success" @click.prevent="approve(false)" v-tooltip.hover.html
-                title="All members look alike. Approve. <kbd>A</kbd>">
-                <i class="mdi mdi-check-all" /> Approve
-            </v-btn>
-            <v-btn id="btn-merge" color="error" @click.prevent="merge" v-tooltip.hover.html
-                title="Members are too dissimilar. Merge into parent. <kbd>M</kbd>">
-                <i class="mdi mdi-call-merge" /> Merge into parent
-            </v-btn>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn id="btn-approve" color="success" @click.prevent="approve(true)" v-on="on">
+                        <i class="mdi mdi-check-all" /><i class="mdi mdi-flag" />
+                        Approve + Flag
+                    </v-btn>
+                </template>
+                All members look alike and this cluster is exceptional. Approve and flag for preferred
+                treatment.<kbd>F</kbd>
+            </v-tooltip>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn id="btn-approve" color="success" @click.prevent="approve(false)" v-on="on">
+                        <i class="mdi mdi-check-all" /> Approve
+                    </v-btn>
+                </template>
+                All members look alike. Approve .<kbd>A</kbd>
+            </v-tooltip>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn id="btn-merge" color="error" @click.prevent="merge" v-on="on">
+                        <i class="mdi mdi-call-merge" /> Merge into parent
+                    </v-btn>
+                </template>
+                Members are too dissimilar. Merge into parent. <kbd>M</kbd>
+            </v-tooltip>
         </div>
         <message-log class="bg-light" :messages="messages" />
         <v-dialog v-model="doneModal" centered no-title no-fade>
@@ -74,6 +87,7 @@ export default {
     name: "ApproveView",
     data() {
         return {
+            doneModal: false,
             loading: true,
             project: null,
             node: null,

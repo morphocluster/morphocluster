@@ -9,9 +9,9 @@
             <v-data-table sort-by="name" :items="projects" :headers="headers" showEmpty hide-default-footer>
                 <template v-slot:[`item.name`]="{ item }">
                     <router-link :to="{
-                        name: 'project',
-                        params: { project_id: item.project_id },
-                    }">{{ item.name }}</router-link>
+                name: 'project',
+                params: { project_id: item.project_id },
+            }">{{ item.name }}</router-link>
                 </template>
 
                 <template v-slot:[`item.progress`]="{ item }">
@@ -21,41 +21,41 @@
                             :value="item.progress.leaves_n_filled_nodes / item.progress.leaves_n_nodes * 100"
                             :buffer-value="item.progress.leaves_n_approved_nodes / item.progress.leaves_n_nodes * 100"
                             background-color="yellow" color="green" height="7" style="margin: 0;" :title="`${item.progress.leaves_n_filled_nodes} / ${item.progress.leaves_n_nodes} clusters grown, ${Humanize.compactInteger(
-                                item.progress.leaves_n_approved_nodes,
-                                1
-                            )} / ${Humanize.compactInteger(
-                                item.progress.leaves_n_nodes,
-                                1
-                            )} clusters validated`" />
+                item.progress.leaves_n_approved_nodes,
+                1
+            )} / ${Humanize.compactInteger(
+                item.progress.leaves_n_nodes,
+                1
+            )} clusters validated`" />
                     </div>
 
                     <div style="border: 2px solid #717171; border-radius: 6px; margin-bottom: 5px; ">
                         <v-progress-linear rounded variant="success"
                             :value="item.progress.leaves_n_approved_objects / item.progress.n_objects_deep * 100"
                             background-color="white" color="green" height="7" style="margin: 0;" :title="`${Humanize.compactInteger(
-                                item.progress.leaves_n_approved_objects,
-                                1
-                            )} / ${Humanize.compactInteger(
-                                item.progress.n_objects_deep,
-                                1
-                            )} (${Math.round(
-                                (item.progress.leaves_n_approved_objects /
-                                    item.progress.n_objects_deep) *
-                                100
-                            )}%) objects in validated clusters`" />
+                item.progress.leaves_n_approved_objects,
+                1
+            )} / ${Humanize.compactInteger(
+                item.progress.n_objects_deep,
+                1
+            )} (${Math.round(
+                (item.progress.leaves_n_approved_objects /
+                    item.progress.n_objects_deep) *
+                100
+            )}%) objects in validated clusters`" />
                     </div>
                 </template>
                 <template v-slot:[`item.action`]="{ item }">
                     <v-btn small variant="primary" class="mr-2" :to="{
-                        name: 'approve',
-                        params: { project_id: item.project_id },
-                    }">
+                name: 'approve',
+                params: { project_id: item.project_id },
+            }">
                         Validate
                     </v-btn>
                     <v-btn small variant="primary" class="mr-2" :to="{
-                        name: 'bisect',
-                        params: { project_id: item.project_id },
-                    }">Grow</v-btn>
+                name: 'bisect',
+                params: { project_id: item.project_id },
+            }">Grow</v-btn>
                 </template>
 
                 <template v-slot:empty>
