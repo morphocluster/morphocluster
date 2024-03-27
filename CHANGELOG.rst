@@ -1,5 +1,17 @@
-Current (0.2.x)
+Current (0.3.x)
 ==================
+
+- Various dependency fixes
+- Recluster explorative (#72)
+- Various improvements without a pull request
+- Readthedocs: Expert Mode (#94)
+- fixed dependecies and recluster (#95)
+- Fix docs (#99)
+- Docs: Update Steps for Submitting Code (#101)
+- Black workflow (#102)
+- Project overview and export (#96)
+- Revise development environment (devcontainer)
+
 
 0.2.2
 =====
