@@ -159,7 +159,7 @@ Updating dependencies
 ~~~~~~~~~~~~~~~~~~~~~
 
 Dependencies are declared in `environment.base.yaml` (general) and `environment.dev.yaml` (development only).
-Run `gen_conda-lock.sh` to regenerate the lock file, then rebuild the devcontainer.
+Run `gen-conda-lock.sh` to regenerate the lock file, then rebuild the devcontainer.
 
 
 Code Style
