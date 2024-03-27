@@ -1,99 +1,62 @@
 <template>
-    <div id="bisect">
-        <nav class="navbar navbar-expand-lg navbar-light bg-dark text-light">
-            <router-link class="navbar-brand text-light" to="/"
-                >MorphoCluster</router-link
-            >
-            <div class="collapse navbar-collapse">
-                <ul class="navbar-nav mr-auto">
-                    <li class="nav-item nav-link text-light" v-if="project">
-                        {{ project.name }}
-                    </li>
-                    <li class="nav-item nav-link text-light">Grow</li>
-                    <li class="nav-item nav-link text-light" v-if="node">
-                        {{ node.name }}
-                    </li>
-                </ul>
-                <dark-mode-control />
-            </div>
-        </nav>
+    <div id="bisect" class="d-flex flex-column fill-height">
         <div v-if="node_status == 'loading'">Loading node...</div>
         <div class="bg-light section-heading border-bottom border-top">
             Node members
             <span v-if="node">({{ node.n_objects }} objects)</span>
-            <span
-                class="float-right mdi mdi-dark mdi-information-outline"
-                v-b-tooltip.hover.html
-                title="All members of this node, randomly ordered."
-            />
+            <v-tooltip left>
+                <template v-slot:activator="{ on }">
+                    <span class="float-right mdi mdi-dark mdi-information-outline" v-on="on"></span>
+                </template>
+                <span>All members of this node, randomly ordered.</span>
+            </v-tooltip>
+
         </div>
-        <div id="node-members" class="row scrollable">
-            <div v-if="node" class="col col-1">
+        <div id="node-members" class="flex-2 overflow-y-auto grid-container">
+            <div v-if="node" class="grid-item col-1">
                 <member-preview v-bind:member="node" />
             </div>
 
-            <div
-                :key="getUniqueId(m)"
-                v-for="m of node_members"
-                class="col col-1"
-            >
+            <div v-for="m in node_members" :key="getUniqueId(m)" class="grid-item col-1">
                 <member-preview v-bind:member="m" />
             </div>
-
-            <infinite-loading
-                ref="infload"
-                v-if="node"
-                @infinite="updateNodeMembers"
-                spinner="circles"
-            >
+            <infinite-loading ref="infload" v-if="node" @infinite="updateNodeMembers" spinner="circles">
                 <div slot="no-more">
-                    <span v-b-tooltip.hover.html title="End of list."
-                        >&#8718;</span
-                    >
+                    <v-tooltip top>
+                        <template v-slot:activator="{ on }">
+                            <span v-on="on">&#8718;</span>
+                        </template>
+                        <span>End of list</span>
+                    </v-tooltip>
                 </div>
+
             </infinite-loading>
         </div>
         <div v-if="rec_status == 'loading'">Loading recommendations...</div>
-        <div
-            v-if="rec_members.length && !done"
-            class="bg-light section-heading border-bottom border-top"
-        >
+        <div v-if="rec_members.length && !done" class="bg-light section-heading border-bottom border-top">
             Recommended members
-            <span v-if="typeof rec_current_page != 'undefined'"
-                >(Page {{ rec_current_page + 1 }} / {{ rec_n_pages }})</span
-            >
-            <span
-                class="float-right mdi mdi-dark mdi-information-outline"
-                v-b-tooltip.hover.html
-                title="Recommendations for this node, page by page."
-            />
+            <span v-if="(typeof rec_current_page !== 'undefined')">(Page {{ rec_current_page + 1 }} / {{ rec_n_pages
+                }})</span>
+
+            <v-tooltip>
+                <template v-slot:activator="{ on }">
+                    <span class="float-right mdi mdi-dark mdi-information-outline" v-on="on" />
+                    <span> Recommendations for this node, page by page.</span>
+                </template>
+            </v-tooltip>
         </div>
-        <div
-            id="recommended-members"
-            v-if="rec_members && !done"
-            class="row scrollable"
-        >
-            <div
-                class="col col-12 spinner-container"
-                v-if="rec_status == 'loading'"
-            >
+
+        <div id="recommended-members" v-if="rec_members && !done" class="flex-1 overflow-y-auto">
+            <div class="col col-12 spinner-container" v-if="rec_status == 'loading'">
                 <spinner spinner="circles" />
             </div>
-            <div
-                :key="getUniqueId(m)"
-                v-for="m of rec_members"
-                class="col col-1"
-            >
-                <member-preview
-                    :member="m"
-                    :controls="rec_member_controls"
-                    v-on:remove="removeMember"
-                    v-on:accept="acceptMember"
-                />
+            <div :key="getUniqueId(m)" v-for="m of rec_members" class="col col-1">
+                <member-preview :member="m" :controls="rec_member_controls" v-on:remove="removeMember"
+                    v-on:accept="acceptMember" />
             </div>
         </div>
         <div v-if="done" class="bg-light section-heading">Report</div>
-        <div id="report" v-if="done" class="scrollable">
+        <div id="report" v-if="done" class="overflow-y-auto">
             Bisection done.
             <table>
                 <tr>
@@ -130,70 +93,60 @@
             <div :style="{ flexGrow: n_unsure_pages }" class="bg-warning" />
             <div :style="{ flexGrow: n_invalid_pages }" class="bg-danger" />
         </div>
-        <div
-            id="decision"
-            v-if="rec_status == 'loaded' && node_status == 'loaded'"
-        >
-            <b-form-checkbox v-model="turtle_mode">Turtle mode</b-form-checkbox>
-            <b-button
-                :disabled="saving"
-                variant="success"
-                v-b-tooltip.hover.html
-                title="All visible recommendations match without exception. Increase left limit. <kbd>F</kbd>"
-                @click.prevent="membersOk"
-            >
-                <i class="mdi mdi-check-all" /> OK</b-button
-            >
-            <b-button
-                id="button-not-ok"
-                :disabled="saving"
-                variant="danger"
-                v-b-tooltip.hover.html
-                :title="not_ok_tooltip"
-                @click.prevent="membersNotOk"
-            >
-                <i class="mdi mdi-close" /> Not OK</b-button
-            >
-            <b-button
-                :disabled="!saved"
-                variant="secondary"
-                v-b-tooltip.hover.html
-                title="Discard progress and start over. <kbd>R</kbd>"
-                @click.prevent="initialize"
-            >
-                <i class="mdi mdi-restart" /> Start over</b-button
-            >
+        <div id="decision" v-if="rec_status == 'loaded' && node_status == 'loaded'">
+            <v-checkbox v-model="turtle_mode" label="Turtle mode"></v-checkbox>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn :disabled="saving" color="success" @click.prevent="membersOk" v-on="on">
+                        <i class="mdi mdi-check-all" /> OK</v-btn>
+                </template>
+                <span> All visible recommendations match without exception. Increase left limit. <kbd>F</kbd> </span>
+            </v-tooltip>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn id="button-not-ok" :disabled="saving" color="error" @click.prevent="membersNotOk" v-on="on">
+                        <i class="mdi mdi-close" /> Not OK</v-btn>
+                </template>
+                <span>{{ not_ok_tooltip }}</span>
+            </v-tooltip>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn :disabled="!saved" variant="secondary" @click.prevent="initialize" v-on="on">
+                        <i class="mdi mdi-restart" /> Start over</v-btn>
+                </template>
+                <span>Discard progress and start over. <kbd>R</kbd></span>
+            </v-tooltip>
             <!-- <b-button variant="outline-success" v-b-tooltip.hover title="Assign all safe objects to the current node." @click.prevent="saveResult">Save result</b-button> -->
             <!-- <div>
         n_valid_pages: {{n_valid_pages}}, n_unsure_pages: {{n_unsure_pages}}, n_invalid_pages: {{n_invalid_pages}}, rec_interval_left: {{rec_interval_left}}, rec_interval_right: {{rec_interval_right}}
       </div> -->
-            <b-button
-                :disabled="!saved"
-                variant="secondary"
-                v-b-tooltip.hover.html
-                title="Continue with next node. <kbd>N</kbd>"
-                @click.prevent="next"
-            >
-                <i class="mdi mdi-chevron-right" /> Next
-            </b-button>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn :disabled="!saved" variant="secondary" @click.prevent="next" v-on="on">
+                        <i class="mdi mdi-chevron-right" /> Next
+                    </v-btn>
+                </template>
+                <span>Continue with next node. <kbd>N</kbd></span>
+            </v-tooltip>
         </div>
         <message-log class="bg-light" :messages="messages" />
-        <b-modal
-            ref="doneModal"
-            centered
-            no-fade
-            header-bg-variant="success"
-            title="Growing done"
-        >
-            <div class="d-block text-center">
-                Growing is done for this project.
-            </div>
-            <footer slot="modal-footer">
-                <b-button variant="primary" :to="{ name: 'projects' }"
-                    >Back to projects</b-button
-                >
-            </footer>
-        </b-modal>
+        <v-dialog v-model="doneModal" centered no-title no-fade>
+            <v-card>
+                <v-card-title class="success">
+                    Growing done
+                </v-card-title>
+                <v-card-text>
+                    <div class="text-center">
+                        Growing is done for this project.
+                    </div>
+                </v-card-text>
+                <v-card-actions>
+                    <v-btn @click="$router.push({ name: 'projects' })" color="primary">
+                        Back to projects
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
@@ -210,7 +163,6 @@ import * as api from "@/helpers/api.js";
 
 import MemberPreview from "@/components/MemberPreview.vue";
 import MessageLog from "@/components/MessageLog.vue";
-import DarkModeControl from "@/components/DarkModeControl.vue";
 
 import Vue from "vue";
 
@@ -220,6 +172,7 @@ export default {
     name: "BisectView",
     data() {
         return {
+            doneModal: false,
             node_status: "",
             project: null,
             node: null,
@@ -296,7 +249,6 @@ export default {
         InfiniteLoading,
         MessageLog,
         Spinner,
-        DarkModeControl,
     },
     mixins: [mixins],
     watch: {
@@ -477,9 +429,8 @@ export default {
             // TODO: arrange_by=random
             if (!this.node_members_url) {
                 const nodes = !!this.node.children;
-                this.node_members_url = `/api/nodes/${
-                    this.node.node_id
-                }/members?objects=${!nodes}&nodes=${nodes}&arrange_by=random&`;
+                this.node_members_url = `/api/nodes/${this.node.node_id
+                    }/members?objects=${!nodes}&nodes=${nodes}&arrange_by=random&`;
                 this.node_members_page = 0;
                 updateMembersUrl = true;
             }
@@ -558,7 +509,7 @@ export default {
                 // Otherwise perform regular bisection
                 this.rec_current_page = Math.trunc(
                     (1 - frac) * this.rec_interval_left +
-                        frac * this.rec_interval_right
+                    frac * this.rec_interval_right
                 );
             }
         },
@@ -737,13 +688,8 @@ export default {
     overflow: hidden;
 }
 
-#bisect > * {
+#bisect>* {
     padding: 0 10px;
-}
-
-.scrollable {
-    margin: 0;
-    overflow-y: auto;
 }
 
 #decision {
@@ -764,9 +710,7 @@ export default {
     padding: 0 5px;
 }
 
-#node-members {
-    flex: 1;
-}
+
 
 #recommended-members,
 #report {
@@ -790,5 +734,20 @@ export default {
 .spinner-container {
     text-align: center;
     margin: 28px 0;
+}
+
+#node-members {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.grid-item {
+    width: calc(100% / 12);
+    box-sizing: border-box;
+    padding: 5px;
+}
+
+.grid-item:first-child {
+    width: calc((100% / 12) * 2);
 }
 </style>

@@ -12,6 +12,8 @@ Current (0.3.x)
 - Project overview and export (#96)
 - Revise development environment (devcontainer)
 
+- Convert frontend to Vuetify (#107)
+
 
 0.2.2
 =====

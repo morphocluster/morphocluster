@@ -1,7 +1,8 @@
-html, body {
+html,
+body {
 	height: 100%;
 	margin: 0;
-	overflow: hidden;
+	overflow: hidden !important;
 }
 
 .tooltip kbd {
@@ -16,26 +17,11 @@ html, body {
 	/*color: gray;*/
 }
 
-/* Dark/Light Mode */
-:root {
-	--background-color: white;
-	--color: #212529;
+/* Different flexing strengths for flex elements */
+.v-application .flex-1 {
+	flex: 1 1 !important;
 }
 
-:root.dark-mode {
-	--background-color: black;
-	--color: #f7f7f9;
-}
-
-body {
-	color: var(--color);
-	background-color: var(--background-color);
-}
-
-table, .table {
-	color: var(--color);
-}
-
-.modal-dialog {
-	color: black;
+.v-application .flex-2 {
+	flex: 2 2 !important;
 }

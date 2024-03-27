@@ -53,6 +53,11 @@ var router = new Router({
       props: (route) => ({ project_id: parseInt(route.params.project_id) }),
     },
     {
+      name: 'template_multi',
+      path: '/template_multi',
+      component: () => import(/* webpackChunkName: "template_multi" */ './views/TemplateMulti.vue'),
+    },
+    {
       path: '/',
       redirect: '/home'
     },
