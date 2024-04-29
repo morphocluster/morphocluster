@@ -1,12 +1,12 @@
 <template>
-    <div id="approve">
+    <div id="approve" class="d-flex flex-column fill-height">
         <div v-if="loading">Loading...</div>
         <div id="node-info">
             <div class="info-hint mdi mdi-information-outline" v-tooltip.hover.html
                 title="All members of this node, most extreme appearance first." />
             <!--<node-header :node="node" v-if="node" />-->
 
-            <div class="row overflow-y-auto" v-if="node_members">
+            <div class="row flex-1 overflow-y-auto" v-if="node_members">
                 <div v-for="m of node_members" :key="getUniqueId(m)" class="col col-2">
                     <member-preview :member="m" :controls="member_controls" v-on:moveup="moveupMember" />
                 </div>
@@ -18,7 +18,7 @@
         <div id="progress" v-if="progress" v-tooltip.hover
             :title="`${progress.leaves_n_approved_objects.toLocaleString('en-US')} / ${progress.leaves_n_objects.toLocaleString('en-US')}`">
             <div id="progress-bar-wrapper">
-                <div :style="{ width: progress.leaves_n_approved_objects / progress.leaves_n_objects + '%' }"
+                <div :style="{ width: (progress.leaves_n_approved_objects / progress.leaves_n_objects * 100) + '%' }"
                     class="progress-bar"></div>
             </div>
         </div>
@@ -51,7 +51,7 @@
             </v-tooltip>
         </div>
         <message-log class="bg-light" :messages="messages" />
-        <v-dialog v-model="doneModal" centered no-title no-fade>
+        <v-dialog v-model="doneModal" centered no-title no-fade ref="doneModal">
             <v-card>
                 <v-card-title class="success">
                     Approval done
@@ -160,7 +160,9 @@ export default {
                         })
                         .then((node_id) => {
                             if (node_id == null) {
-                                this.$refs.doneModal.show();
+                                if (this.$refs.doneModal) {
+                                    this.$refs.doneModal.show();
+                                };
                                 return null;
                             }
                             const to = {

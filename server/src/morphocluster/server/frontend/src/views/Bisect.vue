@@ -1,7 +1,7 @@
 <template>
     <div id="bisect" class="d-flex flex-column fill-height">
         <div v-if="node_status == 'loading'">Loading node...</div>
-        <div class="bg-light section-heading border-bottom border-top">
+        <div class="bg-light section-heading" style="border-top: 2px solid #ccc; border-bottom: 2px solid #ccc;">
             Node members
             <span v-if="node">({{ node.n_objects }} objects)</span>
             <v-tooltip left>
@@ -12,7 +12,7 @@
             </v-tooltip>
 
         </div>
-        <div id="node-members" class="flex-2 overflow-y-auto grid-container">
+        <div id="node-members" class="flex-1 overflow-y-auto grid-container">
             <div v-if="node" class="grid-item col-1">
                 <member-preview v-bind:member="node" />
             </div>
@@ -33,10 +33,11 @@
             </infinite-loading>
         </div>
         <div v-if="rec_status == 'loading'">Loading recommendations...</div>
-        <div v-if="rec_members.length && !done" class="bg-light section-heading border-bottom border-top">
+        <div v-if="rec_members.length && !done" class="bg-light section-heading"
+            style="border-top: 2px solid #ccc; border-bottom: 2px solid #ccc;">
             Recommended members
             <span v-if="(typeof rec_current_page !== 'undefined')">(Page {{ rec_current_page + 1 }} / {{ rec_n_pages
-                }})</span>
+            }})</span>
 
             <v-tooltip>
                 <template v-slot:activator="{ on }">
@@ -46,15 +47,19 @@
             </v-tooltip>
         </div>
 
-        <div id="recommended-members" v-if="rec_members && !done" class="flex-1 overflow-y-auto">
-            <div class="col col-12 spinner-container" v-if="rec_status == 'loading'">
-                <spinner spinner="circles" />
+
+        <div id="recommended-members" v-if="rec_members && !done" class="flex-1 overflow-y-auto grid-container">
+            <div class="grid-item col-1" v-if="rec_status == 'loading'">
+                <spinner spinner=" circles" />
             </div>
-            <div :key="getUniqueId(m)" v-for="m of rec_members" class="col col-1">
-                <member-preview :member="m" :controls="rec_member_controls" v-on:remove="removeMember"
-                    v-on:accept="acceptMember" />
-            </div>
+            <v-row>
+                <v-col v-for="m in rec_members" :key="getUniqueId(m)" class="grid-item col-1">
+                    <member-preview :member="m" :controls="rec_member_controls" v-on:remove="removeMember"
+                        v-on:accept="acceptMember" />
+                </v-col>
+            </v-row>
         </div>
+
         <div v-if="done" class="bg-light section-heading">Report</div>
         <div id="report" v-if="done" class="overflow-y-auto">
             Bisection done.
@@ -89,9 +94,14 @@
             </p>
         </div>
         <div id="progress">
-            <div :style="{ flexGrow: n_valid_pages }" class="bg-success" />
-            <div :style="{ flexGrow: n_unsure_pages }" class="bg-warning" />
-            <div :style="{ flexGrow: n_invalid_pages }" class="bg-danger" />
+            <v-row>
+                <v-progress-linear rounded variation="succsess"
+                    :value="n_valid_pages / (n_valid_pages + n_unsure_pages + n_invalid_pages * 100)"
+                    :buffer-value="n_unsure_pages / (n_valid_pages + n_unsure_pages + n_invalid_pages * 100)" <v-col
+                    :style="{ flex: n_valid_pages }" class="bg-success"></v-col>
+                    <v-col :style="{ flex: n_unsure_pages }" class="bg-warning"></v-col>
+                    <v-col :style="{ flex: n_invalid_pages }" class="bg-danger"></v-col>
+            </v-row>
         </div>
         <div id="decision" v-if="rec_status == 'loaded' && node_status == 'loaded'">
             <v-checkbox v-model="turtle_mode" label="Turtle mode"></v-checkbox>
@@ -283,15 +293,18 @@ export default {
     },
     computed: {
         n_valid_pages() {
+            console.log("hier", this.rec_interval_right - this.n_unsure_pages);
             return this.rec_interval_right - this.n_unsure_pages;
         },
         n_unsure_pages() {
+            console.log("hier1", this.rec_interval_right - this.rec_interval_left);
             return Math.max(
                 0,
                 this.rec_interval_right - this.rec_interval_left
             );
         },
         n_invalid_pages() {
+            console.log("hier2", this.rec_n_pages - this.rec_interval_right);
             return this.rec_n_pages - this.rec_interval_right;
         },
         not_ok_tooltip() {
@@ -710,9 +723,6 @@ export default {
     padding: 0 5px;
 }
 
-
-
-#recommended-members,
 #report {
     flex: 2;
 }
@@ -736,15 +746,28 @@ export default {
     margin: 28px 0;
 }
 
+#recommended-member,
 #node-members {
     display: flex;
     flex-wrap: wrap;
 }
 
+.grid-container {
+    display: flex;
+    flex-wrap: wrap;
+    overflow-x: auto;
+    /* Horizontales Scrollen aktivieren */
+    padding-bottom: 10px;
+    /* Einen kleinen Abstand am unteren Rand hinzufügen */
+}
+
 .grid-item {
     width: calc(100% / 12);
+    /* Berechnen Sie die Breite basierend auf 12 Spalten */
     box-sizing: border-box;
     padding: 5px;
+    margin-bottom: 10px;
+    /* Abstand zwischen den Elementen hinzufügen */
 }
 
 .grid-item:first-child {
