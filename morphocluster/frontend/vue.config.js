@@ -1,6 +1,7 @@
 module.exports = {
   "publicPath": "/frontend",
   "devServer": {
+    publicPath: "/frontend",
     proxy: {
       '/labeling': {
         target: 'http://localhost:5000',
