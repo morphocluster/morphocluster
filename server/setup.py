@@ -1,12 +1,13 @@
-from setuptools import setup
+from setuptools import find_packages, setup
 
 import versioneer
 
 setup(
-    name="morphocluster",
-    packages=["morphocluster"],
+    name="morphocluster.server",
+    packages=find_packages("src/", include=["morphocluster.server"]),
+    package_dir={"": "src"},
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     include_package_data=True,
-    entry_points={"console_scripts": ["morphocluster = morphocluster.scripts:main"]},
+    install_requires=["morphocluster.lib"],
 )

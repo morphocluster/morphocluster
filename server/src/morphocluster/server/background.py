@@ -1,11 +1,12 @@
+import datetime as dt
+import os
+
 import flask_rq2
+from flask import current_app as app
 
 from morphocluster.extensions import database, rq
-from morphocluster.tree import Tree
-import os
-import datetime as dt
-from morphocluster.processing.recluster import Recluster
-from flask import current_app as app
+from morphocluster.lib.recluster import Recluster
+from morphocluster.lib.tree import Tree
 
 
 def validate_background_job(fun):

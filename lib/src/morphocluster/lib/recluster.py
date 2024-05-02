@@ -3,7 +3,6 @@ import sys
 import time
 from typing import Any, Dict, List, Optional, Union
 
-import fire
 import h5py
 import hdbscan
 import numpy as np
@@ -11,7 +10,8 @@ import pandas as pd
 import sklearn.decomposition
 import sklearn.metrics
 import sklearn.neighbors
-from morphocluster.processing import Tree
+
+from morphocluster.lib.tree import Tree
 
 
 def _subsample_dataset(sample_size, dataset):
@@ -309,7 +309,7 @@ class Recluster:
 
         # Apply offset to labels to avoid duplicate `node_id`s
         # (This needs to be done early, as the result might be handled without merging it to the base tree.)
-        offset = max((t.nodes["node_id"].max() for t in self.trees),default=0) + 1
+        offset = max((t.nodes["node_id"].max() for t in self.trees), default=0) + 1
         labels += offset
 
         # Turn cluster_labels to a tree
@@ -371,4 +371,6 @@ class Recluster:
 
 
 if __name__ == "__main__":
+    import fire
+
     sys.exit(fire.Fire(Recluster()))

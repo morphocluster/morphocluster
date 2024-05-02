@@ -1,17 +1,19 @@
 import csv
 import fnmatch
 import os.path
-from typing import Optional
 import zipfile
+from typing import Optional
 
 import chardet
 import click
 import pandas as pd
 
-from morphocluster.processing.recluster import Recluster
+from morphocluster.lib import __version__
+from morphocluster.lib.recluster import Recluster
 
 
 @click.group()
+@click.version_option(__version__)
 def main():
     """
     MorphoCluster preprocessing.
@@ -165,7 +167,7 @@ def features(
     Extract features from an EcoTaxa export (or compatible) archive.
     """
 
-    from morphocluster.processing.extract_features import extract_features
+    from morphocluster.lib.extract_features import extract_features
 
     extract_features(
         archive_fn,

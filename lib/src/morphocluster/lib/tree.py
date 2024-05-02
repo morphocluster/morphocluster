@@ -10,7 +10,6 @@ from io import StringIO
 from typing import Dict
 from zipfile import ZIP_DEFLATED, ZipFile
 
-import fire
 import numpy as np
 import pandas as pd
 
@@ -612,4 +611,6 @@ class Tree(object):
 
 
 if __name__ == "__main__":
+    import fire
+
     sys.exit(fire.Fire(Tree))

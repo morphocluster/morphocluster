@@ -3,12 +3,12 @@ Created on 13.03.2018
 
 @author: mschroeder
 """
-import csv
+
 import itertools
 import os
 import warnings
 from numbers import Integral
-from typing import Iterable, Mapping, Optional
+from typing import Iterable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -23,10 +23,11 @@ from sqlalchemy.sql.functions import coalesce, func
 from timer_cm import Timer
 from tqdm import tqdm
 
-from morphocluster import processing
+import morphocluster.lib as lib
 from morphocluster.classifier import Classifier
 from morphocluster.extensions import database
 from morphocluster.helpers import seq2array
+from morphocluster.lib.prototypes import Prototypes, merge_prototypes
 from morphocluster.member import MemberCollection
 from morphocluster.models import (
     nodes,
@@ -35,7 +36,6 @@ from morphocluster.models import (
     objects,
     projects,
 )
-from morphocluster.processing.prototypes import Prototypes, merge_prototypes
 
 # TODO: Make N_PROTOTYPES configurable
 N_PROTOTYPES = 16
@@ -172,8 +172,8 @@ class Tree(object):
         Load a project from a saved tree.
         """
 
-        if not isinstance(tree, processing.Tree):
-            tree = processing.Tree.from_saved(tree)
+        if not isinstance(tree, lib.Tree):
+            tree = lib.Tree.from_saved(tree)
 
         with self.connection.begin():
             project_id = self.create_project(name)
@@ -230,8 +230,8 @@ class Tree(object):
         Update a project from a saved tree.
         """
 
-        if not isinstance(tree, processing.Tree):
-            tree = processing.Tree.from_saved(tree)
+        if not isinstance(tree, lib.Tree):
+            tree = lib.Tree.from_saved(tree)
 
         with self.connection.begin():
             root_id = self.get_root_id(project_id)
@@ -602,7 +602,7 @@ class Tree(object):
             )
 
             try:
-                tree = processing.Tree(tree_nodes, node_objects, node_rejected_objects)
+                tree = lib.Tree(tree_nodes, node_objects, node_rejected_objects)
             except ValueError:
                 print(tree_nodes)
                 print(node_objects)
@@ -1522,7 +1522,9 @@ class Tree(object):
             return result
 
         # Otherwise go to parent
-        node = self.connection.execute(nodes.select().where(nodes.c.node_id == node_id)).first()
+        node = self.connection.execute(
+            nodes.select().where(nodes.c.node_id == node_id)
+        ).first()
 
         if node["parent_id"]:
             print("No matching children, trying parent: {}".format(node["parent_id"]))
@@ -1642,9 +1644,9 @@ class Tree(object):
                             _n_objects_deep = (
                                 _n_objects + children["_n_objects_deep"].sum()
                             )
-                            invalid_subtree.at[
-                                node_id, "_n_objects_deep"
-                            ] = _n_objects_deep
+                            invalid_subtree.at[node_id, "_n_objects_deep"] = (
+                                _n_objects_deep
+                            )
 
                             # Sample 1000 objects to speed up the calculation
                             with t.child("get_objects"):
@@ -1658,15 +1660,15 @@ class Tree(object):
                             # 3. _own_type_objects, _type_objects
                             # TODO: Replace _own_type_objects with "_atypical_objects"
                             with t.child("_calc_own_type_objects"):
-                                invalid_subtree.at[
-                                    node_id, "_own_type_objects"
-                                ] = self._calc_own_type_objects(children_dict, objects_)
+                                invalid_subtree.at[node_id, "_own_type_objects"] = (
+                                    self._calc_own_type_objects(children_dict, objects_)
+                                )
                                 # self._calc_own_type_objects(children_dict, objects_)
 
                             with t.child("_calc_type_objects"):
-                                invalid_subtree.at[
-                                    node_id, "_type_objects"
-                                ] = self._calc_type_objects(children_dict, objects_)
+                                invalid_subtree.at[node_id, "_type_objects"] = (
+                                    self._calc_type_objects(children_dict, objects_)
+                                )
 
                             if (
                                 len(children_dict) > 0
@@ -1686,18 +1688,26 @@ class Tree(object):
 
                                 if len(objects_) > 0:
                                     # Object mean, weighted with number of objects
-                                    _centroid_vectors.append(np.sum(objects_.vectors, axis=0))
+                                    _centroid_vectors.append(
+                                        np.sum(objects_.vectors, axis=0)
+                                    )
                                     _centroid_supports += len(objects_)
 
                                 if len(children_dict) > 0:
-                                    children_support, children_vector = children_dict.get_support_and_vector()
+                                    children_support, children_vector = (
+                                        children_dict.get_support_and_vector()
+                                    )
                                     if children_support > 0:
                                         _centroid_vectors.append(children_vector)
                                         _centroid_supports += children_support
 
-                                if len(_centroid_vectors) > 0 and _centroid_supports > 0:
+                                if (
+                                    len(_centroid_vectors) > 0
+                                    and _centroid_supports > 0
+                                ):
                                     _centroid = (
-                                        np.sum(_centroid_vectors, axis=0) / _centroid_supports
+                                        np.sum(_centroid_vectors, axis=0)
+                                        / _centroid_supports
                                     )
                                 else:
                                     _centroid = None

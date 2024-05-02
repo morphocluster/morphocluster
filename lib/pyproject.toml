@@ -2,10 +2,10 @@
 requires = ["setuptools", "versioneer[toml]"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-where = ["src/"]
-include = ["morphocluster.lib"]
-
-[project]
-name = "morphocluster.lib"
-...
+[tool.versioneer]
+VCS = "git"
+versionfile_source = "src/morphocluster/lib/_version.py"
+versionfile_build = "src/morphocluster/lib/_version.py"
+parentdir_prefix = ""
+tag_prefix = ""
+style = "pep440"

@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from sklearn.cluster import MiniBatchKMeans
 
-from morphocluster.processing.prototypes import Prototypes, merge_prototypes
+from morphocluster.lib.prototypes import Prototypes, merge_prototypes
 
 N_FEATURES = 32
 
