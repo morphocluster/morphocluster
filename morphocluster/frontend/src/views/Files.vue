@@ -1,102 +1,91 @@
 <template>
-    <div id="files">
-        <nav class="navbar navbar-expand-lg navbar navbar-dark bg-dark">
-            <router-link class="navbar-brand" :to="{ name: 'home' }">MorphoCluster</router-link>
-            <div class="navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav nav-item">
-                    <li class="navbar-item">
-                        <router-link class="nav-link" :to="{ name: 'files' }">Files</router-link>
-                    </li>
-                </ul>
-                <ul class="navbar-nav nav-item">
-                    <li v-for="(parent, index) in entry.parents.slice()" :key="index" class="navbar-item">
-                        <router-link class="nav-link" :to="{ name: 'files', params: { file_path: parent.path } }">{{
-                            parent.name
-                        }}</router-link>
-                    </li>
-                    <li class="navbar-item" v-if="this.entry.name != '.'">
-                        <span class="nav-link">{{ this.entry.name }}</span>
-                    </li>
-                </ul>
-            </div>
-            <dark-mode-control />
-        </nav>
-        <div class="scrollable">
-            <div class="container" v-if="this.entry.type === 'directory'">
+    <div id="files" class="fill-height overflow-y-auto">
+        <v-container>
+            <div v-if="this.entry.type === 'directory'">
                 <div class="alerts" v-if="alerts.length">
-                    <b-alert :key="a" v-for="a of alerts" dismissible show :variant="a.variant">
+                    <v-alert :key="a" v-for="a of alerts" dismissible show :variant="a.variant">
                         {{ a.message }}
-                    </b-alert>
+                    </v-alert>
                 </div>
-                <b-table id="files_table" striped :items="entry.children" :fields="fields" showEmpty>
-                    <template v-slot:cell(name)="child">
-                        <router-link v-if="child.item.type === 'directory'" :to="{
-                            name: 'files',
-                            params: { file_path: child.item.path },
-                        }"><i class="mdi mdi-folder" /> {{ child.item.name }}</router-link>
-                        <router-link v-if="child.item.type === 'file'" :to="{
-                            name: 'files',
-                            params: { file_path: child.item.path },
-                        }"><i class="mdi mdi-file" /> {{ child.item.name }} </router-link>
+
+                <v-data-table :items="entry.children" :headers="headers" hide-default-footer>
+                    <template v-slot:[`item.name`]="{ item }">
+                        <router-link v-if="item.type === 'directory'"
+                            :to="{ name: 'files', params: { file_path: item.path } }">
+                            <i class="mdi mdi-folder" /> {{ item.name }}
+                        </router-link>
+                        <router-link v-if="item.type === 'file'" :to="{ name: 'files', params: { file_path: item.path } }">
+                            <i class="mdi mdi-file" /> {{ item.name }}
+                        </router-link>
                     </template>
-                </b-table>
+                </v-data-table>
+
                 <div class="dropzone" @dragover.prevent @dragenter.prevent @dragleave.prevent @drop="handleDrop">
                     Upload Files
                 </div>
                 <input type="file" id="fileInput" style="display: none" @change="handleFileSelect" multiple />
-                <div class="container mt-4 text-center">
-                    <button class="btn btn-primary" @click="openFileInput">Select File</button>
+                <div class="mt-4 text-center">
+                    <v-btn large color="primary" class="mr-2" @click="openFileInput">Select File</v-btn>
                 </div>
             </div>
-            <div class="container" v-if="this.entry.type === 'file'">
-                <!--TODO: Convert to regular table and select and format properties by hand. -->
-                <table id="table" style="width=100%">
-                    <tr>
-                        <td style="padding-right: 20px;">Name:</td>
-                        <td>{{ this.entry.name }}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding-right: 20px;">Created On:</td>
-                        <td>{{ this.entry.last_modified }}</td>
-                    </tr>
-                </table>
+            <div v-if="this.entry.type === 'file'">
+                <v-card>
+                    <v-card-title>Entry Information</v-card-title>
+                    <v-card-text>
+                        <v-row style="line-height: 1.5;">
+                            <v-col cols=" 6">
+                                <strong>Name:</strong>
+                            </v-col>
+                            <v-col cols="6">
+                                <strong style="font-weight: bold;">{{ entry.name }}
+                                </strong> </v-col>
+                        </v-row>
+                        <v-row>
+                            <v-col cols="6">
+                                <strong>Created On:</strong>
+                            </v-col>
+                            <v-col cols="6">
+                                {{ entry.last_modified }}
+                            </v-col>
+                        </v-row>
+                    </v-card-text>
+                </v-card>
                 <div class=" d-flex justify-content-center">
-                    <b-button size="sm" variant="primary" class="mx-2" @click.prevent="downloadFile">
-                        Download
-                    </b-button>
-                    <b-button size="sm" variant="primary" class="mx-2">
-                        Import as project
-                    </b-button>
+                    <v-row justify="center" class="my-2">
+                        <v-btn color="primary" class="mr-2" @click.prevent="downloadFile">
+                            Download
+                        </v-btn>
+                        <v-btn color="primary" class="mr-2">
+                            Import as project
+                        </v-btn>
+                    </v-row>
                 </div>
             </div>
-        </div>
+        </v-container>
     </div>
 </template>
 
 <script>
 import "@mdi/font/css/materialdesignicons.css";
 import * as api from "@/helpers/api.js";
-import "bootstrap/dist/css/bootstrap.min.css";
-import "bootstrap";
-import { uploadFiles } from "../helpers/api.js";
-import DarkModeControl from "@/components/DarkModeControl.vue";
+import mixins from "@/mixins.js";
 
 export default {
     name: "FilesView",
+    mixins: [mixins],
     props: { file_path: String },
     response: "",
-    components: { DarkModeControl },
     data() {
         return {
-            fields: [
-                { key: "name" },
-                "last_modified",
+            headers: [
+                { text: "Name", value: "name" },
+                { text: "Last Modified", value: "last_modified" }
             ],
             entry: null,
             alerts: [],
         };
     },
-    created() {
+    mounted() {
         this.initialize();
     },
     watch: {
@@ -113,6 +102,8 @@ export default {
         async initialize() {
             try {
                 this.entry = await api.getFileInfo(this.file_path);
+                this.breadcrumb = this.entry.parents.map(p => ({ name: "files", params: { file_path: p.path }, text: p.name }));
+                this.setBreadcrumbs(this.breadcrumb);
             } catch (error) {
                 console.error(error);
                 this.alerts.unshift({
@@ -135,7 +126,7 @@ export default {
                 const file = selectedFiles[i];
                 formData.append('file', file);
             }
-            const response = await uploadFiles(formData, this.entry.path);
+            const response = await api.uploadFiles(formData, this.entry.path);
             console.log("Data upload successful", response.message);
             this.initialize();
         },
@@ -144,6 +135,7 @@ export default {
         },
     },
 };
+
 </script>
 
 <style>
@@ -163,10 +155,6 @@ export default {
     width: auto;
     text-align: right;
     white-space: nowrap;
-}
-
-.scrollable {
-    overflow-y: auto;
 }
 
 .alerts {

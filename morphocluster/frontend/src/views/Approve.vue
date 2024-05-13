@@ -1,122 +1,73 @@
 <template>
-    <div id="approve">
-        <nav class="navbar navbar-expand-lg navbar-light bg-dark text-light">
-            <router-link class="navbar-brand text-light" to="/"
-                >MorphoCluster</router-link
-            >
-            <div class="collapse navbar-collapse">
-                <ul class="navbar-nav mr-auto">
-                    <li class="nav-item nav-link text-light" v-if="project">
-                        {{ project.name }}
-                    </li>
-                    <li class="nav-item nav-link text-light">Approve</li>
-                    <li class="nav-item nav-link text-light" v-if="node">
-                        {{ node.name }}
-                    </li>
-                </ul>
-                <dark-mode-control />
-            </div>
-        </nav>
+    <div id="approve" class="d-flex flex-column fill-height">
         <div v-if="loading">Loading...</div>
         <div id="node-info">
-            <div
-                class="info-hint mdi mdi-information-outline"
-                v-b-tooltip.hover.html
-                title="All members of this node, most extreme appearance first."
-            />
+            <div class="info-hint mdi mdi-information-outline" v-tooltip.hover.html
+                title="All members of this node, most extreme appearance first." />
             <!--<node-header :node="node" v-if="node" />-->
 
-            <div class="row" v-if="node_members">
-                <div
-                    v-for="m of node_members"
-                    :key="getUniqueId(m)"
-                    class="col col-2"
-                >
-                    <member-preview
-                        :member="m"
-                        :controls="member_controls"
-                        v-on:moveup="moveupMember"
-                    />
+            <div class="row flex-1 overflow-y-auto" v-if="node_members">
+                <div v-for="m of node_members" :key="getUniqueId(m)" class="col col-2">
+                    <member-preview :member="m" :controls="member_controls" v-on:moveup="moveupMember" />
                 </div>
             </div>
-            <infinite-loading
-                v-if="node"
-                @infinite="updateMembers"
-                spinner="circles"
-            >
+            <infinite-loading v-if="node" @infinite="updateMembers" spinner="circles">
                 <div slot="no-more" />
             </infinite-loading>
         </div>
-        <div
-            id="progress"
-            v-if="progress"
-            v-b-tooltip.hover
-            :title="
-                progress.leaves_n_approved_objects.toLocaleString('en-US') +
-                ' / ' +
-                progress.leaves_n_objects.toLocaleString('en-US')
-            "
-        >
-            <div
-                :style="{ flexGrow: progress.leaves_n_approved_objects }"
-                class="bg-success"
-            />
-            <div
-                :style="{
-                    flexGrow:
-                        progress.leaves_n_objects -
-                        progress.leaves_n_approved_objects,
-                }"
-                class="bg-danger"
-            />
+        <div id="progress" v-if="progress" v-tooltip.hover
+            :title="`${progress.leaves_n_approved_objects.toLocaleString('en-US')} / ${progress.leaves_n_objects.toLocaleString('en-US')}`">
+            <div id="progress-bar-wrapper">
+                <div :style="{ width: (progress.leaves_n_approved_objects / progress.leaves_n_objects * 100) + '%' }"
+                    class="progress-bar"></div>
+            </div>
         </div>
         <div id="decision">
-            <b-button
-                id="btn-approve"
-                variant="success"
-                @click.prevent="approve(true)"
-                v-b-tooltip.hover.html
-                title="All members look alike and this cluster is exceptional. Approve and flag for preferred treatment. <kbd>F</kbd>"
-            >
-                <i class="mdi mdi-check-all" /><i class="mdi mdi-flag" />
-                Approve + Flag
-            </b-button>
-            <b-button
-                id="btn-approve"
-                variant="success"
-                @click.prevent="approve(false)"
-                v-b-tooltip.hover.html
-                title="All members look alike. Approve. <kbd>A</kbd>"
-            >
-                <i class="mdi mdi-check-all" /> Approve
-            </b-button>
-            <b-button
-                id="btn-merge"
-                variant="danger"
-                @click.prevent="merge"
-                v-b-tooltip.hover.html
-                title="Members are too dissimilar. Merge into parent. <kbd>M</kbd>"
-            >
-                <i class="mdi mdi-call-merge" /> Merge into parent
-            </b-button>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn id="btn-approve" color="success" @click.prevent="approve(true)" v-on="on">
+                        <i class="mdi mdi-check-all" /><i class="mdi mdi-flag" />
+                        Approve + Flag
+                    </v-btn>
+                </template>
+                All members look alike and this cluster is exceptional. Approve and flag for preferred
+                treatment.<kbd>F</kbd>
+            </v-tooltip>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn id="btn-approve" color="success" @click.prevent="approve(false)" v-on="on">
+                        <i class="mdi mdi-check-all" /> Approve
+                    </v-btn>
+                </template>
+                All members look alike. Approve .<kbd>A</kbd>
+            </v-tooltip>
+            <v-tooltip bottom>
+                <template v-slot:activator="{ on }">
+                    <v-btn id="btn-merge" color="error" @click.prevent="merge" v-on="on">
+                        <i class="mdi mdi-call-merge" /> Merge into parent
+                    </v-btn>
+                </template>
+                Members are too dissimilar. Merge into parent. <kbd>M</kbd>
+            </v-tooltip>
         </div>
         <message-log class="bg-light" :messages="messages" />
-        <b-modal
-            ref="doneModal"
-            centered
-            no-fade
-            header-bg-variant="success"
-            title="Approval done"
-        >
-            <div class="d-block text-center">
-                Approval is done for this project.
-            </div>
-            <footer slot="modal-footer">
-                <b-button variant="primary" :to="{ name: 'projects' }"
-                    >Back to projects</b-button
-                >
-            </footer>
-        </b-modal>
+        <v-dialog v-model="doneModal" centered no-title no-fade ref="doneModal">
+            <v-card>
+                <v-card-title class="success">
+                    Approval done
+                </v-card-title>
+                <v-card-text>
+                    <div class="text-center">
+                        Approval is done for this project.
+                    </div>
+                </v-card-text>
+                <v-card-actions>
+                    <v-btn @click="$router.push({ name: 'projects' })" color="primary">
+                        Back to projects
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
@@ -131,13 +82,13 @@ import * as api from "@/helpers/api.js";
 
 import MemberPreview from "@/components/MemberPreview.vue";
 import MessageLog from "@/components/MessageLog.vue";
-import DarkModeControl from "../components/DarkModeControl.vue";
 
 export default {
     name: "ApproveView",
     data() {
         return {
-            loading: false,
+            doneModal: false,
+            loading: true,
             project: null,
             node: null,
             node_members: [],
@@ -165,7 +116,6 @@ export default {
         MemberPreview,
         MessageLog,
         InfiniteLoading,
-        DarkModeControl,
     },
     mixins: [mixins],
     watch: {
@@ -210,7 +160,9 @@ export default {
                         })
                         .then((node_id) => {
                             if (node_id == null) {
-                                this.$refs.doneModal.show();
+                                if (this.$refs.doneModal) {
+                                    this.$refs.doneModal.show();
+                                };
                                 return null;
                             }
                             const to = {
@@ -252,9 +204,8 @@ export default {
 
             if (!this.members_url) {
                 const nodes = this.node.children;
-                this.members_url = `/api/nodes/${
-                    this.node.node_id
-                }/members?objects=${!nodes}&nodes=${nodes}&arrange_by=interleaved&`;
+                this.members_url = `/api/nodes/${this.node.node_id
+                    }/members?objects=${!nodes}&nodes=${nodes}&arrange_by=interleaved&`;
                 this.page = 0;
                 updateMembersUrl = true;
             }
@@ -411,6 +362,7 @@ export default {
 
 #decision {
     margin: 0 auto;
+    margin-bottom: 10px;
 }
 
 #decision button {
@@ -418,12 +370,18 @@ export default {
 }
 
 #progress {
-    display: flex;
-    flex-wrap: nowrap;
-    margin: 0.2em 0;
+    margin-top: 10px;
+    margin-bottom: 10px;
 }
 
-#progress div {
-    height: 0.2em;
+#progress-bar-wrapper {
+    height: 5px;
+    background-color: #ff0000;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background-color: rgb(13, 163, 50);
 }
 </style>

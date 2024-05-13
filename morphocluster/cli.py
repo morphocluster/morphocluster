@@ -316,7 +316,7 @@ def init_app(app):
             n_total = conn.execute(stmt).scalar()
 
             print(
-                f"{n_initialized:,d} out of {n_total:,d} objects ({n_initialized/n_initialized:.2%}) now have a feature vector."
+                f"{n_initialized:,d} out of {n_total:,d} objects ({n_initialized/n_total:.2%}) now have a feature vector."
             )
 
             print("Done.")
