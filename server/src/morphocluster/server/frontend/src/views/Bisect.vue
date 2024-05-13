@@ -1,7 +1,8 @@
 <template>
     <div id="bisect" class="d-flex flex-column fill-height">
         <div v-if="node_status == 'loading'">Loading node...</div>
-        <div class="bg-light section-heading" style="border-top: 2px solid #ccc; border-bottom: 2px solid #ccc;">
+        <div class="bg-light section-heading"
+            style="border-top: 1px solid #7d7e80; background-color: #cdcecf; border-bottom: 1px solid #7d7e80">
             Node members
             <span v-if="node">({{ node.n_objects }} objects)</span>
             <v-tooltip left>
@@ -10,10 +11,9 @@
                 </template>
                 <span>All members of this node, randomly ordered.</span>
             </v-tooltip>
-
         </div>
         <div id="node-members" class="flex-1 overflow-y-auto grid-container">
-            <div v-if="node" class="grid-item col-1">
+            <div v-if="node" class="grid-item col-2">
                 <member-preview v-bind:member="node" />
             </div>
 
@@ -33,31 +33,31 @@
             </infinite-loading>
         </div>
         <div v-if="rec_status == 'loading'">Loading recommendations...</div>
-        <div v-if="rec_members.length && !done" class="bg-light section-heading"
-            style="border-top: 2px solid #ccc; border-bottom: 2px solid #ccc;">
+        <div class="bg-light section-heading"
+            style="border-top: 1px solid #7d7e80; background-color: #cdcecf; border-bottom: 1px solid #7d7e80;">
             Recommended members
-            <span v-if="(typeof rec_current_page !== 'undefined')">(Page {{ rec_current_page + 1 }} / {{ rec_n_pages
-            }})</span>
+            <span v-if="(typeof rec_current_page !== 'undefined') && (rec_n_pages > 0)">
+                (Page {{ rec_current_page + 1 }} / {{ rec_n_pages }})
+            </span>
+            <span v-else>
+                (Page 1 / 1)
+            </span>
 
-            <v-tooltip>
+            <v-tooltip left>
                 <template v-slot:activator="{ on }">
                     <span class="float-right mdi mdi-dark mdi-information-outline" v-on="on" />
-                    <span> Recommendations for this node, page by page.</span>
                 </template>
+                <span> Recommendations for this node, page by page.</span>
             </v-tooltip>
         </div>
-
-
         <div id="recommended-members" v-if="rec_members && !done" class="flex-1 overflow-y-auto grid-container">
             <div class="grid-item col-1" v-if="rec_status == 'loading'">
                 <spinner spinner=" circles" />
             </div>
-            <v-row>
-                <v-col v-for="m in rec_members" :key="getUniqueId(m)" class="grid-item col-1">
-                    <member-preview :member="m" :controls="rec_member_controls" v-on:remove="removeMember"
-                        v-on:accept="acceptMember" />
-                </v-col>
-            </v-row>
+            <div v-for="m in rec_members" :key="getUniqueId(m)" class="grid-item col-1">
+                <member-preview :member="m" :controls="rec_member_controls" v-on:remove="removeMember"
+                    v-on:accept="acceptMember" />
+            </div>
         </div>
 
         <div v-if="done" class="bg-light section-heading">Report</div>
@@ -93,15 +93,10 @@
                 Saving took {{ saving_total_ms / 1000 }}s.
             </p>
         </div>
-        <div id="progress">
-            <v-row>
-                <v-progress-linear rounded variation="succsess"
-                    :value="n_valid_pages / (n_valid_pages + n_unsure_pages + n_invalid_pages * 100)"
-                    :buffer-value="n_unsure_pages / (n_valid_pages + n_unsure_pages + n_invalid_pages * 100)" <v-col
-                    :style="{ flex: n_valid_pages }" class="bg-success"></v-col>
-                    <v-col :style="{ flex: n_unsure_pages }" class="bg-warning"></v-col>
-                    <v-col :style="{ flex: n_invalid_pages }" class="bg-danger"></v-col>
-            </v-row>
+        <div style=" padding: 0%;">
+            <v-progress-linear id="progress" variation="success"
+                :value="n_valid_pages / (n_valid_pages + n_unsure_pages + n_invalid_pages) * 100" :buffer-value="100"
+                background-color="yellow" color="green" height="7"></v-progress-linear>
         </div>
         <div id="decision" v-if="rec_status == 'loaded' && node_status == 'loaded'">
             <v-checkbox v-model="turtle_mode" label="Turtle mode"></v-checkbox>
@@ -177,6 +172,8 @@ import MessageLog from "@/components/MessageLog.vue";
 import Vue from "vue";
 
 const MAX_N_RECOMMENDATIONS = 100000;
+
+// Fixme: Stop process if no recommended objects are left.
 
 export default {
     name: "BisectView",
@@ -293,18 +290,15 @@ export default {
     },
     computed: {
         n_valid_pages() {
-            console.log("hier", this.rec_interval_right - this.n_unsure_pages);
             return this.rec_interval_right - this.n_unsure_pages;
         },
         n_unsure_pages() {
-            console.log("hier1", this.rec_interval_right - this.rec_interval_left);
+            ;
             return Math.max(
-                0,
                 this.rec_interval_right - this.rec_interval_left
             );
         },
         n_invalid_pages() {
-            console.log("hier2", this.rec_n_pages - this.rec_interval_right);
             return this.rec_n_pages - this.rec_interval_right;
         },
         not_ok_tooltip() {
@@ -363,8 +357,9 @@ export default {
                         })
                         // (This really needs to be nested!)
                         .then((node_id) => {
-                            if (node_id === null) {
+                            if (node_id === null && (this.n_invalid_pages + this.n_unsure_pages + this.n_valid_pages) > 0) {
                                 // Done
+                                console.log("hey", this.n_invalid_pages + this.n_unsure_pages + this.n_valid_pages);
                                 this.$refs.doneModal.show();
                                 return Promise.reject(
                                     new Error("No next node")
@@ -398,6 +393,7 @@ export default {
                     this.node_status = "loaded";
                 })
                 .catch((e) => {
+                    this.node_status = "no_data";
                     this.axiosErrorHandler(e);
                 });
 
@@ -730,15 +726,20 @@ export default {
 #progress {
     display: flex;
     flex-wrap: nowrap;
-    margin: 0.2em 0;
+    margin: 0;
+    padding: 0;
+    /* Fügen Sie dies hinzu, um sicherzustellen, dass kein Padding vorhanden ist */
 }
 
 #progress div {
-    height: 0.2em;
+    /* Ändern Sie dies, um sicherzustellen, dass die Fortschrittsleiste den verfügbaren Platz ausfüllt */
+    height: 100%;
+    margin: 0;
+    /* Fügen Sie dies hinzu, um sicherzustellen, dass kein Margin vorhanden ist */
 }
 
 .section-heading {
-    margin: 0.2em 0;
+    margin: 0;
 }
 
 .spinner-container {
@@ -756,18 +757,15 @@ export default {
     display: flex;
     flex-wrap: wrap;
     overflow-x: auto;
-    /* Horizontales Scrollen aktivieren */
     padding-bottom: 10px;
-    /* Einen kleinen Abstand am unteren Rand hinzufügen */
+
 }
 
 .grid-item {
     width: calc(100% / 12);
-    /* Berechnen Sie die Breite basierend auf 12 Spalten */
     box-sizing: border-box;
     padding: 5px;
     margin-bottom: 10px;
-    /* Abstand zwischen den Elementen hinzufügen */
 }
 
 .grid-item:first-child {

@@ -7,8 +7,8 @@
                     v-on:click="$emit(c.event, member)" />
             </div>
         </div>
-        <div class="member-body" :class="{ oneImage: image_urls.length == 1 }">
-            <img v-for="img_url of image_urls" :src="img_url" :key="img_url" />
+        <div class="member-body">
+            <img v-for="img_url of image_urls" :src="img_url" :key="img_url" :style="imageStyle" />
         </div>
     </div>
 </template>
@@ -48,6 +48,16 @@ export default {
             }
             return [];
         },
+        imageStyle: function () {
+            // Berechnen Sie die maximale Anzahl an Bildern, die in einer Vorschau angezeigt werden sollen
+            // Anhand dieser Anzahl passen Sie die Größe der Bilder an
+            const maxImagesToShow = 4; // Sie können diese Zahl je nach Bedarf anpassen
+            const imageSize = 100 / Math.min(maxImagesToShow, this.image_urls.length);
+            return {
+                maxWidth: `${imageSize}%`,
+                maxHeight: `${imageSize}%`,
+            };
+        },
     },
 };
 </script>
@@ -65,9 +75,9 @@ export default {
 
 .member-preview {
     margin-bottom: 15px;
-    max-height: 200px;
+    max-height: 100%;
     color: black;
-    border: 1px solid #2196F3;
+    border: 1px solid #90caf9;
     border-radius: 4px;
 }
 
@@ -86,9 +96,6 @@ export default {
 }
 
 .member-body img {
-    max-width: 90%;
-    max-height: 90%;
-    max-height: 150px;
     width: auto;
     height: auto;
     margin-right: 2px;
