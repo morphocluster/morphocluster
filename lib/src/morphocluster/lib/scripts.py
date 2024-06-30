@@ -207,6 +207,9 @@ def cluster(
     init_tree: bool,
     keep_unexplored: Optional[float],
 ):
+    """
+    (Re-)cluster.
+    """
     rc = Recluster()
 
     for fn in features_fns:
