@@ -4,7 +4,7 @@
 		"TZ": "Europe/Berlin",
 		"LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}",
 		"CONTAINER_WORKSPACE_FOLDER": "${containerWorkspaceFolder}",
-		"FLASK_APP": "morphocluster"
+		"FLASK_APP": "morphocluster.server"
 	},
 	// "runArgs": [
 	// 	"--hostname", "devcontainer",
@@ -48,7 +48,6 @@
 				"davidanson.vscode-markdownlint",
 				"exiasr.hadolint",
 				"Vue.volar",
-				"Vue.vscode-typescript-vue-plugin",
 				"ms-python.black-formatter"
 			],
 			"settings": {

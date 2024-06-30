@@ -3,7 +3,7 @@ API schemas
 """
 from marshmallow import Schema, fields
 
-# from morphocluster.extensions import marshmallow as ma
+# from morphocluster.server.extensions import marshmallow as ma
 
 
 class RQJobSchema(Schema):

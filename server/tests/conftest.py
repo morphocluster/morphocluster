@@ -9,9 +9,9 @@ import pytest
 import redis
 import sqlalchemy.exc
 
-from morphocluster import create_app
-from morphocluster.cli import _add_user
-from morphocluster.extensions import database
+from morphocluster.server import create_app
+from morphocluster.server.cli import _add_user
+from morphocluster.server.extensions import database
 from lovely.pytest.docker.compose import Services
 
 

@@ -1,7 +1,7 @@
 import pytest
 from requests.auth import _basic_auth_str
 
-from morphocluster.extensions import database
+from morphocluster.server.extensions import database
 from requests.auth import _basic_auth_str
 
 

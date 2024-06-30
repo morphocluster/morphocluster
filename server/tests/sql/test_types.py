@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy import Column, Table
 
-from morphocluster.extensions import database
-from morphocluster.sql.types import Point
+from morphocluster.server.extensions import database
+from morphocluster.server.sql.types import Point
 
 _point_table = Table(
     "point_table",

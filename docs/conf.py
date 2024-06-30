@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
 
-from morphocluster import __version__  # noqa
+from morphocluster.lib import __version__  # noqa
 
 project = "MorphoCluster"
 copyright = "2018-2023, Simon-Martin Schroeder"

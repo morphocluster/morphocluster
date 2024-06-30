@@ -50,7 +50,7 @@ def create_app(test_config: Optional[Mapping]=None):
         os.environ.update(test_config)
 
     # Load config
-    app.config.from_object("morphocluster.config_default")
+    app.config.from_object("morphocluster.server.config_default")
 
     settings_file = os.environ.get("MORPHOCLUSTER_SETTINGS")
     if settings_file:
@@ -59,12 +59,12 @@ def create_app(test_config: Optional[Mapping]=None):
     os.makedirs(app.config["FILES_DIR"], exist_ok=True)
 
     # Fix url_for if behind reverse proxy
-    from morphocluster.reverse_proxied import ReverseProxied
+    from morphocluster.server.reverse_proxied import ReverseProxied
 
     app.wsgi_app = ReverseProxied(app.wsgi_app, app.config)
 
     # Register extensions
-    from morphocluster.extensions import database, migrate, redis_lru, rq
+    from morphocluster.server.extensions import database, migrate, redis_lru, rq
 
     database.init_app(app)
     redis_lru.init_app(app)
@@ -72,12 +72,12 @@ def create_app(test_config: Optional[Mapping]=None):
     rq.init_app(app)
 
     # Register cli
-    from morphocluster import cli
+    from morphocluster.server import cli
 
     cli.init_app(app)
 
     # Custom JSON encoder
-    from morphocluster.numpy_json_encoder import NumpyJSONEncoder
+    from morphocluster.server.numpy_json_encoder import NumpyJSONEncoder
 
     app.json_encoder = NumpyJSONEncoder
 
@@ -86,8 +86,8 @@ def create_app(test_config: Optional[Mapping]=None):
         database.engine.dialect.psycopg2_batch_mode = True
 
     # apply the blueprints to the app
-    from morphocluster.api import api
-    from morphocluster.frontend import frontend
+    from morphocluster.server.api import api
+    from morphocluster.server.frontend import frontend
 
     app.register_blueprint(api, url_prefix="/api")
     app.register_blueprint(frontend, url_prefix="/frontend")
@@ -130,7 +130,7 @@ def create_app(test_config: Optional[Mapping]=None):
     # ===============================================================================
     from werkzeug.security import check_password_hash
 
-    from morphocluster import models
+    from morphocluster.server import models
 
     def check_auth(username, password):
         # Retrieve entry from the database

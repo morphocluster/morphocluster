@@ -19,9 +19,9 @@ from sqlalchemy.sql.expression import bindparam, select
 from timer_cm import Timer
 from werkzeug.security import generate_password_hash
 
-from morphocluster import models, processing
-from morphocluster.extensions import database
-from morphocluster.tree import Tree
+from morphocluster.server import models
+from morphocluster.server.extensions import database
+from morphocluster.server.tree import Tree
 
 
 def _add_user(username, password):

@@ -4,7 +4,7 @@ import os
 import flask_rq2
 from flask import current_app as app
 
-from morphocluster.extensions import database, rq
+from morphocluster.server.extensions import database, rq
 from morphocluster.lib.recluster import Recluster
 from morphocluster.lib.tree import Tree
 
@@ -47,7 +47,7 @@ def recluster_project(project_id, min_cluster_size):
     Timeout: 12h
     """
 
-    config = morphocluster.app.app.config
+    config = morphocluster.server.app.app.config
 
     # Dump the database tree
     print("Dumping database tree...")

@@ -21,8 +21,8 @@ from sqlalchemy.types import (
     Text,
 )
 
-from morphocluster.extensions import database as db
-from morphocluster.sql.types import Point
+from morphocluster.server.extensions import database as db
+from morphocluster.server.sql.types import Point
 
 metadata = db.metadata
 

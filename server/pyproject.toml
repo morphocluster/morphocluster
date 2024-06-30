@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools", "versioneer[toml]"]
+build-backend = "setuptools.build_meta"
+
+[tool.versioneer]
+VCS = "git"
+versionfile_source = "src/morphocluster/server/_version.py"
+versionfile_build = "src/morphocluster/server/_version.py"
+parentdir_prefix = ""
+tag_prefix = ""
+style = "pep440"

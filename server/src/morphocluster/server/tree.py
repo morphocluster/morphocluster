@@ -24,12 +24,12 @@ from timer_cm import Timer
 from tqdm import tqdm
 
 import morphocluster.lib as lib
-from morphocluster.classifier import Classifier
-from morphocluster.extensions import database
-from morphocluster.helpers import seq2array
+from morphocluster.server.classifier import Classifier
+from morphocluster.server.extensions import database
+from morphocluster.server.helpers import seq2array
 from morphocluster.lib.prototypes import Prototypes, merge_prototypes
-from morphocluster.member import MemberCollection
-from morphocluster.models import (
+from morphocluster.server.member import MemberCollection
+from morphocluster.server.models import (
     nodes,
     nodes_objects,
     nodes_rejected_objects,

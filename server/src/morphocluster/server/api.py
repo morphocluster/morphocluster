@@ -32,12 +32,12 @@ from timer_cm import Timer
 from werkzeug.exceptions import NotFound
 from werkzeug.utils import secure_filename
 
-from morphocluster import background, models
-from morphocluster.classifier import Classifier
-from morphocluster.extensions import database, redis_lru, rq
-from morphocluster.helpers import keydefaultdict, seq2array
-from morphocluster.schemas import JobSchema, LogSchema
-from morphocluster.tree import Tree
+from morphocluster.server import background, models
+from morphocluster.server.classifier import Classifier
+from morphocluster.server.extensions import database, redis_lru, rq
+from morphocluster.server.helpers import keydefaultdict, seq2array
+from morphocluster.server.schemas import JobSchema, LogSchema
+from morphocluster.server.tree import Tree
 
 api = Blueprint("api", __name__)
 

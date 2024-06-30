@@ -12,12 +12,12 @@ RUN sudo chmod a+rx /usr/local/bin/hadolint
 # Install the Conda packages.
 COPY --chown=$MAMBA_USER:$MAMBA_USER conda-lock.yml /tmp/conda-lock.yml
 RUN --mount=type=cache,target=/opt/conda/pkgs : \
-    # Configure Conda to use the conda-forge channel
+    # Configure mamba to use the conda-forge channel
     && micromamba config append channels conda-forge \
-    # Install and clean up
+    # Install
     && micromamba install --yes --name base \
         --category dev --category main --file /tmp/conda-lock.yml \
-    && micromamba clean --all --yes \
+    # Don't clean up as we're using a cache mount
 ;
 
 # Activate the conda environment for the Dockerfile.
