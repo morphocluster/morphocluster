@@ -27,3 +27,6 @@ mprofile_*.dat
 .venv/*
 data/
 server/src/morphocluster/server/frontend/dist
+lib/build/
+lib/dist/
+server/build/

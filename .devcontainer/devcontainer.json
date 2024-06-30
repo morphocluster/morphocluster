@@ -49,7 +49,8 @@
 				"exiasr.hadolint",
 				"Vue.volar",
 				"ms-python.black-formatter",
-				"github.vscode-github-actions"
+				"github.vscode-github-actions",
+				"ms-vscode.live-server"
 			],
 			"settings": {
 				// Disable telemetry

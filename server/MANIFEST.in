@@ -1,4 +1,3 @@
 graft morphocluster/templates
 graft morphocluster/static
-include versioneer.py
 include morphocluster/_version.py
