@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
 
-from morphocluster import __version__  # noqa
+from morphocluster.lib import __version__  # noqa
 
 project = "MorphoCluster"
 copyright = "2018-2023, Simon-Martin Schroeder"
@@ -35,7 +35,7 @@ extensions = [
     # "sphinx.ext.autodoc",
     # "sphinx.ext.coverage",
     # "sphinx.ext.napoleon",
-    # "sphinxcontrib.programoutput",
+    "sphinxcontrib.programoutput",
     # "sphinx.ext.viewcode",
     # "sphinx.ext.intersphinx",
     # "sphinx_autodoc_typehints",
@@ -75,7 +75,9 @@ html_theme = "sphinx_rtd_theme"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+html_static_path = [
+    # "_static",
+]
 
 rst_prolog = """
 .. default-role:: code

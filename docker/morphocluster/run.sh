@@ -3,7 +3,7 @@
 # . /opt/conda/etc/profile.d/conda.sh
 micromamba activate base
 
-export FLASK_APP=morphocluster
+export FLASK_APP=morphocluster.server
 
 echo Waiting for Postgres...
 ./wait-for postgres:5432

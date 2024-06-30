@@ -4,7 +4,7 @@
 		"TZ": "Europe/Berlin",
 		"LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}",
 		"CONTAINER_WORKSPACE_FOLDER": "${containerWorkspaceFolder}",
-		"FLASK_APP": "morphocluster"
+		"FLASK_APP": "morphocluster.server"
 	},
 	// "runArgs": [
 	// 	"--hostname", "devcontainer",
@@ -32,7 +32,7 @@
 	],
 	"mounts": [
 		"source=pre-commit-cache-${localEnv:USER},target=/home/mambauser/.cache/pre-commit,type=volume",
-		"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind,consistency=cached",
+		"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind,consistency=cached"
 	],
 	"customizations": {
 		"vscode": {
@@ -48,8 +48,9 @@
 				"davidanson.vscode-markdownlint",
 				"exiasr.hadolint",
 				"Vue.volar",
-				"Vue.vscode-typescript-vue-plugin",
-				"ms-python.black-formatter"
+				"ms-python.black-formatter",
+				"github.vscode-github-actions",
+				"ms-vscode.live-server"
 			],
 			"settings": {
 				// Disable telemetry
@@ -64,19 +65,23 @@
 					// Ignore Jupyter checkpoint files
 					"**/.ipynb_checkpoints": true,
 					// Ignore cache directory, except for files which start with . (e.g. .gitignore)
-					".devcontainer/cache/*/[!\\.]*": true,
+					".devcontainer/cache/*/[!\\.]*": true
 				},
 				"flake8.args": [
 					"--max-line-length=88",
 					// Let black handle formatting: <https://stackoverflow.com/q/59241007>
 					// Also exclude isort stuff: <https://stackoverflow.com/a/69396215>
 					// But don't exclude E5 for line length
-					"--extend-ignore=E101,E111,E114,E115,E116,E117,E12,E13,E2,E3,E401,E70,W1,W2,W3,W5,E4,W4",
+					"--extend-ignore=E101,E111,E114,E115,E116,E117,E12,E13,E2,E3,E401,E70,W1,W2,W3,W5,E4,W4"
 				],
 				// Turn on "black" for automatic code formatting
 				"python.formatting.provider": "black",
 				"black-formatter.args": [
 					"--line-length=88"
+				],
+				"black-formatter.importStrategy": "fromEnvironment",
+				"black-formatter.interpreter": [
+					"/opt/conda/bin/python"
 				],
 				// Format on save
 				"editor.formatOnSave": true,
@@ -90,6 +95,9 @@
 				"python.languageServer": "Pylance",
 				"python.analysis.typeCheckingMode": "basic",
 				// Use isort for imports
+				"isort.interpreter": [
+					"/opt/conda/bin/python"
+				],
 				"python.sortImports.path": "/opt/conda/bin/isort",
 				"python.sortImports.args": [
 					"--settings-path=${workspaceFolder}/pyproject.toml"

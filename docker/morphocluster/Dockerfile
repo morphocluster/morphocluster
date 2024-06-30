@@ -68,7 +68,7 @@ COPY --from=build-frontend /frontend/dist morphocluster/frontend/dist
 COPY docker/wait-for docker/morphocluster/run.sh docker/morphocluster/activate ./
 COPY docker/morphocluster/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-ENV FLASK_APP=morphocluster
+ENV FLASK_APP=morphocluster.server
 
 # Enable bash completion
 RUN _FLASK_COMPLETE=bash_source flask > ~/.flask-complete.bash && \
