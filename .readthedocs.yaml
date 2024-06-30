@@ -30,4 +30,4 @@ python:
    install:
    - requirements: docs/requirements.txt
    - method: pip
-      path: lib/
+     path: lib/
