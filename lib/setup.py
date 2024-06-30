@@ -7,7 +7,15 @@ setup(
     cmdclass=versioneer.get_cmdclass(),
     packages=find_namespace_packages("src/", include=["morphocluster.lib"]),
     package_dir={"": "src"},
-    install_requires=["chardet", "click", "numpy", "scikit-learn", "h5py", "hdbscan"],
+    install_requires=[
+        "chardet",
+        "click",
+        "numpy",
+        "pandas",
+        "scikit-learn",
+        "h5py",
+        "hdbscan",
+    ],
     entry_points={
         "console_scripts": ["morphocluster = morphocluster.lib.scripts:main"]
     },
