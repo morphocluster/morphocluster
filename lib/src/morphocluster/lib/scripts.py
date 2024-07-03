@@ -190,11 +190,23 @@ def features(
 )
 @click.option("--min-cluster-size", type=int, default=128)
 @click.option("--min-samples", type=int, default=1)
-@click.option("--method", type=click.Choice(["eom", "leaf"]), default="leaf")
+@click.option(
+    "--method",
+    type=click.Choice(["eom", "leaf"]),
+    default="leaf",
+    help="Leaf or excess-of-mass clustering. (Default: leaf.)",
+)
 @click.option("--sample-size", type=int, default=None)
 @click.option("--pca", type=int, default=None)
 @click.option("--init-tree/--no-init-tree", help="Initialize tree from dataset.")
-@click.option("--keep-unexplored", type=float, default=None)
+@click.option(
+    "--keep-unexplored",
+    type=float,
+    default=None,
+    help="Subsample unexplored data for clustering. \
+        Can speed up clustering. \
+        Number in range (0,1).",
+)
 def cluster(
     features_fns,
     result_fn,
