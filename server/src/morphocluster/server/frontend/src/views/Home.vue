@@ -1,24 +1,26 @@
 <template>
   <div id="home">
     <div class="container">
-      <h1>MorphoCluster</h1>
-      <b-button size="m" variant="primary" class="mr-2" :to="{
-        name: 'projects'
-      }">
+      <v-btn large color="primary" class="mr-2" :to="{ name: 'projects' }">
         Projects
-      </b-button>
-      <b-button size="l" variant="primary" class="mr-2" :to="{
-        name: 'files'
-      }">
+      </v-btn>
+      <v-btn large color="primary" class="mr-2" :to="{ name: 'files' }">
         Files
-      </b-button>
+      </v-btn>
     </div>
   </div>
 </template>
 
+
 <script>
+import mixins from "@/mixins.js";
+
 export default {
-  name: "ProjectsView",
+  name: "HomeView",
+  mixins: [mixins],
+  mounted() {
+    this.setBreadcrumbs([{ name: "home" }]);
+  },
 }
 </script>
 
