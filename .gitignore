@@ -20,10 +20,13 @@ dump.rdb
 .ipynb_checkpoints/
 morphocluster/config_dev.py
 environment.yml
-docker-compose.yml
+/docker-compose.yml
 docker/morphocluster/authorized_keys
 mprofile_*.dat
-morphocluster/frontend/dist
 *.code-workspace
 .venv/*
 data/
+server/src/morphocluster/server/frontend/dist
+lib/build/
+lib/dist/
+server/build/

@@ -15,13 +15,12 @@ services:
     restart: unless-stopped
     volumes:
       - morphocluster-data:/data
-      - ${PWD}/docker/morphocluster/authorized_keys:/authorized_keys:ro
     environment:
       # Store command history in the data volume
       - HISTSIZE=-1
       - HISTFILESIZE=-1
       - HISTFILE=/data/.bash_history
-      - FLASK_APP=morphocluster
+      - FLASK_APP=morphocluster.server
     # # TODO: Uncomment this block to use the host's GPU inside the container
     # deploy:
     #   resources:

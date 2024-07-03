@@ -1,8 +1,12 @@
 #!/usr/bin/env sh
 
-pip install -e .
+pip install -e lib/ -e server/
 
-npm install --quiet --prefix morphocluster/frontend
+# Install frontend libraries
+npm install --quiet --prefix /workspace/morphocluster/server/src/morphocluster/server/frontend
+
+# Build frontend
+npm run --prefix /workspace/morphocluster/server/src/morphocluster/server/frontend build
 
 flask db upgrade
 
