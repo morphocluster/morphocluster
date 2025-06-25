@@ -5,10 +5,10 @@ services:
     # build:
     #   context: .
     #   dockerfile: docker/morphocluster/Dockerfile
-    # image: morphocluster/morphocluster:0.2.1
-    # ports:
+    image: morphocluster/morphocluster:0.2.1
+    ports:
     #   # Expose port 8000 (web service)
-    #   - "8000:8000"
+      - "8000:8000"
     depends_on:
       - postgres
       - redis-lru
@@ -61,4 +61,6 @@ services:
 volumes:
   # We use named volumes so that the data is not lost if the image is rebuilt
   postgres-data:
+  # Add devices 
   morphocluster-data:
+  # Add devices
